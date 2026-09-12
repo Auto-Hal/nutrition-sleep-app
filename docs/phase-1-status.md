@@ -1,6 +1,6 @@
 # Phase 1 実装ステータス
 
-基準日: 2026-09-12 / 対象: `phase/1-foundation` / 状態: Preview migration適用前・実機受入待ち
+基準日: 2026-09-12 / 対象: `phase/1-foundation` / 状態: Preview migration適用済み・実機受入待ち
 
 ## 実装識別子
 
@@ -60,7 +60,7 @@
 | ID | 判定 | 根拠 |
 |---|---|---|
 | F01 未認証保護 | PARTIAL | route/APIの保護とE2E redirectは確認。Supabase実環境でのDB境界は未実行。 |
-| F02 メールOTP | PARTIAL | server-side OTP request/verifyを実装。実SMTP・実ユーザーの送受信は未実施。 |
+| F02 メールOTP | PARTIAL | server-side OTP request/verifyを実装し、Preview AuthでEmail provider Enabledを確認。実SMTP・実ユーザーの送受信は未実施。 |
 | F03 セッション | PARTIAL | encrypted cookie/session、refresh lease、logoutを実装。実Supabaseでの同時refresh/失効は未実施。 |
 | F04 RLS | PASS（Preview） | Preview実DBでRLS enabled+forced、owner policy、user A/B相互不可視、anon拒否を確認。CI pgTAP 17 assertionsもPASS。 |
 | F05 private schema | PASS（Preview） | Preview実DBで`private` schemaのauthenticated/anon usageと`app_sessions` selectがfalse、Data API向けgrantなしを確認。 |
@@ -83,7 +83,7 @@
 
 ## Phase 2開始前のSupervisor判断
 
-- 専用Supabase organizationでのPreview migration適用を許可するか（Productionは未適用のまま）。
+- 専用Supabase organizationでのPreview migration適用済み状態を確認するか（Productionは未適用のまま）。
 - Vercel projectのtarget不整合を解消し、安全なPreview URLを受入対象にするか。
 - Preview実機受入をPASSとする対象commitと証跡を承認するか。
 - CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
