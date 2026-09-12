@@ -1,6 +1,6 @@
 # Phase 1 実装ステータス
 
-基準日: 2026-09-12 / 対象: `phase/1-foundation` / 状態: Preview Supabase認証・実機受入待ち
+基準日: 2026-09-12 / 対象: `phase/1-foundation` / 状態: Preview migration適用前・実機受入待ち
 
 ## 実装識別子
 
@@ -15,8 +15,9 @@
 ## 外部環境
 
 - ENV-001更新: Supabase Proは使用せず、新しい専用SupabaseアカウントのFree枠2 projectを使う。
-- 専用Supabaseアカウント: 未作成／未認証。認証が必要になった時点で停止する。
-- 要求するproject: `nutrition-sleep-preview` と `nutrition-sleep-production`（ともに未作成）
+- 専用Supabase organization: `TsunoApp` (`vaupyfcztcoglwvqjict`)（Free）
+- Preview project: `nutrition-sleep-preview` / ref `pprsfxpfljdjlwdfbtqo`（既存の空projectを改名。migration/data未適用）
+- Production project: `nutrition-sleep-production` / ref `vyvnicyupcrsmtgdyypv`（新規作成。migration/data未適用）
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) のStudy Graph / money-canvas projectは変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / project ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`（Tsuno team）
@@ -58,28 +59,28 @@
 | F01 未認証保護 | PARTIAL | route/APIの保護とE2E redirectは確認。Supabase実環境でのDB境界は未実行。 |
 | F02 メールOTP | PARTIAL | server-side OTP request/verifyを実装。実SMTP・実ユーザーの送受信は未実施。 |
 | F03 セッション | PARTIAL | encrypted cookie/session、refresh lease、logoutを実装。実Supabaseでの同時refresh/失効は未実施。 |
-| F04 RLS | BLOCKED | migrationとpgTAPを実装。A/B/anon実DB試験はDB未作成。 |
-| F05 private schema | BLOCKED | private schema/grantを実装。実DBのpermission試験は未実施。 |
+| F04 RLS | BLOCKED | migrationとpgTAPはCIでPASS。Preview projectへの適用とA/B/anon実DB試験は未実施。 |
+| F05 private schema | BLOCKED | private schema/grantはmigrationに実装。Preview実DBのpermission試験は未実施。 |
 | F06 Profile/revision | PARTIAL | UI/API/RPC/triggerを実装。DB保存・409競合の実試験は未実施。 |
 | F07 fresh migration | PASS（CI） | GitHub Actionsでfresh `db reset` とpgTAPをPASS。専用Preview projectへの適用は未実施。 |
 | F08 IA / empty states | PASS | 4固定タブ、Settings/Library切替、未提供を0や同期済みにしない表示を実装し、build/E2E確認。 |
 | F09 iPhone | BLOCKED | 安全なPreview URL未取得のため実機未実施。 |
 | F10 iPad | BLOCKED | 安全なPreview URL未取得のため実機未実施。 |
 | F11 通信断 | PARTIAL | 保存失敗を成功表示しないUIは実装。offline queue/復帰照合はPhase 6対象。 |
-| F12 環境分離 | BLOCKED | Vercel projectは作成済みだがtargetがproductionとして返り、専用Supabase 2 projectは未作成。 |
+| F12 環境分離 | PARTIAL | 専用Free organizationにPreview/Production projectを用意。Preview migration適用とVercel安全なPreview URLが未完了。 |
 | F13 Production verification | BLOCKED | user approval前のmain merge/Production移行は禁止されており未実施。 |
 
 ## 未解決事項
 
 1. Vercelのproduction-target deploymentを実機確認に使わない形で整理し、安全なPreview deploymentを作成すること。
-2. 新しい専用Supabaseアカウントへログインし、Free枠でPreview / Productionの2 projectを作成すること。
+2. Supabase MCP/管理接続を専用organizationへ再認証し、Preview projectへsource migrationを適用すること。
 3. Preview / Production projectへOTP送信元とserver-only secretsを別々に登録すること。
 4. Previewでfresh replay、RLS pgTAP、実OTP、iPhone/iPadを実施すること。
 5. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
 
 ## Phase 2開始前のSupervisor判断
 
-- 新規Supabase projectを作成できる専用アカウントを承認し、Preview migration適用を許可するか。
+- 専用Supabase organizationでのPreview migration適用を許可するか（Productionは未適用のまま）。
 - Vercel projectのtarget不整合を解消し、安全なPreview URLを受入対象にするか。
 - Preview実機受入をPASSとする対象commitと証跡を承認するか。
 - CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
