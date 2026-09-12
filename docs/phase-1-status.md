@@ -1,16 +1,16 @@
 # Phase 1 実装ステータス
 
-基準日: 2026-09-12 / 対象: `phase/1-foundation` / 状態: 外部環境と実機受入待ち
+基準日: 2026-09-12 / 対象: `phase/1-foundation` / 状態: Preview Supabase認証・実機受入待ち
 
 ## 実装識別子
 
-- ローカルrepository: `nutrition-sleep-app`（GitHub remote未設定）
+- GitHub repository: [Auto-Hal/nutrition-sleep-app](https://github.com/Auto-Hal/nutrition-sleep-app)（private）
 - branch: `phase/1-foundation`
 - Next.js: `15.5.9`（Supervisor指定の安全基準を満たす既存固定版。`eslint-config-next`も`15.5.9`）
 - main bootstrap commit: `c473829 docs: add Phase 1 foundation plan`
 - 実装commit: `3f80909 feat: implement Phase 1 foundation`
-- status document作成時点の実装head: `45f80fcfa2d450af2a50a0a4a86d0e2e3e11a235 chore: ignore generated local Supabase metadata`
-- GitHub private repository: 未作成。GitHub connectorにはrepository作成操作がなく、ブラウザ作成画面はGitHubサインインを要求したため、認証を自動操作せず停止。
+- 現在の実装head: `38e8f8a071a15d232580a5442952bb88186a8398`（pgTAP制約検証の修正）
+- Draft PR: [#1](https://github.com/Auto-Hal/nutrition-sleep-app/pull/1)（`phase/1-foundation` → `main`、未merge）
 
 ## 外部環境
 
@@ -19,15 +19,16 @@
 - 要求するproject: `nutrition-sleep-preview` と `nutrition-sleep-production`（ともに未作成）
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) のStudy Graph / money-canvas projectは変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
-- Vercel project / Preview URL: 未作成。既存projectは変更していない。新規deployは対象teamの所有権確認が必要なため、既存projectを流用していない。
+- Vercel project: `nutrition-sleep-app` / project ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`（Tsuno team）
+- Vercel deployment: `dpl_7G4yrqpbSDzWbnDfrzMdjk5iQYjm` はREADYだが、要求したPreviewではなく `target=production` と返されたため、実機確認には使用していない。Production利用・移行はSupervisor承認まで行わない。Preview URLは未取得。
 
 ## Migration / DB
 
 - migration: `supabase/migrations/20260912000000_phase1_foundation.sql`
-- DB test: `supabase/tests/phase1_rls.sql`（pgTAP 16 assertions）
+- DB test: `supabase/tests/phase1_rls.sql`（pgTAP 17 assertions）
 - schema: `public.user_profiles`、server-only `private.app_sessions`のみ。Fitbit / Google Health固有のschemaは作成していない。
-- fresh replay: 未実行。ローカルDocker/Supabase DBが利用できず、`supabase db lint --local` は `127.0.0.1:54322` 接続拒否で終了した。CIには `supabase start` → `db reset` → `test db` → `supabase stop` を設定済み。
-- RLS/policy/permission: migrationとpgTAP契約を実装済み。実DBでの実行結果は上記のDB未起動により未取得。未実行をPASSとは扱わない。
+- fresh replay: GitHub Actions CI run `34687753331` で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` を実行しPASS。
+- RLS/policy/permission: 同runのpgTAP 17 assertionsがPASS。専用Preview Supabaseでのuser A / user B / anon実DB試験はproject作成待ち。
 
 ## 自動検証
 
@@ -41,12 +42,13 @@
 | `pnpm test:e2e` | PASS（Chromium + WebKit mobile、4 tests） |
 | `pnpm verify:env`（安全なダミー値） | PASS |
 | `git diff --check` | PASS |
-| remote GitHub CI | 未実行（repository未作成） |
+| GitHub Actions CI run `34687753331` | PASS（checks + database） |
+| GitHub Actions Preview run `34687753238` | BLOCKED（`VERCEL_TOKEN`等のGitHub Environment secret未設定） |
 
 ## 実機
 
-- iPhone Safari / ホーム画面PWA: 未実施（Preview URL未作成）。
-- iPad Safari / 縦横・キーボード: 未実施（Preview URL未作成）。
+- iPhone Safari / ホーム画面PWA: 未実施（安全なPreview URL未取得）。
+- iPad Safari / 縦横・キーボード: 未実施（安全なPreview URL未取得）。
 - PlaywrightのChromium/WebKit mobile検証は通過したが、実機合格の代替にはしていない。
 
 ## Phase 1受入条件
@@ -59,27 +61,26 @@
 | F04 RLS | BLOCKED | migrationとpgTAPを実装。A/B/anon実DB試験はDB未作成。 |
 | F05 private schema | BLOCKED | private schema/grantを実装。実DBのpermission試験は未実施。 |
 | F06 Profile/revision | PARTIAL | UI/API/RPC/triggerを実装。DB保存・409競合の実試験は未実施。 |
-| F07 fresh migration | BLOCKED | migrationはfresh replay可能な構成。local DBが起動できずreplay結果未取得。 |
+| F07 fresh migration | PASS（CI） | GitHub Actionsでfresh `db reset` とpgTAPをPASS。専用Preview projectへの適用は未実施。 |
 | F08 IA / empty states | PASS | 4固定タブ、Settings/Library切替、未提供を0や同期済みにしない表示を実装し、build/E2E確認。 |
-| F09 iPhone | BLOCKED | Preview未作成のため実機未実施。 |
-| F10 iPad | BLOCKED | Preview未作成のため実機未実施。 |
+| F09 iPhone | BLOCKED | 安全なPreview URL未取得のため実機未実施。 |
+| F10 iPad | BLOCKED | 安全なPreview URL未取得のため実機未実施。 |
 | F11 通信断 | PARTIAL | 保存失敗を成功表示しないUIは実装。offline queue/復帰照合はPhase 6対象。 |
-| F12 環境分離 | BLOCKED | 設定境界と検査を実装。分離Supabase/Vercel未作成。 |
+| F12 環境分離 | BLOCKED | Vercel projectは作成済みだがtargetがproductionとして返り、専用Supabase 2 projectは未作成。 |
 | F13 Production verification | BLOCKED | user approval前のmain merge/Production移行は禁止されており未実施。 |
 
 ## 未解決事項
 
-1. GitHubでprivate repositoryを作成し、feature branchをpushしてPR/CIを有効化すること。
+1. Vercelのproduction-target deploymentを実機確認に使わない形で整理し、安全なPreview deploymentを作成すること。
 2. 新しい専用Supabaseアカウントへログインし、Free枠でPreview / Productionの2 projectを作成すること。
 3. Preview / Production projectへOTP送信元とserver-only secretsを別々に登録すること。
-4. Vercelに新規projectを作成し、Preview environmentへ接続すること。
-5. Previewでfresh replay、RLS pgTAP、実OTP、iPhone/iPadを実施すること。
-6. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
+4. Previewでfresh replay、RLS pgTAP、実OTP、iPhone/iPadを実施すること。
+5. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
 
 ## Phase 2開始前のSupervisor判断
 
-- 新規Supabase projectを作成できる契約／organizationを承認するか。
-- GitHub / Vercelの所有者、repository名、project名、Environment reviewerを確定するか。
+- 新規Supabase projectを作成できる専用アカウントを承認し、Preview migration適用を許可するか。
+- Vercel projectのtarget不整合を解消し、安全なPreview URLを受入対象にするか。
 - Preview実機受入をPASSとする対象commitと証跡を承認するか。
 - CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
 
