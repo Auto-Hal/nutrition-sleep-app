@@ -3,8 +3,8 @@ select plan(16);
 
 select has_table('public', 'user_profiles', 'user_profiles exists');
 select has_table('private', 'app_sessions', 'app_sessions is server-only');
-select rls_enabled('public.user_profiles', 'RLS enabled on user_profiles');
-select rls_enabled('private.app_sessions', 'RLS enabled on app_sessions');
+select ok((select relrowsecurity from pg_class where oid = 'public.user_profiles'::regclass), 'RLS enabled on user_profiles');
+select ok((select relrowsecurity from pg_class where oid = 'private.app_sessions'::regclass), 'RLS enabled on app_sessions');
 select has_index('public', 'user_profiles', 'user_profiles_pkey', 'profile owner index exists');
 select has_index('public', 'user_profiles', 'user_profiles_updated_at_idx', 'profile update index exists');
 select has_index('private', 'app_sessions', 'app_sessions_pkey', 'session hash index exists');
