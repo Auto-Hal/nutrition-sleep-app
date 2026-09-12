@@ -1,5 +1,5 @@
 begin;
-select plan(17);
+select plan(21);
 
 select has_table('public', 'user_profiles', 'user_profiles exists');
 select has_table('private', 'app_sessions', 'app_sessions is server-only');
@@ -28,10 +28,15 @@ select ok((select exists (
     and conname = 'user_profiles_weight_updated_on_check'
 )), 'weight date pair check exists');
 select has_column('public', 'user_profiles', 'revision', 'profile revision exists');
+select has_column('public', 'user_profiles', 'time_zone', 'profile timezone exists');
 select has_column('private', 'app_sessions', 'refresh_lease_until', 'refresh lease exists');
 select has_column('private', 'app_sessions', 'key_version', 'encryption key version exists');
 select table_privs_are('public', 'user_profiles', 'anon', array[]::text[], 'anon has no profile privileges');
 select table_privs_are('private', 'app_sessions', 'authenticated', array[]::text[], 'authenticated cannot access private sessions');
+
+select ok((select position('pg_timezone_names' in pg_get_functiondef('public.validate_user_profile()'::regprocedure)) > 0), 'update validation checks timezone catalog');
+select ok((select position('at time zone new.time_zone' in pg_get_functiondef('public.validate_user_profile()'::regprocedure)) > 0), 'update date validation uses profile timezone');
+select throws_ok($$insert into public.user_profiles (user_id, time_zone) values ('00000000-0000-0000-0000-000000000000', 'Invalid/Timezone')$$, '22023', 'time zone must be a valid IANA time zone', 'invalid profile timezone is rejected');
 
 select * from finish();
 rollback;

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const migration = readFileSync(resolve(process.cwd(), "supabase/migrations/20260912000000_phase1_foundation.sql"), "utf8");
+const correctiveMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/20260912155034_phase1_profile_timezone.sql"), "utf8");
 
 describe("Phase 1 database contract", () => {
   it("keeps session storage outside the exposed API schema", () => {
@@ -19,5 +20,12 @@ describe("Phase 1 database contract", () => {
 
   it("does not create a health provider table in Phase 1", () => {
     expect(migration).not.toMatch(/create table public\.(fitbit|google|sleep|health)/i);
+  });
+
+  it("keeps timezone-aware profile validation in a corrective migration", () => {
+    expect(migration).not.toContain("at time zone new.time_zone");
+    expect(correctiveMigration).toContain("pg_timezone_names");
+    expect(correctiveMigration).toContain("at time zone new.time_zone");
+    expect(correctiveMigration).toContain("time zone must be a valid IANA time zone");
   });
 });

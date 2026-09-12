@@ -4,6 +4,7 @@ import { createAuthClient, createUserClient } from "@/lib/supabase/user";
 import { query } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { decryptSecret, encryptSecret, hashSessionId } from "@/lib/security/crypto";
+import { resolveRefreshRace, type RefreshLeaseSnapshot } from "@/lib/auth/refresh";
 
 export const SESSION_COOKIE = "astra_session";
 const SESSION_IDLE_DAYS = 7;
@@ -19,6 +20,7 @@ type StoredSession = {
   expires_at: string;
   revoked_at: string | null;
   revision: number;
+  refresh_lease_until: string | null;
 };
 
 export type AppSession = {
@@ -49,7 +51,7 @@ export async function persistAuthSession(userId: string, email: string | null, a
 }
 
 async function loadStoredSession(sessionId: string) {
-  const result = await query<StoredSession>("select session_hash, user_id, access_token_ciphertext, refresh_token_ciphertext, token_expires_at, expires_at, revoked_at, revision from private.app_sessions where session_hash = $1 and revoked_at is null and expires_at > now()", [hashSessionId(sessionId)]);
+  const result = await query<StoredSession>("select session_hash, user_id, access_token_ciphertext, refresh_token_ciphertext, token_expires_at, expires_at, revoked_at, revision, refresh_lease_until from private.app_sessions where session_hash = $1 and revoked_at is null and expires_at > now()", [hashSessionId(sessionId)]);
   return result.rows[0] ?? null;
 }
 
@@ -67,6 +69,15 @@ async function persistRefresh(stored: StoredSession, accessToken: string, refres
   return result.rows[0]?.revision ?? stored.revision;
 }
 
+function toRefreshSnapshot(stored: StoredSession): RefreshLeaseSnapshot<StoredSession> {
+  return {
+    value: stored,
+    revision: stored.revision,
+    tokenExpiresAt: new Date(stored.token_expires_at).getTime(),
+    refreshLeaseUntil: stored.refresh_lease_until ? new Date(stored.refresh_lease_until).getTime() : null,
+  };
+}
+
 export async function getAppSession(): Promise<AppSession | null> {
   const env = serverEnv();
   if (!env) return null;
@@ -75,37 +86,36 @@ export async function getAppSession(): Promise<AppSession | null> {
   if (!sessionId) return null;
   let stored = await loadStoredSession(sessionId);
   if (!stored) return null;
-  let accessToken = decryptSecret(stored.access_token_ciphertext, env.encryptionKey);
-  let refreshToken = decryptSecret(stored.refresh_token_ciphertext, env.encryptionKey);
-  let tokenExpiresAt = new Date(stored.token_expires_at).getTime();
-  if (tokenExpiresAt - Date.now() < REFRESH_WINDOW_MS) {
-    if (await claimRefresh(stored)) {
-      const refreshed = await createAuthClient().auth.refreshSession({ refresh_token: refreshToken });
-      if (refreshed.data.session) {
-        accessToken = refreshed.data.session.access_token;
-        refreshToken = refreshed.data.session.refresh_token;
-        tokenExpiresAt = Date.now() + refreshed.data.session.expires_in * 1000;
-        const nextRevision = await persistRefresh(stored, accessToken, refreshToken, refreshed.data.session.expires_in, env.encryptionKey);
-        if (nextRevision === stored.revision) {
-          stored = await loadStoredSession(sessionId);
-          if (!stored) return null;
-          accessToken = decryptSecret(stored.access_token_ciphertext, env.encryptionKey);
-          refreshToken = decryptSecret(stored.refresh_token_ciphertext, env.encryptionKey);
-          tokenExpiresAt = new Date(stored.token_expires_at).getTime();
-        } else {
-          stored = { ...stored, revision: nextRevision };
+  const initialSnapshot = toRefreshSnapshot(stored);
+  if (initialSnapshot.tokenExpiresAt - Date.now() < REFRESH_WINDOW_MS) {
+    const resolved = await resolveRefreshRace(initialSnapshot, {
+      refreshWindowMs: REFRESH_WINDOW_MS,
+      load: async () => {
+        const latest = await loadStoredSession(sessionId);
+        return latest ? toRefreshSnapshot(latest) : null;
+      },
+      claim: (snapshot) => claimRefresh(snapshot.value),
+      refreshAndPersist: async (snapshot) => {
+        const current = snapshot.value;
+        const refreshToken = decryptSecret(current.refresh_token_ciphertext, env.encryptionKey);
+        let persisted = false;
+        try {
+          const refreshed = await createAuthClient().auth.refreshSession({ refresh_token: refreshToken });
+          if (!refreshed.data.session) return null;
+          await persistRefresh(current, refreshed.data.session.access_token, refreshed.data.session.refresh_token, refreshed.data.session.expires_in, env.encryptionKey);
+          persisted = true;
+          const latest = await loadStoredSession(sessionId);
+          return latest ? toRefreshSnapshot(latest) : null;
+        } finally {
+          if (!persisted) await releaseRefresh(current);
         }
-      } else {
-        await releaseRefresh(stored);
-      }
-    } else {
-      stored = await loadStoredSession(sessionId);
-      if (!stored) return null;
-      accessToken = decryptSecret(stored.access_token_ciphertext, env.encryptionKey);
-      refreshToken = decryptSecret(stored.refresh_token_ciphertext, env.encryptionKey);
-      tokenExpiresAt = new Date(stored.token_expires_at).getTime();
-    }
+      },
+    });
+    if (!resolved) return null;
+    stored = resolved.value;
   }
+  const accessToken = decryptSecret(stored.access_token_ciphertext, env.encryptionKey);
+  const tokenExpiresAt = new Date(stored.token_expires_at).getTime();
   const { data } = await createUserClient(accessToken).auth.getUser();
   if (!data.user || data.user.id !== stored.user_id || tokenExpiresAt <= Date.now()) return null;
   await query("update private.app_sessions set last_seen_at = now() where session_hash = $1 and revoked_at is null", [stored.session_hash]);
