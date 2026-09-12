@@ -33,6 +33,8 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PREVIEW_SUPABASE_PUBLISHABLE_KEY }}
           DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
           APP_SESSION_ENCRYPTION_KEY: ${{ secrets.PREVIEW_APP_SESSION_ENCRYPTION_KEY }}
+      - name: Link the dedicated Vercel project
+        run: pnpm dlx vercel@48.2.0 link --yes --project=nutrition-sleep-app --scope=tsuno2 --token=${{ secrets.VERCEL_TOKEN }}
       - run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      - run: pnpm dlx vercel@48.2.0 build --token=${{ secrets.VERCEL_TOKEN }}
-      - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+      - run: pnpm dlx vercel@48.2.0 build --target=preview --yes --token=${{ secrets.VERCEL_TOKEN }}
+      - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --target=preview --token=${{ secrets.VERCEL_TOKEN }}
