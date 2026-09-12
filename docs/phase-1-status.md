@@ -8,7 +8,7 @@
 - branch: `phase/1-foundation`
 - main bootstrap commit: `c473829 docs: add Phase 1 foundation plan`
 - 実装commit: `3f80909 feat: implement Phase 1 foundation`
-- 最新commit: `45f80fcfa2d450af2a50a0a4a86d0e2e3e11a235 chore: ignore generated local Supabase metadata`
+- status document作成時点の実装head: `45f80fcfa2d450af2a50a0a4a86d0e2e3e11a235 chore: ignore generated local Supabase metadata`
 - GitHub private repository: 未作成。GitHub connectorにはrepository作成操作がなく、ブラウザ作成画面はGitHubサインインを要求したため、認証を自動操作せず停止。
 
 ## 外部環境
