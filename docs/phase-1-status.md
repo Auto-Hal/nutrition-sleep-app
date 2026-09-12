@@ -9,7 +9,7 @@
 - Next.js: `15.5.9`（Supervisor指定の安全基準を満たす既存固定版。`eslint-config-next`も`15.5.9`）
 - main bootstrap commit: `c473829 docs: add Phase 1 foundation plan`
 - 実装commit: `3f80909 feat: implement Phase 1 foundation`
-- 現在の実装head: `b351ded0a92d6cc261b4648ce3b5ef9b6524f2cc`（専用Preview実DB検証記録）
+- 現在の実装head: `3e7d9f502779ffcdbb1336f813cfb0409aa2eec4`（Preview適用・Auth設定確認記録）
 - Draft PR: [#1](https://github.com/Auto-Hal/nutrition-sleep-app/pull/1)（`phase/1-foundation` → `main`、未merge）
 
 ## 外部環境
@@ -46,8 +46,8 @@
 | `pnpm test:e2e` | PASS（Chromium + WebKit mobile、4 tests） |
 | `pnpm verify:env`（安全なダミー値） | PASS |
 | `git diff --check` | PASS |
-| GitHub Actions CI run `34695383714` | PASS（checks + database） |
-| GitHub Actions Preview run `34695383711` | BLOCKED（`VERCEL_TOKEN`等のGitHub Environment secret未設定） |
+| GitHub Actions CI run `34695649497` | PASS（checks + database） |
+| GitHub Actions Preview run `34695649492` | BLOCKED（`VERCEL_TOKEN`等のGitHub Environment secret未設定） |
 
 ## 実機
 
