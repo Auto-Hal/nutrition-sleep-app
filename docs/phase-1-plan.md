@@ -30,23 +30,23 @@ Googleの移行資料には、OAuth・エンドポイント・応答形式の変
 
 詳細なRequired Changeは[CR-001](./cr-001-fitbit-api.md)に記録する。Phase 1のAuth・RLS・4タブ骨格は独立して進め、health provider固有のOAuth schema・token形式・接続テーブルは作成しない。CR-001はPhase 1とは別トラックでAstraが審議する。Phase 1はこの調査を待たず、承認範囲の受入条件が揃えば完了できる。ただしPhase 1完了をhealth provider連携の実現・同等性の証明とは扱わない。
 
-## 3. 新規環境の案
+## 3. ENV-001: Dedicated Supabase Account / Two Free Projects
 
-名前は仮称であり、空き・所有者・契約枠は未確認。Study Graphのrepo、Supabase、Vercel、環境変数、OAuth登録、データ、接続設定を再利用・変更しない。
+Supervisor判断（2026-09-12）により、Supabase Pro契約と既存organizationのprojectは使用しない。新しいSupabaseアカウントを本アプリ専用にし、Free枠の2 projectをPreview / Productionへ割り当てる。Study Graphとmoney-canvasのrepo、Supabase、Vercel、環境変数、OAuth登録、データ、接続設定は再利用・変更しない。
 
 | リソース | 提案 | 分離方法 |
 |---|---|---|
 | GitHub | private repo `nutrition-sleep-app` | mainを実装正本。PR・必須CI・force push禁止 |
 | Supabase local | このrepo専用CLI/Docker構成 | 合成データのみ。CIも毎回独立DB |
-| Supabase Preview | 新規 `nutrition-sleep-preview` | 検証用アカウント・合成プロフィールのみ |
-| Supabase Production | 新規 `nutrition-sleep-prod` | Previewと別project ref・Auth・資格情報 |
+| Supabase Preview | 新しい専用アカウントの `nutrition-sleep-preview` | 検証用アカウント・合成プロフィールのみ |
+| Supabase Production | 新しい専用アカウントの `nutrition-sleep-production` | Previewと別project ref・DB・Auth・Storage・secret |
 | Vercel | 新規 `nutrition-sleep-app` | Preview/Productionごとに接続先を固定 |
 | リージョン | Supabase東京、Vercel実行地域も近接を第一候補 | 作成時に提供状況を確認 |
 | メール | アプリ専用のSMTP資格情報・送信元 | Study GraphのSMTP設定を流用しない |
 
-Previewは当面1つの共有検証DBとし、DBを変更する受入候補は同時に1本だけにする。CIの環境ロックでmigrationから実機受入まで競合を防ぐ。候補変更時は実機証跡を失効させる。並列のschema検証が必要になったら、別Preview DBまたはbranchingを改めて設計する。
+PreviewとProductionは完全に別projectとし、DB・Auth・Storage・secretを共有しない。migrationは同じsourceから両環境へ適用できる形にする。Production固有の手作業schema変更は行わず、Previewで検証済みのmigrationだけをSupervisor承認後にProductionへ適用する。PreviewのDBを変更する受入候補は同時に1本だけにし、CIの環境ロックでmigrationから実機受入まで競合を防ぐ。候補変更時は実機証跡を失効させる。
 
-作成前にGitHub owner、Supabase organization、Vercel team、利用枠・費用、メール送信元を実アカウントで確認する。契約追加やドメイン購入をこの計画の承認だけで実施しない。環境IDの対応表を作り、migration/deployの対象照合に使う。secretの値は文書化しない。
+作成前にGitHub owner、専用Supabaseアカウント、Vercel team、利用枠、メール送信元を実アカウントで確認する。Supabase新アカウントのログイン・OAuthが必要になったらユーザー操作で停止し、認証後に2 projectを作成する。環境IDの対応表を作り、migration/deployの対象照合に使う。Supabaseアカウント資格情報はGitHub、Vercel、source codeへ保存しない。secretの値は文書化しない。
 
 Node.jsは22以上のサポート対象を使用し、作成時にNext.js/Vercelとの互換性を確認して正確なバージョンを固定する。TypeScript、Supabase SDK/CLI、Vercel CLIも固定しlockfileをcommitする。Node.js 20向けの古いCI雛形をそのまま使わない。[SupabaseのNode.js 20サポート終了案内](https://supabase.com/changelog/45715-deprecation-notice-dropping-support-for-node-js-20)
 

@@ -2,6 +2,8 @@
 
 This repository contains the approved Phase 1 foundation for the Astra nutrition and sleep management app. The current scope is authentication, profile storage, four-tab navigation, Supabase migrations/RLS, and the CI/Preview handoff. Meal logging, catalog/OCR, nutrition analytics, Fitbit/Google Health integration, offline sync, and export remain in later phases.
 
+ENV-001 uses a new app-dedicated Supabase account with two Free projects: `nutrition-sleep-preview` and `nutrition-sleep-production`. The existing `Auto-Hal's Org` projects `study-graph` and `money-canvas` are out of scope and must not be changed, paused, or reused.
+
 ## Local setup
 
 1. Use Node.js 24.19.0 and pnpm 10.15.0.

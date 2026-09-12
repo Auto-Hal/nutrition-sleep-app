@@ -6,6 +6,7 @@
 
 - ローカルrepository: `nutrition-sleep-app`（GitHub remote未設定）
 - branch: `phase/1-foundation`
+- Next.js: `15.5.9`（Supervisor指定の安全基準を満たす既存固定版。`eslint-config-next`も`15.5.9`）
 - main bootstrap commit: `c473829 docs: add Phase 1 foundation plan`
 - 実装commit: `3f80909 feat: implement Phase 1 foundation`
 - status document作成時点の実装head: `45f80fcfa2d450af2a50a0a4a86d0e2e3e11a235 chore: ignore generated local Supabase metadata`
@@ -13,12 +14,12 @@
 
 ## 外部環境
 
-- Supabase organization: `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`)
-- 要求したproject: `nutrition-sleep-preview`（未作成）
-- 作成結果: organizationのFree枠に既存active projectが2つあり、新規project作成が拒否された。既存のStudy Graph / money-canvas projectは変更していない。
-- Production Supabase project: 未作成。Previewと同一projectの流用もしていない。
+- ENV-001更新: Supabase Proは使用せず、新しい専用SupabaseアカウントのFree枠2 projectを使う。
+- 専用Supabaseアカウント: 未作成／未認証。認証が必要になった時点で停止する。
+- 要求するproject: `nutrition-sleep-preview` と `nutrition-sleep-production`（ともに未作成）
+- 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) のStudy Graph / money-canvas projectは変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
-- Vercel project / Preview URL: 未作成。既存projectは変更していない。新規deployは明示的なproject/destinationが確定していない状態での実行を自動レビューに拒否されたため、既存projectを流用していない。
+- Vercel project / Preview URL: 未作成。既存projectは変更していない。新規deployは対象teamの所有権確認が必要なため、既存projectを流用していない。
 
 ## Migration / DB
 
@@ -69,8 +70,8 @@
 ## 未解決事項
 
 1. GitHubでprivate repositoryを作成し、feature branchをpushしてPR/CIを有効化すること。
-2. Supabase organizationのproject上限を解消すること（契約変更、別organization、または明示承認された既存projectの整理）。Study Graph環境を変更・流用しない。
-3. Preview / Production Supabase projectを別々に作成し、OTP送信元とserver-only secretsを登録すること。
+2. 新しい専用Supabaseアカウントへログインし、Free枠でPreview / Productionの2 projectを作成すること。
+3. Preview / Production projectへOTP送信元とserver-only secretsを別々に登録すること。
 4. Vercelに新規projectを作成し、Preview environmentへ接続すること。
 5. Previewでfresh replay、RLS pgTAP、実OTP、iPhone/iPadを実施すること。
 6. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
