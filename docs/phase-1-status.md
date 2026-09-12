@@ -9,7 +9,7 @@
 - Next.js: `15.5.9`（Supervisor指定の安全基準を満たす既存固定版。`eslint-config-next`も`15.5.9`）
 - main bootstrap commit: `c473829 docs: add Phase 1 foundation plan`
 - 実装commit: `3f80909 feat: implement Phase 1 foundation`
-- 現在の実装head: `e128376683cf7ff5bc39b553f4560b9495ea6f28`（Vercel対応Node engine更新後のPreview適用）
+- 現在の実装head: `6dc2e6db986cc3603763753fcbf26be75b0b4a80`（Preview実績更新）
 - Draft PR: [#1](https://github.com/Auto-Hal/nutrition-sleep-app/pull/1)（`phase/1-foundation` → `main`、未merge）
 
 ## 外部環境
@@ -23,7 +23,7 @@
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / project ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`（Tsuno team）
 - Vercel project Git接続: `github.com/Auto-Hal/nutrition-sleep-app` のみ接続（既存Study Graph / money-canvasは接続していない）。
-- Vercel Preview deployment: GitHub Actions job `103570987882` がPASS。Preview URLは `https://nutrition-sleep-r2lixfqsf-tsuno2.vercel.app`。Production利用・移行はSupervisor承認まで行わない。
+- Vercel Preview deployment: GitHub Actions run `34700573577` / job `103571483233` がPASS。Preview URLは `https://nutrition-sleep-p1ok2rpf1-tsuno2.vercel.app`。Production利用・移行はSupervisor承認まで行わない。
 - Vercel Preview環境変数: `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY` をPreview専用に登録済み。値はGitHub/sourceへ保存していない。
 
 ## Migration / DB
@@ -49,7 +49,7 @@
 | `pnpm verify:env`（安全なダミー値） | PASS |
 | `git diff --check` | PASS |
 | GitHub Actions CI run `34697975491` | PASS（checks + database） |
-| GitHub Actions Preview run `34697975508` | PASS（Vercel deploy job `103570987882`） |
+| GitHub Actions Preview run `34700573577` | PASS（Vercel deploy job `103571483233`） |
 
 ## 実機
 
@@ -85,7 +85,7 @@
 ## Phase 2開始前のSupervisor判断
 
 - 専用Supabase organizationでのPreview migration適用済み状態を確認するか（Productionは未適用のまま）。
-- Vercel Preview deployment `nutrition-sleep-r2lixfqsf-tsuno2.vercel.app` を受入対象にするか。
+- Vercel Preview deployment `nutrition-sleep-p1ok2rpf1-tsuno2.vercel.app` を受入対象にするか。
 - Preview実機受入をPASSとする対象commitと証跡を承認するか。
 - CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
 
