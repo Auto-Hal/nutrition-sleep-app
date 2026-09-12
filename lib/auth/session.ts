@@ -66,7 +66,7 @@ async function releaseRefresh(stored: StoredSession) {
 
 async function persistRefresh(stored: StoredSession, accessToken: string, refreshToken: string, expiresIn: number, secret: string) {
   const result = await query<{ revision: number }>("update private.app_sessions set access_token_ciphertext = $1, refresh_token_ciphertext = $2, token_expires_at = $3, last_seen_at = now(), refresh_lease_until = null, revision = revision + 1 where session_hash = $4 and revision = $5 and revoked_at is null and refresh_lease_until is not null returning revision", [encryptSecret(accessToken, secret), encryptSecret(refreshToken, secret), new Date(Date.now() + expiresIn * 1000).toISOString(), stored.session_hash, stored.revision]);
-  return result.rows[0]?.revision ?? stored.revision;
+  return result.rows[0]?.revision ?? null;
 }
 
 function toRefreshSnapshot(stored: StoredSession): RefreshLeaseSnapshot<StoredSession> {
@@ -102,7 +102,11 @@ export async function getAppSession(): Promise<AppSession | null> {
         try {
           const refreshed = await createAuthClient().auth.refreshSession({ refresh_token: refreshToken });
           if (!refreshed.data.session) return null;
-          await persistRefresh(current, refreshed.data.session.access_token, refreshed.data.session.refresh_token, refreshed.data.session.expires_in, env.encryptionKey);
+          const persistedRevision = await persistRefresh(current, refreshed.data.session.access_token, refreshed.data.session.refresh_token, refreshed.data.session.expires_in, env.encryptionKey);
+          if (persistedRevision === null) {
+            const latest = await loadStoredSession(sessionId);
+            return latest ? toRefreshSnapshot(latest) : null;
+          }
           persisted = true;
           const latest = await loadStoredSession(sessionId);
           return latest ? toRefreshSnapshot(latest) : null;
