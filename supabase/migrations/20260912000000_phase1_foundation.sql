@@ -6,7 +6,7 @@ create table public.user_profiles (
   birth_date date,
   sex text check (sex is null or sex in ('male', 'female')),
   height_cm numeric(5, 2) check (height_cm is null or height_cm > 0),
-  weight_kg numeric(6, 2) check (weight_kg is null or weight_kg > 0),
+  weight_kg numeric(6, 2) constraint user_profiles_weight_kg_check check (weight_kg is null or weight_kg > 0),
   weight_updated_on date,
   activity_level text check (activity_level is null or activity_level in ('low', 'moderate', 'high')),
   nutrition_goal_note text check (nutrition_goal_note is null or char_length(nutrition_goal_note) <= 500),
@@ -14,7 +14,7 @@ create table public.user_profiles (
   revision integer not null default 1 check (revision > 0),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
-  check ((weight_kg is null) = (weight_updated_on is null))
+  constraint user_profiles_weight_updated_on_check check ((weight_kg is null) = (weight_updated_on is null))
 );
 
 create index user_profiles_updated_at_idx on public.user_profiles (updated_at desc);

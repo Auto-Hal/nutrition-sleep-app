@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(17);
 
 select has_table('public', 'user_profiles', 'user_profiles exists');
 select has_table('private', 'app_sessions', 'app_sessions is server-only');
@@ -17,8 +17,16 @@ select policies_are('public', 'user_profiles', array[
 ], 'profile policies are limited to own rows');
 select function_privs_are('public', 'upsert_user_profile', array['integer','date','text','numeric','numeric','date','text','text','text'], 'authenticated', array['EXECUTE'], 'profile RPC is executable by authenticated');
 
-select has_check('public', 'user_profiles', 'user_profiles_weight_kg_check', 'weight must be positive');
-select has_check('public', 'user_profiles', 'user_profiles_weight_updated_on_check', 'weight date pair check exists');
+select ok((select exists (
+  select 1 from pg_constraint
+  where conrelid = 'public.user_profiles'::regclass
+    and conname = 'user_profiles_weight_kg_check'
+)), 'weight must be positive');
+select ok((select exists (
+  select 1 from pg_constraint
+  where conrelid = 'public.user_profiles'::regclass
+    and conname = 'user_profiles_weight_updated_on_check'
+)), 'weight date pair check exists');
 select has_column('public', 'user_profiles', 'revision', 'profile revision exists');
 select has_column('private', 'app_sessions', 'refresh_lease_until', 'refresh lease exists');
 select has_column('private', 'app_sessions', 'key_version', 'encryption key version exists');
