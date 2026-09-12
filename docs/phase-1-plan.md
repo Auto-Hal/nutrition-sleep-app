@@ -1,6 +1,6 @@
 # 栄養・睡眠管理アプリ — Phase 1 Foundation 設計・実装計画
 
-作成日: 2026-09-12 / 状態: PROPOSED・実装未着手
+作成日: 2026-09-12 / 状態: IMPLEMENTED・外部環境／実機受入待ち
 
 基準はユーザー提示の「Astra Handoff / MVP Requirements v1.1」。Phase 0 APPROVEDを維持する。本書はPhase 1開始前の設計案であり、要件正本の改訂でもPhase 1承認記録でもない。DOCXファイル自体はこのワークスペースに提供されていないため、DOCXとの実ファイル照合は未実施。
 
@@ -203,7 +203,7 @@ PWAはmanifestとHTTPS、ホーム画面からの起動を検証する。Phase 1
 
 ## 12. Luna MAXへのhandoff
 
-**状態:** 本計画承認後に有効。現時点で実装依頼や外部環境作成は実行していない。
+**状態:** Phase 1の承認済み範囲を実装済み。ローカル検証は完了し、GitHub private repository、分離Supabase、Vercel Preview、実機確認は外部環境の準備後に実施する。main mergeとProduction移行は未実施。
 
 - **決定事項:** 承認された版の本書を参照。Next.js/TS + 独立Supabase + Vercel。メールOTP、BFFセッション、利用者JWTによるRLS、4タブ、Settings参照プロフィール、CIから本番までのゲート。
 - **不変条件:** Study Graph無変更、Unknown≠0、他人のデータ拒否、secret/token非露出、未保存を保存済みとしない。食事Snapshot等の後続契約を保持。

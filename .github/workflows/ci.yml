@@ -15,7 +15,8 @@ jobs:
       SUPABASE_URL: https://local.invalid
       SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      APP_SESSION_ENCRYPTION_KEY: ci-only-placeholder
+      APP_SESSION_ENCRYPTION_KEY: ci-only-placeholder-32-byte-value
+      APP_ORIGIN: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -29,6 +30,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm verify:env
       - run: pnpm build
 
   database:
