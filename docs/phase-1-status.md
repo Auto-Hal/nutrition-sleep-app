@@ -9,7 +9,7 @@
 - Next.js: `15.5.9`（Supervisor指定の安全基準を満たす既存固定版。`eslint-config-next`も`15.5.9`）
 - main bootstrap commit: `c473829 docs: add Phase 1 foundation plan`
 - 実装commit: `3f80909 feat: implement Phase 1 foundation`
-- 現在の実装head: `5dd8fa12e98c23239b14d23316b6fcf1bb576ce0`（Preview適用・Auth設定確認記録）
+- 現在の実装head: `e128376683cf7ff5bc39b553f4560b9495ea6f28`（Vercel対応Node engine更新後のPreview適用）
 - Draft PR: [#1](https://github.com/Auto-Hal/nutrition-sleep-app/pull/1)（`phase/1-foundation` → `main`、未merge）
 
 ## 外部環境
@@ -22,14 +22,16 @@
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) のStudy Graph / money-canvas projectは変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / project ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`（Tsuno team）
-- Vercel deployment: `dpl_7G4yrqpbSDzWbnDfrzMdjk5iQYjm` はREADYだが、要求したPreviewではなく `target=production` と返されたため、実機確認には使用していない。Production利用・移行はSupervisor承認まで行わない。Preview URLは未取得。
+- Vercel project Git接続: `github.com/Auto-Hal/nutrition-sleep-app` のみ接続（既存Study Graph / money-canvasは接続していない）。
+- Vercel Preview deployment: GitHub Actions job `103570987882` がPASS。Preview URLは `https://nutrition-sleep-r2lixfqsf-tsuno2.vercel.app`。Production利用・移行はSupervisor承認まで行わない。
+- Vercel Preview環境変数: `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY` をPreview専用に登録済み。値はGitHub/sourceへ保存していない。
 
 ## Migration / DB
 
 - migration: `supabase/migrations/20260912000000_phase1_foundation.sql`
 - DB test: `supabase/tests/phase1_rls.sql`（pgTAP 17 assertions）
 - schema: `public.user_profiles`、server-only `private.app_sessions`のみ。Fitbit / Google Health固有のschemaは作成していない。
-- fresh replay: GitHub Actions CI run `34694666203`（rerun database job `103556171339`）で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` を実行しPASS。pgTAP 17 assertionsもPASS。
+- fresh replay: GitHub Actions CI run `34697975491`（database job `103564651360`）で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` を実行しPASS。pgTAP 17 assertionsもPASS。
 - Preview適用: 専用Preview (`pprsfxpfljdjlwdfbtqo`) のSQL Editorでsource migration全文を実行しSuccess。Previewは空projectからの適用で、Productionには適用していない。
 - Hosted dashboardのmigration ledgerはSQL Editor直接適用では作成されないため、適用の正本はGitHub migration fileとCI fresh replay。専用MCP reload後にCLI適用へ切り替える余地を未解決事項として残す。
 - RLS/policy/permission: Preview SQL検証でRLS enabled+forced、owner policy 3件、authenticatedのselect/insert/update/RPC executeのみtrue、anonとprivate schema/tableはfalseを確認。user A/B実DB試験は `A sees own=1 / A sees B=0 / B sees own=1 / B sees A=0 / B height after A cross-update=180.00`、anon実DBは `42501 permission denied for table user_profiles`、未認証RPCは `42501 authentication required`。revision実DBは `1→2`、stale `40001` conflict。試験用Auth/profileはcleanup後0件。
@@ -46,13 +48,13 @@
 | `pnpm test:e2e` | PASS（Chromium + WebKit mobile、4 tests） |
 | `pnpm verify:env`（安全なダミー値） | PASS |
 | `git diff --check` | PASS |
-| GitHub Actions CI run `34695855131` | PASS（checks + database） |
-| GitHub Actions Preview run `34695855088` | BLOCKED（`VERCEL_TOKEN`等のGitHub Environment secret未設定） |
+| GitHub Actions CI run `34697975491` | PASS（checks + database） |
+| GitHub Actions Preview run `34697975508` | PASS（Vercel deploy job `103570987882`） |
 
 ## 実機
 
-- iPhone Safari / ホーム画面PWA: 未実施（安全なPreview URL未取得）。
-- iPad Safari / 縦横・キーボード: 未実施（安全なPreview URL未取得）。
+- iPhone Safari / ホーム画面PWA: ユーザー実機確認待ち（Preview URL取得済み）。
+- iPad Safari / 縦横・キーボード: ユーザー実機確認待ち（Preview URL取得済み）。
 - PlaywrightのChromium/WebKit mobile検証は通過したが、実機合格の代替にはしていない。
 
 ## Phase 1受入条件
@@ -67,24 +69,23 @@
 | F06 Profile/revision | PASS（Preview） | Preview RPCでprofile revision `1→2`とstale `40001` conflictを確認。 |
 | F07 fresh migration | PASS | GitHub Actionsでfresh `db reset` とpgTAPをPASSし、Preview空projectへsource migrationを適用。 |
 | F08 IA / empty states | PASS | 4固定タブ、Settings/Library切替、未提供を0や同期済みにしない表示を実装し、build/E2E確認。 |
-| F09 iPhone | BLOCKED | 安全なPreview URL未取得のため実機未実施。 |
-| F10 iPad | BLOCKED | 安全なPreview URL未取得のため実機未実施。 |
+| F09 iPhone | BLOCKED | Preview URLは取得済み。実機操作確認が未実施。 |
+| F10 iPad | BLOCKED | Preview URLは取得済み。実機操作確認が未実施。 |
 | F11 通信断 | PARTIAL | 保存失敗を成功表示しないUIは実装。offline queue/復帰照合はPhase 6対象。 |
-| F12 環境分離 | PARTIAL | 専用Free organizationにPreview/Production projectを用意し、Preview migrationを適用。Vercel安全なPreview URLと環境別secret設定が未完了。 |
+| F12 環境分離 | PARTIAL | 専用Free organizationにPreview/Production projectを用意し、Preview migrationとPreview専用Vercel環境変数を適用。Production schema/dataは未適用。 |
 | F13 Production verification | BLOCKED | user approval前のmain merge/Production移行は禁止されており未実施。 |
 
 ## 未解決事項
 
-1. Vercelのproduction-target deploymentを実機確認に使わない形で整理し、安全なPreview deploymentを作成すること。
-2. Preview / Production projectへOTP送信元とserver-only secretsを別々に登録すること。
+1. Previewで実OTP、iPhone/iPadを実施すること。
+2. Preview / Production projectへOTP送信元とserver-only secretsを別々に登録すること（Productionは承認後）。
 3. 専用MCP reload後にPreview migration ledgerをCLI経由で確認し、必要なら適用手順を正規化すること。
-4. Previewで実OTP、iPhone/iPadを実施すること。
-5. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
+4. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
 
 ## Phase 2開始前のSupervisor判断
 
 - 専用Supabase organizationでのPreview migration適用済み状態を確認するか（Productionは未適用のまま）。
-- Vercel projectのtarget不整合を解消し、安全なPreview URLを受入対象にするか。
+- Vercel Preview deployment `nutrition-sleep-r2lixfqsf-tsuno2.vercel.app` を受入対象にするか。
 - Preview実機受入をPASSとする対象commitと証跡を承認するか。
 - CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
 
