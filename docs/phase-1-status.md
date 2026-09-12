@@ -18,6 +18,7 @@
 - 専用Supabase organization: `TsunoApp` (`vaupyfcztcoglwvqjict`)（Free）
 - Preview project: `nutrition-sleep-preview` / ref `pprsfxpfljdjlwdfbtqo`（既存の空projectを改名。migration/data未適用）
 - Production project: `nutrition-sleep-production` / ref `vyvnicyupcrsmtgdyypv`（新規作成。migration/data未適用）
+- Supabase MCP: 専用organization向けOAuth接続を完了（project ref `pprsfxpfljdjlwdfbtqo`）。
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) のStudy Graph / money-canvas projectは変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / project ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`（Tsuno team）
@@ -73,7 +74,7 @@
 ## 未解決事項
 
 1. Vercelのproduction-target deploymentを実機確認に使わない形で整理し、安全なPreview deploymentを作成すること。
-2. Supabase MCP/管理接続を専用organizationへ再認証し、Preview projectへsource migrationを適用すること。
+2. Preview projectへsource migrationを適用し、fresh replay/RLS/permissionを実DBで検証すること。
 3. Preview / Production projectへOTP送信元とserver-only secretsを別々に登録すること。
 4. Previewでfresh replay、RLS pgTAP、実OTP、iPhone/iPadを実施すること。
 5. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
