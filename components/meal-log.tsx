@@ -90,7 +90,7 @@ export function MealLog() {
             const meal = meals.find((candidate) => candidate.meal_type === type);
             return <div className="meal-row" key={type}>
               <div><strong>{label}</strong><div className="meal-items">{meal?.entries.map((entry) => <span key={entry.id}>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>)}</div></div>
-              <div className="meal-actions"><span className={`pill ${meal?.state === "skipped" ? "pending" : ""}`}>{stateLabel(meal?.state)}</span><button className="button secondary" type="button" onClick={() => openComposer(type)} disabled={busy}>追加</button>{meal?.state !== "skipped" && <button className="button ghost" type="button" onClick={() => setSkipped(type)} disabled={busy}>skipped</button>}</div>
+              <div className="meal-actions"><span className={`pill ${meal?.state === "skipped" ? "pending" : ""}`}>{stateLabel(meal?.state)}</span><button className="button secondary" type="button" onClick={() => openComposer(type)} disabled={busy}>追加</button>{(meal?.entries.length ?? 0) === 0 && meal?.state !== "skipped" && <button className="button ghost" type="button" onClick={() => setSkipped(type)} disabled={busy}>skipped</button>}</div>
             </div>;
           })}
           {meals.filter((meal) => meal.meal_type === "custom").flatMap((meal) => meal.entries.map((entry) => <div className="meal-row" key={entry.id}><div><strong>追加</strong><div className="meal-items"><span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span></div></div><span className="pill">{meal.eaten_at ? new Date(meal.eaten_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : "時刻未設定"}</span></div>))}
