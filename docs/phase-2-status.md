@@ -5,6 +5,7 @@
 - ブランチ: `phase/2-nutrition-entry-foundation`
 - PR: [#2](https://github.com/Auto-Hal/nutrition-sleep-app/pull/2)
 - 実装コミット: `73cf50bd542e2ed8ac8dd4bd528b86f619547506`, `80c450c182d40fd08eeb6f9f5c98a4adea02818b`, `61a1c291c8070b30b1a4b3a0a1769921a31dd56f`
+- Supervisor corrective acceptance head: `42f310ee109cdf5be24b7c00dee5c3f81f78e2bf`
 - 現在のPR head: この文書を含む最終push後に `git rev-parse HEAD` で確認する（status文書の更新で変動するため固定値にしない）
 - Production Supabase `vyvnicyupcrsmtgdyypv`、Production Vercel、mainは変更していない
 - Phase 3は開始していない
@@ -26,6 +27,7 @@
 3. `20260914004500_phase2_owner_trigger_fix.sql`
 4. `20260914006000_phase2_fk_indexes.sql`
 5. `20260914008000_phase2_batch_unit_validation.sql`
+6. `20260914010000_phase2_integrity_hardening.sql`
 
 Preview project `pprsfxpfljdjlwdfbtqo` のmigration ledgerには以下が記録されている。
 
@@ -35,6 +37,9 @@ Preview project `pprsfxpfljdjlwdfbtqo` のmigration ledgerには以下が記録�
 - `20260913101902 phase2_owner_trigger_fix`
 - `20260913102637 phase2_fk_indexes`
 - `20260913104249 phase2_batch_unit_validation`
+- `20260914010000 phase2_integrity_hardening`
+
+`20260914010000_phase2_integrity_hardening.sql` はSupervisorがPR #2へ追加したcorrective migrationで、固定枠の状態遷移、Batch専用RPC境界、Batch再計算時の品質伝播、snapshot provenance/quality保存を強化する。Preview SQL Editorで適用し、ledgerへの記録を確認した。Production projectには適用していない。
 
 CIのdatabase jobでは空DBにPhase 1からPhase 2までをfresh replayし、Phase 1/2 pgTAP合計65 assertionが成功した。Production projectにはmigrationを適用していない。
 
@@ -46,13 +51,12 @@ Data APIのtable権限はauthenticatedへSELECTのみを付与し、anon/public�
 
 ## CI、Preview、ローカル検証
 
-- GitHub Actions CI run `34753191760`: success（checks job `103713077804`、database job `103713077693`）
-- Preview workflow run `34753191782`: success
-- 最新Preview deployment: `dpl_CWjK8KREoyfG8ZderHgbe3cGRtLC`
-- 最新Preview deployment URL: `https://nutrition-sleep-p755o09ka-tsuno2.vercel.app`
-- 最新Preview deploymentはPR #2の現在コードを含むREADY状態
+- GitHub Actions CI run `34754339558`: success（checks job `103716065397`、database job `103716065251`）
+- 最新Preview deployment: `dpl_EeZhK5G5fz5CF8n3CKdaTF3w1nXw`
+- 最新Preview deployment URL: `https://nutrition-sleep-b6tf0p9xp-tsuno2.vercel.app`
+- 最新Preview deploymentはSupervisor corrective headを含むREADY状態
 - 固定branch alias: [nutrition-sleep-app-git-phase-2-nutrition-entry-f-9522f4-tsuno2.vercel.app](https://nutrition-sleep-app-git-phase-2-nutrition-entry-f-9522f4-tsuno2.vercel.app)
-- Preview deploymentのsource commitは`610ecb257bc99d4c01254dae91f7c6f9e1199452`（実装検証後のstatus文書同期コミット）。実装branchのsource headは上記実装コミット列で管理する
+- Preview deploymentのsource commitは`42f310ee109cdf5be24b7c00dee5c3f81f78e2bf`（Supervisor corrective acceptance head）
 - `pnpm install --frozen-lockfile`: PASS
 - `pnpm lint`: PASS
 - `pnpm typecheck`: PASS
@@ -75,5 +79,9 @@ Data APIのtable権限はauthenticatedへSELECTのみを付与し、anon/public�
 | P2-07 | Catalog/Meal/Batch/Snapshot RLSとanon拒否 | PASS | Preview user A/B/anon実DB、pgTAP、権限確認 |
 | P2-08 | Library無効化と履歴保護 | PASS | API/UI、FK、pgTAP |
 | P2-09 | fresh replay、lint/typecheck/unit/build/E2E/CI/Preview | PASS | CI run、ローカル検証、READY deployment |
+
+## Corrective Preview smoke
+
+`20260914010000_phase2_integrity_hardening.sql` 適用後、Preview実DBで14項目のfocused smokeをトランザクション内で実施し、全項目PASS。固定枠のactive entry保護、空枠skip、Batch専用RPC境界、nested Batch拒否、snapshotのamount/quality/provenance/source不変性、unknown保持、依存Batch再計算、品質伝播、使用中componentの単位変更拒否、user A/B/anon RLSを確認した。smokeはrollbackで終了し、実データは残していない。
 
 SupervisorによるPRレビュー、Preview上の認証済みUI操作、iPhone/iPad実機確認はこの実装報告後のゲートとして残る。Production migration、Production deploy、main merge、Phase 3開始はSupervisorの次の承認まで行わない。

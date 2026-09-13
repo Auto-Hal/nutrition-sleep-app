@@ -21,6 +21,8 @@ Phase 2では、後続の栄養集計に耐える食事入力の基礎を追加�
 - `supabase/migrations/20260914003000_phase2_privilege_hardening.sql`: authenticatedの暗黙table権限を撤去しSELECTだけを付与。
 - `supabase/migrations/20260914004500_phase2_owner_trigger_fix.sql`: tableごとの`NEW`列を別分岐で評価するowner trigger修正。
 - `supabase/migrations/20260914006000_phase2_fk_indexes.sql`: FK検査用index。
+- `supabase/migrations/20260914008000_phase2_batch_unit_validation.sql`: Batch構成要素の単位検証。
+- `supabase/migrations/20260914010000_phase2_integrity_hardening.sql`: 固定枠状態遷移、Batch専用RPC境界、品質伝播、snapshot provenance/qualityのcorrective hardening。
 - `app/api/catalog/**`, `app/api/batches/**`, `app/api/meals/**`: owner-scoped CRUDとOrigin検証。
 - `components/catalog-library.tsx`, `components/meal-log.tsx`: Library CRUD、Batch編集、Today食事入力。
 - `lib/nutrition/catalog.ts`: nutrient vocabulary、型、入力payload helper。
@@ -30,13 +32,13 @@ Phase 2では、後続の栄養集計に耐える食事入力の基礎を追加�
 | ID | 条件 | 状態 |
 |---|---|---|
 | P2-01 | 5種類のCatalog item typeと18栄養項目を登録・一覧・編集できる | PASS（unit、pgTAP、Preview smoke、Library実装） |
-| P2-02 | Catalog現在値とMealEntry snapshotを分離し、後日修正で過去snapshotが変わらない | 実装済み・Preview transaction検証済み |
-| P2-03 | NULL/unknownと明示0を区別する | 実装済み・unit/Preview検証済み |
+| P2-02 | Catalog現在値とMealEntry snapshotを分離し、後日修正で過去snapshotが変わらない | PASS（unit、pgTAP、Preview corrective smoke） |
+| P2-03 | NULL/unknownと明示0を区別する | PASS（unit、pgTAP、Preview corrective smoke） |
 | P2-04 | Batchの構成・量・servingsを保存し、Batch編集後も過去snapshotが不変 | PASS（transaction smoke、pgTAP、単位検証） |
-| P2-05 | 朝食・昼食・夕食とcustom/eaten_at、3状態を区別する | 実装済み・Preview transaction検証済み |
-| P2-06 | idempotencyとrevision conflictで二重登録・上書きを防ぐ | 実装済み・unit/Preview検証済み |
+| P2-05 | 朝食・昼食・夕食とcustom/eaten_at、3状態を区別する | PASS（E2E、pgTAP、Preview corrective smoke） |
+| P2-06 | idempotencyとrevision conflictで二重登録・上書きを防ぐ | PASS（unit、pgTAP、Preview corrective smoke） |
 | P2-07 | Catalog/Meal/Batch/SnapshotのRLSとanon拒否 | PASS（Preview A/B/anon、pgTAP、権限確認） |
 | P2-08 | Libraryで無効化でき、履歴をhard deleteで破壊しない | PASS（API/UI、FK、pgTAP） |
 | P2-09 | fresh replay、lint、typecheck、unit、build、E2E、CI、Preview | PASS |
 
-Preview project `pprsfxpfljdjlwdfbtqo`へはPhase 2 migrationと3本のcorrective migrationを適用済み。Production project `vyvnicyupcrsmtgdyypv`には適用していない。
+Preview project `pprsfxpfljdjlwdfbtqo`へはPhase 2 migrationと5本のcorrective migrationを適用済み。最新の `20260914010000_phase2_integrity_hardening.sql` はPreviewへ適用し、migration ledgerへの記録と14項目のfocused smokeを確認済み。Production project `vyvnicyupcrsmtgdyypv`には適用していない。
