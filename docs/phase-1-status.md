@@ -22,7 +22,8 @@
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) の `study-graph` / `money-canvas` は変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`
-- Vercel Preview deployment: GitHub Actions Preview run `34704461734` / deploy job `103581888948` / [https://nutrition-sleep-r77sgi2ri-tsuno2.vercel.app](https://nutrition-sleep-r77sgi2ri-tsuno2.vercel.app)
+- Vercel Preview deployment (runtime verified): `dpl_BHFGVLnFvSwpSjY8ZkkpBJjm3ssw` / [https://nutrition-sleep-36xod3rmx-tsuno2.vercel.app](https://nutrition-sleep-36xod3rmx-tsuno2.vercel.app)
+- GitHub Actions Preview run `34704461734` / deploy job `103581888948`もPASS。
 - Vercel Preview環境変数: `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY` をPreview専用に登録。値はGitHub/sourceへ保存していない。
 - Production Vercel deployment、Production environment variables、Production Supabase schema/dataは未適用。
 
@@ -40,7 +41,7 @@
 ## Auth / session hardening
 
 - OTP requestは`shouldCreateUser: false`を維持し、登録済みPreview userのみを対象とする。
-- Preview Auth userの事前Provision後、Previewで`POST /api/auth/request-otp`がHTTP 200となりコード入力画面へ遷移することを確認（Vercel runtime log、deployment `dpl_7QwbzkJGZW2G1VVvFd8KgMhDKRZe`）。
+- Preview Auth userの事前Provision後、Previewで`POST /api/auth/request-otp`がHTTP 200となりコード入力画面へ遷移することを確認（Vercel runtime log、deployment `dpl_BHFGVLnFvSwpSjY8ZkkpBJjm3ssw`）。
 - `lib/auth/refresh.ts` にbounded retry、短時間wait、lease再読込、expiry再評価、未解決時null返却を実装。
 - refresh persistenceがrevision競合で0行になった場合は更新後tokenを有効扱いせず、最新rowを再読込して再評価する。
 - `tests/session-concurrency.test.ts`: 同一sessionの並行refreshでrefresh実行1回・双方revision 2のfresh token、lease timeout時nullを確認。
