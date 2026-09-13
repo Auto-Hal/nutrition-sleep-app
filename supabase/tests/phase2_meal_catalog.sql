@@ -1,5 +1,5 @@
 begin;
-select plan(50);
+select plan(51);
 
 select has_table('public', 'nutrient_definitions', 'nutrient definitions exist');
 select has_table('public', 'catalog_items', 'catalog items exist');
@@ -58,6 +58,7 @@ select ok((select position('batch items must be edited through the batch RPC' in
 select ok((select position('perform public.recalculate_batch_nutrients' in pg_get_functiondef('public.update_catalog_item(uuid,integer,text,text,numeric,text,boolean,jsonb)'::regprocedure)) > 0), 'component catalog updates refresh dependent batch nutrients');
 select ok((select position('batch component cannot be another batch' in pg_get_functiondef('public.create_batch(text,text,numeric,text,jsonb,text)'::regprocedure)) > 0), 'nested batches are rejected');
 select ok((select position('meal with active entries must remain recorded' in pg_get_functiondef('public.set_meal_state(uuid,integer,public.meal_state,timestamptz)'::regprocedure)) > 0), 'meal state RPC preserves active-entry consistency');
+select ok((select position("bool_or(coalesce(n.quality, 'unknown') = 'unknown')" in pg_get_functiondef('public.recalculate_batch_nutrients(uuid)'::regprocedure)) > 0), 'batch quality preserves the weakest component quality');
 
 select * from finish();
 rollback;
