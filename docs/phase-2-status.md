@@ -2,13 +2,15 @@
 
 ## 現在の状態
 
-- ブランチ: `phase/2-nutrition-entry-foundation`
-- PR: [#2](https://github.com/Auto-Hal/nutrition-sleep-app/pull/2)
-- 実装コミット: `73cf50bd542e2ed8ac8dd4bd528b86f619547506`, `80c450c182d40fd08eeb6f9f5c98a4adea02818b`, `61a1c291c8070b30b1a4b3a0a1769921a31dd56f`
+- **Phase 2 COMPLETE**
+- PR: [#2](https://github.com/Auto-Hal/nutrition-sleep-app/pull/2) はmainへmerge済み
+- merge commit: `259f7962574d747514fbbd9051e448d051131ad5`
 - Supervisor corrective acceptance head: `42f310ee109cdf5be24b7c00dee5c3f81f78e2bf`
-- 現在のPR head: この文書を含む最終push後に `git rev-parse HEAD` で確認する（status文書の更新で変動するため固定値にしない）
-- Production Supabase `vyvnicyupcrsmtgdyypv`、Production Vercel、mainは変更していない
-- Phase 3は開始していない
+- Production Supabase `vyvnicyupcrsmtgdyypv` へPhase 2 migration 6本を適用済み
+- Production Vercel deployment: `dpl_4RVzBWNRXHVUKVZ3Te1CjBBc2bmE`
+- Production alias: `https://nutrition-sleep-app.vercel.app`
+- Production verification完了
+- **Phase 3 READY TO START**
 
 ## スキーマと履歴不変性
 
@@ -39,9 +41,9 @@ Preview project `pprsfxpfljdjlwdfbtqo` のmigration ledgerには以下が記録�
 - `20260913104249 phase2_batch_unit_validation`
 - `20260914010000 phase2_integrity_hardening`
 
-`20260914010000_phase2_integrity_hardening.sql` はSupervisorがPR #2へ追加したcorrective migrationで、固定枠の状態遷移、Batch専用RPC境界、Batch再計算時の品質伝播、snapshot provenance/quality保存を強化する。Preview SQL Editorで適用し、ledgerへの記録を確認した。Production projectには適用していない。
+`20260914010000_phase2_integrity_hardening.sql` はSupervisorがPR #2へ追加したcorrective migrationで、固定枠の状態遷移、Batch専用RPC境界、Batch再計算時の品質伝播、snapshot provenance/quality保存を強化する。Preview SQL Editorで適用し、ledgerへの記録を確認した。Production projectにもPhase 2 rollout時に適用済み。
 
-CIのdatabase jobでは空DBにPhase 1からPhase 2までをfresh replayし、Phase 1/2 pgTAP合計65 assertionが成功した。Production projectにはmigrationを適用していない。
+CIのdatabase jobでは空DBにPhase 1からPhase 2までをfresh replayし、pgTAPは全assertion成功。Production projectにも同じmigration sourceを順序どおり適用済み。
 
 ## RLS、権限、RPC
 
@@ -84,7 +86,7 @@ Data APIのtable権限はauthenticatedへSELECTのみを付与し、anon/public�
 
 `20260914010000_phase2_integrity_hardening.sql` 適用後、Preview実DBで14項目のfocused smokeをトランザクション内で実施し、全項目PASS。固定枠のactive entry保護、空枠skip、Batch専用RPC境界、nested Batch拒否、snapshotのamount/quality/provenance/source不変性、unknown保持、依存Batch再計算、品質伝播、使用中componentの単位変更拒否、user A/B/anon RLSを確認した。smokeはrollbackで終了し、実データは残していない。
 
-SupervisorによるPRレビュー、Preview上の認証済みUI操作、iPhone/iPad実機確認は完了。Production migration、Production deploy、main merge、Phase 3開始はProduction rollout承認まで行わない。
+SupervisorによるPRレビュー、Preview上の認証済みUI操作、iPhone/iPad実機確認、main merge、Production migration、Production deploy、Production verificationまで完了。Phase 2は正式にCOMPLETE。
 
 
 ## Preview device acceptance（2026-09-14）
@@ -97,3 +99,18 @@ SupervisorによるPRレビュー、Preview上の認証済みUI操作、iPhone/i
 - iPad実機: PASS。
 - Phase 2 Preview acceptance COMPLETE。
 - Production rollout READY。Phase 3はProduction verification完了まで開始しない。
+
+
+## Production rollout acceptance（2026-09-14）
+
+- PR #2をmainへmerge。merge commit: `259f7962574d747514fbbd9051e448d051131ad5`。
+- Production Supabase `vyvnicyupcrsmtgdyypv` のledgerでPhase 1 3本 + Phase 2 6本、計9本を確認。
+- Phase 2必須8テーブル、RLS、RPC EXECUTE境界、snapshot write protection、`quality` / `source_uri` / `source_observed_at` を確認。
+- Phase 1 Profile/session/rate-limitオブジェクトを維持し、既存データへの破壊的影響なし。
+- Production deployment `dpl_4RVzBWNRXHVUKVZ3Te1CjBBc2bmE` は commit `259f7962574d747514fbbd9051e448d051131ad5`、`READY`、`target=production`。
+- Production alias `https://nutrition-sleep-app.vercel.app` が同deploymentを指すことを確認。
+- Vercel runtimeで誤passwordの `POST /api/auth/login 401`、正しいpasswordの `POST /api/auth/login 200` を確認。
+- 認証後の `/today`、`/settings`、`/api/catalog`、`/api/batches`、`/api/meals` は200。
+- Production runtime確認範囲で5xxなし。
+- Catalog→MealEntryおよびskipped処理のDB write-path smokeはrollback transaction内でPASSし、テストデータ残存なし。
+- **Phase 2 COMPLETE / Phase 3 READY TO START**。
