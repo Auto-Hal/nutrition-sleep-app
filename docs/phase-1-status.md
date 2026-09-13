@@ -6,7 +6,8 @@
 
 - GitHub repository: [Auto-Hal/nutrition-sleep-app](https://github.com/Auto-Hal/nutrition-sleep-app)（private）
 - branch: `phase/1-foundation`
-- current head: `86cf4c3dda69b8893cb8a4063b75a8b4f4305e40`（`fix: guard refresh persistence races`）
+- PR head (status metadata): `bbc75e0ff50d71353a97d47707d1da4f0e4efae8`
+- implementation head: `86cf4c3dda69b8893cb8a4063b75a8b4f4305e40`（`fix: guard refresh persistence races`）
 - Next.js: `15.5.24`
 - eslint-config-next: `15.5.24`
 - main bootstrap commit: `c473829439a82eac34284fe0bc6086d5fd99ef53`
