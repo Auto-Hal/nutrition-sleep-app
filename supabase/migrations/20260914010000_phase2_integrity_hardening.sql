@@ -70,7 +70,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public, pg_catalog
-as $
+as $batch$
 declare
   owner_id uuid := (select auth.uid());
   batch public.batches;
@@ -134,7 +134,7 @@ begin
     and bc.user_id = owner_id
   group by d.code, d.unit;
 end;
-$;
+$batch$;
 
 create or replace function public.create_catalog_item(
   p_item_type public.catalog_item_type,
