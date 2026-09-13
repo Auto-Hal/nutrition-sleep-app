@@ -85,4 +85,87 @@ describe("session refresh lease coordination", () => {
     expect(result).toBeNull();
     expect(sleeps).toBe(2);
   });
+
+  it("returns the old token when the lease exceeds the bound but it is still valid", async () => {
+    const now = 1_000;
+    const leased: RefreshLeaseSnapshot<TestSession> = {
+      value: { token: "still-valid" },
+      revision: 7,
+      tokenExpiresAt: now + 5_000,
+      refreshLeaseUntil: now + 30_000,
+    };
+
+    const result = await resolveRefreshRace(leased, {
+      now: () => now,
+      refreshWindowMs: 60,
+      maxAttempts: 3,
+      waitMs: 1,
+      load: async () => leased,
+      claim: async () => false,
+      refreshAndPersist: async () => leased,
+      sleep: async () => undefined,
+    });
+
+    expect(result?.value.token).toBe("still-valid");
+    expect(result?.revision).toBe(7);
+  });
+
+  it("returns null when the lease exceeds the bound and the old token is expired", async () => {
+    const now = 1_000;
+    const leased: RefreshLeaseSnapshot<TestSession> = {
+      value: { token: "expired" },
+      revision: 7,
+      tokenExpiresAt: now,
+      refreshLeaseUntil: now + 30_000,
+    };
+
+    const result = await resolveRefreshRace(leased, {
+      now: () => now,
+      refreshWindowMs: 60,
+      maxAttempts: 3,
+      waitMs: 1,
+      load: async () => leased,
+      claim: async () => false,
+      refreshAndPersist: async () => leased,
+      sleep: async () => undefined,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("reloads the latest row after a refresh persistence revision race", async () => {
+    const now = 1_000;
+    const initial: RefreshLeaseSnapshot<TestSession> = {
+      value: { token: "stale" },
+      revision: 1,
+      tokenExpiresAt: now + 10,
+      refreshLeaseUntil: null,
+    };
+    const leased = { ...initial, refreshLeaseUntil: now + 30_000 };
+    const latest: RefreshLeaseSnapshot<TestSession> = {
+      value: { token: "fresh-from-db" },
+      revision: 2,
+      tokenExpiresAt: now + 300_000,
+      refreshLeaseUntil: null,
+    };
+    let loadCount = 0;
+
+    const result = await resolveRefreshRace(initial, {
+      now: () => now,
+      refreshWindowMs: 60,
+      maxAttempts: 3,
+      waitMs: 1,
+      load: async () => {
+        loadCount += 1;
+        return loadCount === 1 ? leased : latest;
+      },
+      claim: async () => false,
+      refreshAndPersist: async () => latest,
+      sleep: async () => undefined,
+    });
+
+    expect(result?.value.token).toBe("fresh-from-db");
+    expect(result?.revision).toBe(2);
+    expect(loadCount).toBeGreaterThanOrEqual(2);
+  });
 });

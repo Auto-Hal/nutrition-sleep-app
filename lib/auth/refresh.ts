@@ -35,8 +35,9 @@ function leaseIsActive<T>(snapshot: RefreshLeaseSnapshot<T>, now: number) {
 
 /**
  * Resolves a near-expiry session while another request may own its refresh lease.
- * A caller only receives a refreshed/current snapshot; an unresolved expired lease
- * is reported as null instead of being treated as a valid session.
+ * A caller only receives a refreshed/current snapshot. If the lease owner does not
+ * finish within the bounded retry window, an unexpired access token may still be
+ * used safely; an expired token is always reported as null.
  */
 export async function resolveRefreshRace<T>(
   initial: RefreshLeaseSnapshot<T>,
@@ -73,6 +74,9 @@ export async function resolveRefreshRace<T>(
   const final = await options.load();
   if (!final) return null;
   const finalNow = now();
-  if (!needsRefresh(final, finalNow, refreshWindowMs) && !leaseIsActive(final, finalNow)) return final;
+  // A lease can legitimately outlive this request's bounded wait. Do not turn a
+  // still-valid access token into an unauthenticated session solely because the
+  // refresh window is open or another request still owns the lease.
+  if (final.tokenExpiresAt > finalNow) return final;
   return null;
 }
