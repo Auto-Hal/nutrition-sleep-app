@@ -29,14 +29,14 @@ Phase 2では、後続の栄養集計に耐える食事入力の基礎を追加�
 
 | ID | 条件 | 状態 |
 |---|---|---|
-| P2-01 | 5種類のCatalog item typeと18栄養項目を登録・一覧・編集できる | 実装済み・自動検証待ち |
+| P2-01 | 5種類のCatalog item typeと18栄養項目を登録・一覧・編集できる | PASS（unit、pgTAP、Preview smoke、Library実装） |
 | P2-02 | Catalog現在値とMealEntry snapshotを分離し、後日修正で過去snapshotが変わらない | 実装済み・Preview transaction検証済み |
 | P2-03 | NULL/unknownと明示0を区別する | 実装済み・unit/Preview検証済み |
-| P2-04 | Batchの構成・量・servingsを保存し、Batch編集後も過去snapshotが不変 | 実装済み・自動検証待ち |
+| P2-04 | Batchの構成・量・servingsを保存し、Batch編集後も過去snapshotが不変 | PASS（transaction smoke、pgTAP、単位検証） |
 | P2-05 | 朝食・昼食・夕食とcustom/eaten_at、3状態を区別する | 実装済み・Preview transaction検証済み |
 | P2-06 | idempotencyとrevision conflictで二重登録・上書きを防ぐ | 実装済み・unit/Preview検証済み |
-| P2-07 | Catalog/Meal/Batch/SnapshotのRLSとanon拒否 | 実装済み・Preview権限検証済み、CI pgTAP待ち |
-| P2-08 | Libraryで無効化でき、履歴をhard deleteで破壊しない | 実装済み・自動検証待ち |
-| P2-09 | fresh replay、lint、typecheck、unit、build、E2E、CI、Preview | 進行中 |
+| P2-07 | Catalog/Meal/Batch/SnapshotのRLSとanon拒否 | PASS（Preview A/B/anon、pgTAP、権限確認） |
+| P2-08 | Libraryで無効化でき、履歴をhard deleteで破壊しない | PASS（API/UI、FK、pgTAP） |
+| P2-09 | fresh replay、lint、typecheck、unit、build、E2E、CI、Preview | PASS |
 
 Preview project `pprsfxpfljdjlwdfbtqo`へはPhase 2 migrationと3本のcorrective migrationを適用済み。Production project `vyvnicyupcrsmtgdyypv`には適用していない。
