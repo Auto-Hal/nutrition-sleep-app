@@ -57,6 +57,7 @@ describe("Phase 2 catalog and meal contract", () => {
     expect(integrityMigration).toContain("batch items must be edited through the batch RPC");
     expect(integrityMigration).toContain("batch component cannot be another batch");
     expect(integrityMigration).toContain("perform public.recalculate_batch_nutrients");
+    expect(integrityMigration).toContain("bool_or(coalesce(n.quality, 'unknown') = 'unknown')");
     expect(integrityMigration).toContain("meal with active entries must remain recorded");
     expect(integrityMigration).toContain("meal with active entries cannot be skipped");
     expect(read("app/api/catalog/route.ts")).not.toContain('"estimated_dish", "batch"]');
