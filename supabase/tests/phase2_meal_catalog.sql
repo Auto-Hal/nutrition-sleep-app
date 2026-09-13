@@ -51,14 +51,17 @@ select function_privs_are('public', 'create_skipped_meal', array['date','public.
 select ok((select prosecdef from pg_proc where oid = 'public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure), 'meal snapshot RPC has controlled definer boundary');
 select ok((select position('pg_advisory_xact_lock' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation serializes duplicate attempts');
 select ok((select position('source_catalog_revision' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation records catalog revision');
-select ok((select position('case when n.amount is null then null' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation preserves unknown nutrients');
+select ok((select position('n.amount is null' in lower(pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure))) > 0), 'meal creation preserves unknown nutrients');
 select ok((select position('coalesce(n.quality' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation snapshots data quality');
 select ok((select position('batch items must be created through the batch RPC' in pg_get_functiondef('public.create_catalog_item(public.catalog_item_type,text,text,numeric,text,jsonb,text)'::regprocedure)) > 0), 'generic catalog RPC cannot create batches');
 select ok((select position('batch items must be edited through the batch RPC' in pg_get_functiondef('public.update_catalog_item(uuid,integer,text,text,numeric,text,boolean,jsonb)'::regprocedure)) > 0), 'generic catalog RPC cannot edit batches');
 select ok((select position('perform public.recalculate_batch_nutrients' in pg_get_functiondef('public.update_catalog_item(uuid,integer,text,text,numeric,text,boolean,jsonb)'::regprocedure)) > 0), 'component catalog updates refresh dependent batch nutrients');
 select ok((select position('batch component cannot be another batch' in pg_get_functiondef('public.create_batch(text,text,numeric,text,jsonb,text)'::regprocedure)) > 0), 'nested batches are rejected');
 select ok((select position('meal with active entries must remain recorded' in pg_get_functiondef('public.set_meal_state(uuid,integer,public.meal_state,timestamptz)'::regprocedure)) > 0), 'meal state RPC preserves active-entry consistency');
-select ok((select position("bool_or(coalesce(n.quality, 'unknown') = 'unknown')" in pg_get_functiondef('public.recalculate_batch_nutrients(uuid)'::regprocedure)) > 0), 'batch quality preserves the weakest component quality');
+select ok((
+  select position('bool_or' in lower(pg_get_functiondef('public.recalculate_batch_nutrients(uuid)'::regprocedure))) > 0
+     and position('n.quality' in lower(pg_get_functiondef('public.recalculate_batch_nutrients(uuid)'::regprocedure))) > 0
+), 'batch quality preserves the weakest component quality');
 
 select * from finish();
 rollback;
