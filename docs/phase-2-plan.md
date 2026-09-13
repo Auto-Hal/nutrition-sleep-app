@@ -42,3 +42,8 @@ Phase 2では、後続の栄養集計に耐える食事入力の基礎を追加�
 | P2-09 | fresh replay、lint、typecheck、unit、build、E2E、CI、Preview | PASS |
 
 Preview project `pprsfxpfljdjlwdfbtqo`へはPhase 2 migrationと5本のcorrective migrationを適用済み。最新の `20260914010000_phase2_integrity_hardening.sql` はPreviewへ適用し、migration ledgerへの記録と14項目のfocused smokeを確認済み。Production project `vyvnicyupcrsmtgdyypv`には適用していない。
+
+
+## Completion note
+
+Phase 2 rolloutは2026-09-14に完了した。PR #2はmainへmergeされ、Production Supabaseへ6 migrationを同一sourceで適用し、Production Vercel deployment `dpl_4RVzBWNRXHVUKVZ3Te1CjBBc2bmE`（commit `259f7962574d747514fbbd9051e448d051131ad5`）を `target=production` で検証済み。Preview/iPhone/iPad/Production acceptanceはすべてPASS。Phase 2 COMPLETE、Phase 3 READY TO START。
