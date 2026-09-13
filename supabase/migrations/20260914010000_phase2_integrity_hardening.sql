@@ -600,7 +600,7 @@ begin
   update public.meals
   set state = p_state,
       eaten_at = case
-        when p_state = 'not_recorded' and meal_type <> 'custom' then null
+        when p_state in ('not_recorded', 'skipped') and meal_type <> 'custom' then null
         else coalesce(p_eaten_at, eaten_at)
       end
   where id = meal.id
