@@ -101,3 +101,12 @@
 - CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
 
 main merge、Production migration、Production deploy、Phase 2開始は、Preview・実機レビューとSupervisor承認が完了するまで行わない。
+
+## Production deployment cleanup（2026-09-13）
+
+- Phase 1環境構築時に意図しない初期Production deployment（`dpl_7G4yrqpbSDzWbnDfrzMdjk5iQYjm`）が1件作成された。
+- Supervisor reviewで検出した。
+- 当該deploymentはProduction Supabase、Production secret、Production dataへ接続されていなかった。
+- Phase 1 acceptance前に当該deploymentを削除し、`nutrition-sleep-app.vercel.app` と `nutrition-sleep-app-tsuno2.vercel.app` のProduction aliasを解除した。
+- 削除後、Vercel API上の当該deploymentは404、active Production deploymentは0件、project domainsは空、Project Overviewは `No Production Deployment` となった。
+- Production branch trackingを `phase1-production-disabled` へ変更し、同名Git branchが存在しないことを確認した。GitHub/Vercel Git連携は維持した。
