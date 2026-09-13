@@ -46,10 +46,10 @@ Data APIのtable権限はauthenticatedへSELECTのみを付与し、anon/public�
 
 ## CI、Preview、ローカル検証
 
-- GitHub Actions CI run `34753018208`: success（checks job `103712625020`、database job `103712625133`）
-- Preview workflow run `34753018209`: success
-- 最新Preview deployment: `dpl_DZZWKe8usAiF1zGSa4k3uREkXqtZ`
-- 最新Preview deployment URL: `https://nutrition-sleep-owzi1tdlj-tsuno2.vercel.app`
+- GitHub Actions CI run `34753191760`: success（checks job `103713077804`、database job `103713077693`）
+- Preview workflow run `34753191782`: success
+- 最新Preview deployment: `dpl_CWjK8KREoyfG8ZderHgbe3cGRtLC`
+- 最新Preview deployment URL: `https://nutrition-sleep-p755o09ka-tsuno2.vercel.app`
 - 最新Preview deploymentはPR #2の現在コードを含むREADY状態
 - 固定branch alias: [nutrition-sleep-app-git-phase-2-nutrition-entry-f-9522f4-tsuno2.vercel.app](https://nutrition-sleep-app-git-phase-2-nutrition-entry-f-9522f4-tsuno2.vercel.app)
 - Preview deploymentのPR merge SHAはVercel生成の`850097c5c9b78de34afb2c49269b45e7181ef46d`。実装branchのsource headは上記実装コミット列で管理する
