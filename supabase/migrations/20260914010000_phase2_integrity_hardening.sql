@@ -65,6 +65,77 @@ begin
 end;
 $$;
 
+create or replace function public.recalculate_batch_nutrients(p_batch_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $
+declare
+  owner_id uuid := (select auth.uid());
+  batch public.batches;
+  component_count integer;
+begin
+  select * into batch
+  from public.batches
+  where catalog_item_id = p_batch_id and user_id = owner_id;
+
+  if batch.catalog_item_id is null then
+    raise exception using errcode = '42501', message = 'batch is not owned by user';
+  end if;
+
+  select count(*) into component_count
+  from public.batch_components
+  where batch_id = p_batch_id and user_id = owner_id;
+
+  if component_count = 0 then
+    raise exception using errcode = '22023', message = 'batch needs a component';
+  end if;
+
+  delete from public.item_nutrients
+  where catalog_item_id = p_batch_id and user_id = owner_id;
+
+  insert into public.item_nutrients (
+    catalog_item_id,
+    user_id,
+    nutrient_code,
+    amount,
+    unit,
+    provenance,
+    quality
+  )
+  select
+    p_batch_id,
+    owner_id,
+    d.code,
+    case
+      when count(bc.id) = count(n.amount)
+        then sum(n.amount * (bc.quantity / c.serving_size)) / batch.servings
+      else null
+    end,
+    d.unit,
+    'batch_calculation',
+    case
+      when count(bc.id) <> count(n.amount) then 'unknown'
+      when bool_or(coalesce(n.quality, 'unknown') = 'unknown') then 'unknown'
+      when bool_or(n.quality = 'unverified') then 'unverified'
+      else 'user_verified'
+    end
+  from public.nutrient_definitions d
+  cross join public.batch_components bc
+  join public.catalog_items c
+    on c.id = bc.catalog_item_id
+   and c.user_id = owner_id
+  left join public.item_nutrients n
+    on n.catalog_item_id = c.id
+   and n.nutrient_code = d.code
+   and n.user_id = owner_id
+  where bc.batch_id = p_batch_id
+    and bc.user_id = owner_id
+  group by d.code, d.unit;
+end;
+$;
+
 create or replace function public.create_catalog_item(
   p_item_type public.catalog_item_type,
   p_name text,
