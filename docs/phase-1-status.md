@@ -17,7 +17,7 @@
 
 - ENV-001: Supabase Proは使用せず、本アプリ専用organizationのFree project 2件を使用。
 - 専用Supabase organization: `TsunoApp` (`vaupyfcztcoglwvqjict`)（Free）
-- Preview project: `nutrition-sleep-preview` / ref `pprsfxpfljdjlwdfbtqo`（migration適用済み、検証用データなし）
+- Preview project: `nutrition-sleep-preview` / ref `pprsfxpfljdjlwdfbtqo`（migration適用済み、OTP受入用Auth user 1件を事前Provision済み）
 - Production project: `nutrition-sleep-production` / ref `vyvnicyupcrsmtgdyypv`（schema/data未適用）
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) の `study-graph` / `money-canvas` は変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
@@ -40,6 +40,7 @@
 ## Auth / session hardening
 
 - OTP requestは`shouldCreateUser: false`を維持し、登録済みPreview userのみを対象とする。
+- Preview Auth userの事前Provision後、Previewで`POST /api/auth/request-otp`がHTTP 200となりコード入力画面へ遷移することを確認（Vercel runtime log、deployment `dpl_7QwbzkJGZW2G1VVvFd8KgMhDKRZe`）。
 - `lib/auth/refresh.ts` にbounded retry、短時間wait、lease再読込、expiry再評価、未解決時null返却を実装。
 - refresh persistenceがrevision競合で0行になった場合は更新後tokenを有効扱いせず、最新rowを再読込して再評価する。
 - `tests/session-concurrency.test.ts`: 同一sessionの並行refreshでrefresh実行1回・双方revision 2のfresh token、lease timeout時nullを確認。
@@ -70,7 +71,7 @@
 | ID | 判定 | 根拠 |
 |---|---|---|
 | F01 未認証保護 | PASS（Preview DB / E2E） | 未認証route保護、anon table拒否、未認証RPC拒否を確認。 |
-| F02 メールOTP | PARTIAL | `shouldCreateUser: false`とEmail providerを確認。Preview userの事前Provisionと実OTP受信・入力は未実施。 |
+| F02 メールOTP | PARTIAL（送信受付PASS） | `shouldCreateUser: false`、Preview user事前Provision、`POST /api/auth/request-otp` HTTP 200を確認。実OTP受信・入力はユーザー実機確認待ち。 |
 | F03 セッション | PASS（unit） / PARTIAL（実Auth） | encrypted server session、refresh lease、bounded concurrent refresh testはPASS。実Supabase token refreshは実ユーザー受入待ち。 |
 | F04 RLS | PASS（Preview + CI） | RLS enabled+forced、owner policy、A/B相互不可視、anon拒否、pgTAP 21 assertionsを確認。 |
 | F05 private schema | PASS（Preview + CI） | `private.app_sessions`のData API非公開と不要privilegeなしを確認。 |
@@ -85,7 +86,7 @@
 
 ## 未解決事項
 
-1. Preview Auth userをメールアドレスで事前Provisionし、OTP requestが422ではなく送信受付になることを確認すること。実OTP受信・入力はユーザー実機レビューで行う。
+1. 実OTP受信・入力をユーザー実機レビューで確認すること。
 2. iPhone / iPadでPreviewのログイン、4タブ、Settings / Library、Profile保存、iPad縦横を確認すること。
 3. 専用Supabase migration ledgerはSQL Editor直接適用のため、CLI適用履歴の正規化は別途判断が必要。
 4. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
