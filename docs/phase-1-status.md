@@ -6,8 +6,8 @@
 
 - GitHub repository: [Auto-Hal/nutrition-sleep-app](https://github.com/Auto-Hal/nutrition-sleep-app)（private）
 - branch: `phase/1-foundation`
-- PR head (status metadata): `bbc75e0ff50d71353a97d47707d1da4f0e4efae8`
-- implementation head: `86cf4c3dda69b8893cb8a4063b75a8b4f4305e40`（`fix: guard refresh persistence races`）
+- current PR head（確認時点）: `git rev-parse HEAD`で取得（docs-only commitで変動するため固定しない）
+- implementation / acceptance target commit: `833298b9e0b8abb27def3b518dd592d253983216`（`fix: preserve valid sessions after refresh lease timeout`）
 - Next.js: `15.5.24`
 - eslint-config-next: `15.5.24`
 - main bootstrap commit: `c473829439a82eac34284fe0bc6086d5fd99ef53`
@@ -23,8 +23,8 @@
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) の `study-graph` / `money-canvas` は変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`
-- Vercel Preview deployment (runtime verified): `dpl_BHFGVLnFvSwpSjY8ZkkpBJjm3ssw` / [https://nutrition-sleep-36xod3rmx-tsuno2.vercel.app](https://nutrition-sleep-36xod3rmx-tsuno2.vercel.app)
-- GitHub Actions Preview run `34704461734` / deploy job `103581888948`もPASS。
+- Vercel Preview deployment (runtime verified): `dpl_7ZrFqtCvkvmDmS7zcyjMZCChsZUK` / [https://nutrition-sleep-mb7tvu5l2-tsuno2.vercel.app](https://nutrition-sleep-mb7tvu5l2-tsuno2.vercel.app)（commit `833298b9e0b8abb27def3b518dd592d253983216`のPreview、READY）
+- GitHub Actions Preview run `34734419693` / deploy job `103663120405`もPASS。
 - Vercel Preview環境変数: `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY` をPreview専用に登録。値はGitHub/sourceへ保存していない。
 - Production Vercel deployment、Production environment variables、Production Supabase schema/dataは未適用。
 
@@ -33,7 +33,7 @@
 - migration 1: `supabase/migrations/20260912000000_phase1_foundation.sql`
 - corrective migration: `supabase/migrations/20260912155034_phase1_profile_timezone.sql`
 - DB test: `supabase/tests/phase1_rls.sql`（pgTAP 21 assertions）
-- fresh replay: GitHub Actions CI run `34704461656` の database job `103581888528` で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` をPASS。初期migration → corrective migrationの順で適用し、pgTAP 21 assertionsをPASS。
+- fresh replay: GitHub Actions CI run `34734419696` の database job `103663294928` で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` をPASS。初期migration → corrective migrationの順で適用し、pgTAP 21 assertionsをPASS。
 - Preview適用: Preview projectのSQL Editorで2 migrationを順に適用し、corrective migrationはSuccess。Productionには適用していない。
 - corrective migrationは元migrationを変更せず、`pg_timezone_names`でIANA timezoneを検証し、`(now() at time zone new.time_zone)::date`をbirth/weightの日付検証に使用する。
 - Preview実DB検証: User A `own=1 / sees B=0 / timezone=Pacific/Kiritimati`、User B `own=1 / sees A=0 / cross-update後のheight=175`、anonは`42501 permission denied`、invalid timezoneは`22023`、stale revisionは`40001`。検証用Auth/profileはrollback後0件。
@@ -43,9 +43,9 @@
 
 - OTP requestは`shouldCreateUser: false`を維持し、登録済みPreview userのみを対象とする。
 - Preview Auth userの事前Provision後、Previewで`POST /api/auth/request-otp`がHTTP 200となりコード入力画面へ遷移することを確認（Vercel runtime log、deployment `dpl_BHFGVLnFvSwpSjY8ZkkpBJjm3ssw`）。
-- `lib/auth/refresh.ts` にbounded retry、短時間wait、lease再読込、expiry再評価、未解決時null返却を実装。
+- `lib/auth/refresh.ts` にbounded retry、短時間wait、lease再読込、expiry再評価を実装。retry bound後も`tokenExpiresAt > now`なら現access tokenを継続利用し、期限切れだけをnullとする。
 - refresh persistenceがrevision競合で0行になった場合は更新後tokenを有効扱いせず、最新rowを再読込して再評価する。
-- `tests/session-concurrency.test.ts`: 同一sessionの並行refreshでrefresh実行1回・双方revision 2のfresh token、lease timeout時nullを確認。
+- `tests/session-concurrency.test.ts`: A)並行refresh完了時の双方fresh token、B)lease超過でも旧token有効、C)lease超過かつ旧token期限切れ、D)refresh persistence revision race後のDB最新row再読込を確認。
 
 ## 自動検証
 
@@ -54,13 +54,13 @@
 | `pnpm install --frozen-lockfile` | PASS |
 | `pnpm lint` | PASS |
 | `pnpm typecheck` | PASS |
-| `pnpm test` | PASS（3 files / 8 tests） |
+| `pnpm test` | PASS（3 files / 11 tests） |
 | `pnpm build` | PASS（Next.js 15.5.24） |
 | `pnpm test:e2e` | PASS（Chromium + WebKit mobile、4 tests） |
 | `pnpm verify:env`（安全なダミー値） | PASS |
 | `git diff --check` | PASS |
-| GitHub Actions CI run `34704461656` | PASS（checks + database） |
-| GitHub Actions Preview run `34704461734` | PASS（Vercel deploy job `103581888948`） |
+| GitHub Actions CI run `34734419696` | PASS（checks + database、database job `103663294928`） |
+| GitHub Actions Preview run `34734419693` | PASS（Vercel deploy） |
 
 ## 実機
 
@@ -74,7 +74,7 @@
 |---|---|---|
 | F01 未認証保護 | PASS（Preview DB / E2E） | 未認証route保護、anon table拒否、未認証RPC拒否を確認。 |
 | F02 メールOTP | PARTIAL（送信受付PASS） | `shouldCreateUser: false`、Preview user事前Provision、`POST /api/auth/request-otp` HTTP 200を確認。実OTP受信・入力はユーザー実機確認待ち。 |
-| F03 セッション | PASS（unit） / PARTIAL（実Auth） | encrypted server session、refresh lease、bounded concurrent refresh testはPASS。実Supabase token refreshは実ユーザー受入待ち。 |
+| F03 セッション | PASS（unit） / PARTIAL（実Auth） | encrypted server session、refresh lease、bounded concurrent refresh A〜DはPASS。実Supabase token refreshは実ユーザー受入待ち。 |
 | F04 RLS | PASS（Preview + CI） | RLS enabled+forced、owner policy、A/B相互不可視、anon拒否、pgTAP 21 assertionsを確認。 |
 | F05 private schema | PASS（Preview + CI） | `private.app_sessions`のData API非公開と不要privilegeなしを確認。 |
 | F06 Profile/revision | PASS（Preview + CI） | revision `1→2`、stale `40001`、invalid timezone `22023`を確認。 |
