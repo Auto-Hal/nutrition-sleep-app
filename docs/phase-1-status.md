@@ -1,6 +1,6 @@
 # Phase 1 実装ステータス
 
-基準日: 2026-09-13 / 対象: `phase/1-foundation` / 状態: Preview受入COMPLETE・Production rollout READY
+基準日: 2026-09-13 / 対象: `main` / 状態: Phase 1 COMPLETE・Phase 2 READY
 
 ## 実装識別子
 
@@ -12,21 +12,23 @@
 - eslint-config-next: `15.5.24`
 - main bootstrap commit: `c473829439a82eac34284fe0bc6086d5fd99ef53`
 - Phase 1 implementation commit: `3f80909`（履歴上の実装起点）
-- Draft PR: [#1](https://github.com/Auto-Hal/nutrition-sleep-app/pull/1)（`phase/1-foundation` → `main`、未merge）
+- PR: [#1](https://github.com/Auto-Hal/nutrition-sleep-app/pull/1)（`phase/1-foundation` → `main`、merge済み）
+- main merge commit: `ae6ae5596e5f583b5de856cd682d2745ad40ef25`
 
 ## 外部環境
 
 - ENV-001: Supabase Proは使用せず、本アプリ専用organizationのFree project 2件を使用。
 - 専用Supabase organization: `TsunoApp` (`vaupyfcztcoglwvqjict`)（Free）
 - Preview project: `nutrition-sleep-preview` / ref `pprsfxpfljdjlwdfbtqo`（migration適用済み、email/password受入用Auth user 1件を事前Provision済み）
-- Production project: `nutrition-sleep-production` / ref `vyvnicyupcrsmtgdyypv`（schema/data未適用）
+- Production project: `nutrition-sleep-production` / ref `vyvnicyupcrsmtgdyypv`（Phase 1 migration適用済み、Production専用Auth user稼働）
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) の `study-graph` / `money-canvas` は変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`
 - Vercel Preview deployment (device acceptance verified): `dpl_CNe5ZXXpXoVHcNfZC1F79cQetGaZ` / branch alias [https://nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app](https://nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app)（`phase/1-foundation`、READY、target=null）。CR-002のOrigin検証はこの固定branch aliasを正規Preview originとし、一時deployment URLは受入・ログインには使用しない。
 - GitHub Actions CI run `34737129020`（checks job `103670440872` / database job `103670440799`）とPreview run `34737128989`（deploy job `103672961483`）をPASS。
 - Vercel Preview環境変数: 既存の`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY`に加え、CR-002の`APP_ALLOWED_USER_ID`、`APP_LOGIN_RATE_LIMIT_KEY`、`APP_ORIGIN`を`phase/1-foundation` Preview専用へ登録した。値はGitHub/sourceへ保存していない。登録時に誤って作成されたProduction側3値は即時削除し、現在Production環境変数は未設定。
-- Production Vercel deployment、Production environment variables、Production Supabase schema/dataは未適用。
+- Production Vercel deployment: `dpl_CFBwBrkCwAtmnnLL9AvMwQQ2cL8L`（READY / target=production / commit `ae6ae5596e5f583b5de856cd682d2745ad40ef25`）。正式aliasは `https://nutrition-sleep-app.vercel.app`。
+- Production環境変数はProduction専用値で設定済み。PreviewとProductionのSupabase/Auth/DB/secretsは分離維持。
 
 ## Migration / DB
 
@@ -35,7 +37,8 @@
 - CR-002 migration: `supabase/migrations/20260913120000_cr002_login_rate_limits.sql`
 - DB test: `supabase/tests/phase1_rls.sql`（pgTAP 25 assertions）
 - fresh replay: GitHub Actions CI run `34737129020` の database job `103670440799` で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` をPASS。初期migration → corrective migration → CR-002 migrationの順で適用し、pgTAP 25 assertionsをPASS。
-- Preview適用: Preview projectへ3 migrationを順に適用し、CR-002 `private.login_rate_limits`の作成・RLS・権限を確認した。Productionには適用していない。
+- Preview適用: Preview projectへ3 migrationを順に適用し、CR-002 `private.login_rate_limits`の作成・RLS・権限を確認した。
+- Production適用: 同一migration source 3本を同順序で適用。ledgerは `20260912000000_phase1_foundation` → `20260912155034_phase1_profile_timezone` → `20260913120000_cr002_login_rate_limits`。Production固有のschema分岐は作成していない。
 - corrective migrationは元migrationを変更せず、`pg_timezone_names`でIANA timezoneを検証し、`(now() at time zone new.time_zone)::date`をbirth/weightの日付検証に使用する。
 - Preview実DB検証: User A `own=1 / sees B=0 / timezone=Pacific/Kiritimati`、User B `own=1 / sees A=0 / cross-update後のheight=175`、anonは`42501 permission denied`、invalid timezoneは`22023`、stale revisionは`40001`。検証用Auth/profileはrollback後0件。
 - `private.app_sessions` はData APIへ公開せず、authenticated/anonに不要なtable privilegeを付与していない。RPCはSECURITY INVOKERでauthenticatedのみにEXECUTEを付与。
@@ -43,7 +46,8 @@
 ## Auth / session hardening
 
 - CR-002によりメールOTP、Magic Link、SMTP配送依存はsuperseded。`/api/auth/login`の`signInWithPassword`と既存server-side sessionだけを使用し、signup/anonymousはPreviewで無効化した。
-- Preview Auth user `90ffbd25-b787-442d-8bb5-8b4d61ee2d56`を事前Provision済み。passwordはlocal-only utilityで設定し、Production userは作成しない。
+- Preview Auth user `90ffbd25-b787-442d-8bb5-8b4d61ee2d56`を事前Provision済み。
+- Production Auth user `3647ef68-500d-4c6a-b1eb-d91bbd228043`をProduction専用にProvisionし、Production `APP_ALLOWED_USER_ID`へ設定済み。Preview user UUID/passwordは流用していない。
 - `APP_ALLOWED_USER_ID`をsession発行時とcookie session読込時に照合し、許可外userは認証済み扱いにしない。
 - State-changing APIはOrigin欠落を含めfail-closed。Vercel `x-forwarded-for`はHMAC化した値だけをDB rate-limit keyに使用し、15分5回窓を共有する。
 - DB障害時はrate-limitを通過させず、session保存失敗時はcookieを発行しない。
@@ -88,21 +92,20 @@
 | F09 iPhone | PASS | 固定Preview aliasでログインと主要画面表示を実機確認。 |
 | F10 iPad | PASS | 固定Preview aliasで縦向き・横向きとも主要画面表示に問題なし。 |
 | F11 通信断 | PARTIAL | 保存失敗を成功表示しないUIは実装。offline queue/復帰照合はPhase 6対象。 |
-| F12 環境分離 | PASS（Preview構成） / PARTIAL（Production未検証） | 専用Free organizationのPreview/Production project、`phase/1-foundation`専用Vercel env、Production側3値の削除を確認。Production schema/dataは未適用。 |
-| F13 Production verification | BLOCKED | main merge、Production migration/deployはSupervisor承認前のため未実施。 |
+| F12 環境分離 | PASS | Preview/ProductionでSupabase project、Auth user、DB接続、暗号鍵、rate-limit keyを分離。Preview変更なしでProduction rollout完了。 |
+| F13 Production verification | PASS | Production deployment READY、正式alias、login 200/401、app session、4タブ、Profile round-trip、RLS/anon拒否を確認。 |
 
 ## 未解決事項
 
-1. 専用Supabase migration ledgerはSQL Editor直接適用のため、CLI適用履歴の正規化は別途判断が必要。
-2. Production rollout（main merge、Production migration、Production専用Auth user/env、Production deploy、verification）を実施すること。
-3. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
+1. Phase 2実装を開始すること。
+2. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
 
 ## Phase 2開始前のSupervisor判断
 
 - CR-002 email/password実認証、Preview migration/RLS/revision/session hardening、iPhone/iPad実機受入はSupervisor承認済み。
-- Phase 1 Preview acceptanceはCOMPLETE。
-- Production rolloutは main merge → Production migration → Production専用Auth user/env設定 → Production deploy → Production verification の順で実施する。
-- Phase 2開始はProduction verification完了後にSupervisorが明示的に宣言する。
+- main merge、Production migration、Production専用Auth user/env、Production deploy、Production smoke/RLS/Profile verificationまで完了。
+- Phase 1はCOMPLETE。
+- Phase 2開始を許可する。
 - CR-001の採用APIとprovider-neutral境界はPhase 5開始前に確定し、未解決のままPhase 5へ進めない。
 
 ## Production deployment cleanup（2026-09-13）
@@ -134,3 +137,18 @@
 - iPhone実機確認PASS。
 - iPad実機の縦向き・横向き確認PASS。
 - fail-closed Originポリシーは緩和しない。一時deployment URLは実機受入・ログインURLとして使用しない。
+
+
+## Production verification（2026-09-13）
+
+- main merge commit: `ae6ae5596e5f583b5de856cd682d2745ad40ef25`。
+- Production Supabase: `vyvnicyupcrsmtgdyypv`。
+- Production Auth user: `3647ef68-500d-4c6a-b1eb-d91bbd228043`。
+- Production deployment: `dpl_CFBwBrkCwAtmnnLL9AvMwQQ2cL8L` / READY / target=production。
+- 正式Production alias: `https://nutrition-sleep-app.vercel.app`。
+- Vercel runtimeで誤passwordの `POST /api/auth/login 401`、正しいpasswordの `POST /api/auth/login 200` を確認。
+- 認証後の `/today`、`/nutrition`、`/sleep`、`/settings` は200を確認。
+- `POST /api/profile 200` を確認し、Profile保存経路がProduction runtimeで成功していることを確認。
+- Production signupは無効、anonymous providerも無効。Production runtime logsにsecret出力なし。
+- Preview環境は変更せず、Productionと分離維持。
+- Phase 1 Production verification COMPLETE。Phase 2 READY。
