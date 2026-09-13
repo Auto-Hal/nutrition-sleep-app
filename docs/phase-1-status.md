@@ -7,7 +7,7 @@
 - GitHub repository: [Auto-Hal/nutrition-sleep-app](https://github.com/Auto-Hal/nutrition-sleep-app)（private）
 - branch: `phase/1-foundation`
 - current PR head（確認時点）: `git rev-parse HEAD`で取得（docs-only commitで変動するため固定しない）
-- implementation / acceptance target commit: `833298b9e0b8abb27def3b518dd592d253983216`（`fix: preserve valid sessions after refresh lease timeout`）
+- implementation / acceptance target commit: `0e03aa8879a325cac7f5b2690fe42df31bb05be2`（`fix: verify app sessions are revoked during recovery`）
 - Next.js: `15.5.24`
 - eslint-config-next: `15.5.24`
 - main bootstrap commit: `c473829439a82eac34284fe0bc6086d5fd99ef53`
@@ -23,9 +23,9 @@
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) の `study-graph` / `money-canvas` は変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`
-- Vercel Preview deployment (runtime verified): `dpl_7ZrFqtCvkvmDmS7zcyjMZCChsZUK` / [https://nutrition-sleep-mb7tvu5l2-tsuno2.vercel.app](https://nutrition-sleep-mb7tvu5l2-tsuno2.vercel.app)（commit `833298b9e0b8abb27def3b518dd592d253983216`のPreview、READY）
-- GitHub Actions Preview run `34734419693` / deploy job `103663120405`もPASS。
-- Vercel Preview環境変数: 既存の`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY`に加え、CR-002の`APP_ALLOWED_USER_ID`、`APP_LOGIN_RATE_LIMIT_KEY`、`APP_ORIGIN`をPreview専用へ登録し、デプロイ後に確認する。値はGitHub/sourceへ保存していない。Production環境変数は未設定。
+- Vercel Preview deployment (runtime verified): `dpl_8iUmdkjJWMX9ruwJjzcc9yzdDCxC` / [https://nutrition-sleep-pq2x8hzos-tsuno2.vercel.app](https://nutrition-sleep-pq2x8hzos-tsuno2.vercel.app)（commit `0e03aa8879a325cac7f5b2690fe42df31bb05be2`、`phase/1-foundation`、READY、branch alias `nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app`）
+- GitHub Actions CI run `34737129020`（checks job `103670440872` / database job `103670440799`）とPreview run `34737128989`（deploy job `103672961483`）をPASS。
+- Vercel Preview環境変数: 既存の`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY`に加え、CR-002の`APP_ALLOWED_USER_ID`、`APP_LOGIN_RATE_LIMIT_KEY`、`APP_ORIGIN`を`phase/1-foundation` Preview専用へ登録した。値はGitHub/sourceへ保存していない。登録時に誤って作成されたProduction側3値は即時削除し、現在Production環境変数は未設定。
 - Production Vercel deployment、Production environment variables、Production Supabase schema/dataは未適用。
 
 ## Migration / DB
@@ -34,7 +34,7 @@
 - corrective migration: `supabase/migrations/20260912155034_phase1_profile_timezone.sql`
 - CR-002 migration: `supabase/migrations/20260913120000_cr002_login_rate_limits.sql`
 - DB test: `supabase/tests/phase1_rls.sql`（pgTAP 25 assertions）
-- fresh replay: GitHub Actions CI run `34734419696` の database job `103663294928` で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` をPASS。初期migration → corrective migration → CR-002 migrationの順で適用し、pgTAP 25 assertionsをPASS（CR-002変更後のCIで再実行予定）。
+- fresh replay: GitHub Actions CI run `34737129020` の database job `103670440799` で `supabase start` → `supabase db reset` → `supabase test db` → `supabase stop` をPASS。初期migration → corrective migration → CR-002 migrationの順で適用し、pgTAP 25 assertionsをPASS。
 - Preview適用: Preview projectへ3 migrationを順に適用し、CR-002 `private.login_rate_limits`の作成・RLS・権限を確認した。Productionには適用していない。
 - corrective migrationは元migrationを変更せず、`pg_timezone_names`でIANA timezoneを検証し、`(now() at time zone new.time_zone)::date`をbirth/weightの日付検証に使用する。
 - Preview実DB検証: User A `own=1 / sees B=0 / timezone=Pacific/Kiritimati`、User B `own=1 / sees A=0 / cross-update後のheight=175`、anonは`42501 permission denied`、invalid timezoneは`22023`、stale revisionは`40001`。検証用Auth/profileはrollback後0件。
@@ -58,13 +58,14 @@
 | `pnpm install --frozen-lockfile` | PASS |
 | `pnpm lint` | PASS |
 | `pnpm typecheck` | PASS |
-| `pnpm test` | PASS（6 files / 19 tests） |
+| `pnpm test` | PASS（7 files / 24 tests） |
 | `pnpm build` | PASS（Next.js 15.5.24） |
-| `pnpm test:e2e` | PASS（Chromium + WebKit mobile、4 tests） |
+| `pnpm test:e2e` | PASS（Chromium + WebKit mobile、6 tests） |
 | `pnpm verify:env`（安全なダミー値） | PASS |
 | `git diff --check` | PASS |
-| GitHub Actions CI run `34734419696` | PASS（checks + database、database job `103663294928`） |
-| GitHub Actions Preview run `34734419693` | PASS（Vercel deploy） |
+| GitHub Actions CI run `34737129020` | PASS（checks `103670440872` + database `103670440799`） |
+| GitHub Actions Preview run `34737128989` | PASS（deploy `103672961483`、Vercel CLI deploy） |
+| Vercel Preview redeploy `dpl_8iUmdkjJWMX9ruwJjzcc9yzdDCxC` | PASS（Preview / branch alias / READY） |
 
 ## 実機
 
@@ -77,22 +78,22 @@
 | ID | 判定 | 根拠 |
 |---|---|---|
 | F01 未認証保護 | PASS（Preview DB / E2E） | 未認証route保護、anon table拒否、未認証RPC拒否を確認。 |
-| F02 email/password | PARTIAL（コード・設定PASS、実ログイン待ち） | OTP route/UIを削除、`signInWithPassword`、single-user allow-list、signup/anonymous拒否、rate-limit、password local utilityを実装。Previewのpassword設定と実ログインはSupervisor確認後。 |
+| F02 email/password | PARTIAL（コード・Preview設定PASS、実ログイン待ち） | OTP route/UIを削除、`signInWithPassword`、single-user allow-list、signup/anonymous拒否、rate-limit、password local utilityを実装。Preview Auth userのpassword設定と正しいpasswordでの実ログインは未確認。 |
 | F03 セッション | PASS（unit） / PARTIAL（実Auth） | encrypted server session、refresh lease、bounded concurrent refresh A〜DはPASS。実Supabase token refreshは実ユーザー受入待ち。 |
-| F04 RLS | PASS（Preview + CI） | RLS enabled+forced、owner policy、A/B相互不可視、anon拒否、pgTAP 21 assertionsを確認。 |
+| F04 RLS | PASS（Preview + CI） | RLS enabled+forced、owner policy、A/B相互不可視、anon拒否、pgTAP 25 assertionsを確認。 |
 | F05 private schema | PASS（Preview + CI） | `private.app_sessions`のData API非公開と不要privilegeなしを確認。 |
 | F06 Profile/revision | PASS（Preview + CI） | revision `1→2`、stale `40001`、invalid timezone `22023`を確認。 |
-| F07 fresh migration | PASS | 初期migration → corrective migrationのfresh replayとpgTAPをPASS。 |
+| F07 fresh migration | PASS | 初期migration → corrective migration → CR-002 migrationのfresh replayとpgTAP 25 assertionsをPASS。 |
 | F08 IA / empty states | PASS | Today / Nutrition / Sleep / Settingsの4固定タブ、Settings / Library切替、empty状態をbuild/E2E確認。 |
 | F09 iPhone | BLOCKED | Supervisorレビュー後の実機操作確認待ち。 |
 | F10 iPad | BLOCKED | Supervisorレビュー後の実機操作確認待ち。 |
 | F11 通信断 | PARTIAL | 保存失敗を成功表示しないUIは実装。offline queue/復帰照合はPhase 6対象。 |
-| F12 環境分離 | PASS（構成） / PARTIAL（Production未検証） | 専用Free organizationのPreview/Production project、Preview専用Vercel envを確認。Production schema/dataは未適用。 |
+| F12 環境分離 | PASS（Preview構成） / PARTIAL（Production未検証） | 専用Free organizationのPreview/Production project、`phase/1-foundation`専用Vercel env、Production側3値の削除を確認。Production schema/dataは未適用。 |
 | F13 Production verification | BLOCKED | main merge、Production migration/deployはSupervisor承認前のため未実施。 |
 
 ## 未解決事項
 
-1. Preview Auth userへpasswordをlocal-only utilityで設定し、Preview `/api/auth/login`の実認証を確認すること。
+1. Preview Auth userへpasswordをlocal-only utilityで設定し、Preview `/api/auth/login`の正しいpasswordによる実認証を確認すること。
 2. iPhone / iPadでPreviewのpasswordログイン、4タブ、Settings / Library、Profile保存、iPad縦横を確認すること。
 3. 専用Supabase migration ledgerはSQL Editor直接適用のため、CLI適用履歴の正規化は別途判断が必要。
 4. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
