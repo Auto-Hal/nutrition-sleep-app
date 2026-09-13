@@ -1,5 +1,6 @@
 node_modules/
 .pnpm-store/
+supabase/.temp/
 .next/
 out/
 playwright-report/

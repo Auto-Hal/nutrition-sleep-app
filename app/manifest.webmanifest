@@ -1,0 +1,10 @@
+{
+  "name": "栄養・睡眠管理",
+  "short_name": "栄養・睡眠管理",
+  "start_url": "/today",
+  "display": "standalone",
+  "background_color": "#f5f7f4",
+  "theme_color": "#f5f7f4",
+  "lang": "ja",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

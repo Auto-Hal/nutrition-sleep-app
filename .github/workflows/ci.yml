@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://local.invalid
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      APP_SESSION_ENCRYPTION_KEY: ci-only-placeholder-32-byte-value
+      APP_ALLOWED_USER_ID: 00000000-0000-4000-8000-000000000001
+      APP_LOGIN_RATE_LIMIT_KEY: ci-only-rate-limit-key-32-byte-value
+      APP_ORIGIN: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm verify:env
+      - run: pnpm build
+
+  database:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - run: supabase db reset
+      - run: supabase test db
+      - if: always()
+        run: supabase stop
