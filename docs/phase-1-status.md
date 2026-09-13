@@ -1,6 +1,6 @@
 # Phase 1 実装ステータス
 
-基準日: 2026-09-13 / 対象: `phase/1-foundation` / 状態: CR-002実装済み・Supervisorレビュー待ち
+基準日: 2026-09-13 / 対象: `phase/1-foundation` / 状態: Preview受入COMPLETE・Production rollout READY
 
 ## 実装識別子
 
@@ -23,7 +23,7 @@
 - 既存 `Auto-Hal's Org` (`ofmbnluuohkooklrhslo`) の `study-graph` / `money-canvas` は変更・pause・停止していない。
 - Vercel team: `Tsuno` (`team_aTOsma3gZ9xkcFkGJ53dUCCO`)
 - Vercel project: `nutrition-sleep-app` / ID `prj_WiPB989mXurOuIgVm8asfmfdPA6W`
-- Vercel Preview deployment (runtime verified): `dpl_8iUmdkjJWMX9ruwJjzcc9yzdDCxC` / [https://nutrition-sleep-pq2x8hzos-tsuno2.vercel.app](https://nutrition-sleep-pq2x8hzos-tsuno2.vercel.app)（commit `0e03aa8879a325cac7f5b2690fe42df31bb05be2`、`phase/1-foundation`、READY、branch alias `nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app`）
+- Vercel Preview deployment (device acceptance verified): `dpl_CNe5ZXXpXoVHcNfZC1F79cQetGaZ` / branch alias [https://nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app](https://nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app)（`phase/1-foundation`、READY、target=null）。CR-002のOrigin検証はこの固定branch aliasを正規Preview originとし、一時deployment URLは受入・ログインには使用しない。
 - GitHub Actions CI run `34737129020`（checks job `103670440872` / database job `103670440799`）とPreview run `34737128989`（deploy job `103672961483`）をPASS。
 - Vercel Preview環境変数: 既存の`SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`DATABASE_URL`、`APP_SESSION_ENCRYPTION_KEY`に加え、CR-002の`APP_ALLOWED_USER_ID`、`APP_LOGIN_RATE_LIMIT_KEY`、`APP_ORIGIN`を`phase/1-foundation` Preview専用へ登録した。値はGitHub/sourceへ保存していない。登録時に誤って作成されたProduction側3値は即時削除し、現在Production環境変数は未設定。
 - Production Vercel deployment、Production environment variables、Production Supabase schema/dataは未適用。
@@ -69,8 +69,8 @@
 
 ## 実機
 
-- iPhone Safari / ホーム画面PWA: Preview URLは取得済み、ユーザー確認待ち。
-- iPad Safari / 縦横・キーボード: ユーザー確認待ち。
+- iPhone Safari: 固定Preview aliasでemail/passwordログイン、主要画面表示をユーザー実機確認しPASS。
+- iPad Safari: 固定Preview aliasで縦向き・横向きの主要画面表示をユーザー実機確認しPASS。
 - PlaywrightのChromium/WebKit mobile検証は通過したが、実機合格の代替にはしていない。
 
 ## Phase 1受入条件
@@ -78,34 +78,32 @@
 | ID | 判定 | 根拠 |
 |---|---|---|
 | F01 未認証保護 | PASS（Preview DB / E2E） | 未認証route保護、anon table拒否、未認証RPC拒否を確認。 |
-| F02 email/password | PARTIAL（コード・Preview設定PASS、実ログイン待ち） | OTP route/UIを削除、`signInWithPassword`、single-user allow-list、signup/anonymous拒否、rate-limit、password local utilityを実装。Preview Auth userのpassword設定と正しいpasswordでの実ログインは未確認。 |
-| F03 セッション | PASS（unit） / PARTIAL（実Auth） | encrypted server session、refresh lease、bounded concurrent refresh A〜DはPASS。実Supabase token refreshは実ユーザー受入待ち。 |
+| F02 email/password | PASS（Preview実認証） | OTP route/UIを削除し、`signInWithPassword`、single-user allow-list、signup/anonymous拒否、rate-limitを実装。固定Preview aliasから実ユーザーの正しいpasswordでログイン成功を確認。 |
+| F03 セッション | PASS（unit + Preview実Auth） | encrypted server session、実ログイン後のapp session確立、refresh lease、bounded concurrent refresh A〜Dを確認。 |
 | F04 RLS | PASS（Preview + CI） | RLS enabled+forced、owner policy、A/B相互不可視、anon拒否、pgTAP 25 assertionsを確認。 |
 | F05 private schema | PASS（Preview + CI） | `private.app_sessions`のData API非公開と不要privilegeなしを確認。 |
 | F06 Profile/revision | PASS（Preview + CI） | revision `1→2`、stale `40001`、invalid timezone `22023`を確認。 |
 | F07 fresh migration | PASS | 初期migration → corrective migration → CR-002 migrationのfresh replayとpgTAP 25 assertionsをPASS。 |
 | F08 IA / empty states | PASS | Today / Nutrition / Sleep / Settingsの4固定タブ、Settings / Library切替、empty状態をbuild/E2E確認。 |
-| F09 iPhone | BLOCKED | Supervisorレビュー後の実機操作確認待ち。 |
-| F10 iPad | BLOCKED | Supervisorレビュー後の実機操作確認待ち。 |
+| F09 iPhone | PASS | 固定Preview aliasでログインと主要画面表示を実機確認。 |
+| F10 iPad | PASS | 固定Preview aliasで縦向き・横向きとも主要画面表示に問題なし。 |
 | F11 通信断 | PARTIAL | 保存失敗を成功表示しないUIは実装。offline queue/復帰照合はPhase 6対象。 |
 | F12 環境分離 | PASS（Preview構成） / PARTIAL（Production未検証） | 専用Free organizationのPreview/Production project、`phase/1-foundation`専用Vercel env、Production側3値の削除を確認。Production schema/dataは未適用。 |
 | F13 Production verification | BLOCKED | main merge、Production migration/deployはSupervisor承認前のため未実施。 |
 
 ## 未解決事項
 
-1. Preview Auth userへpasswordをlocal-only utilityで設定し、Preview `/api/auth/login`の正しいpasswordによる実認証を確認すること。
-2. iPhone / iPadでPreviewのpasswordログイン、4タブ、Settings / Library、Profile保存、iPad縦横を確認すること。
-3. 専用Supabase migration ledgerはSQL Editor直接適用のため、CLI適用履歴の正規化は別途判断が必要。
-4. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
+1. 専用Supabase migration ledgerはSQL Editor直接適用のため、CLI適用履歴の正規化は別途判断が必要。
+2. Production rollout（main merge、Production migration、Production専用Auth user/env、Production deploy、verification）を実施すること。
+3. CR-001（旧Fitbit Sleep v1.2 superseded）のAstra審議をPhase 5開始前に完了すること。
 
 ## Phase 2開始前のSupervisor判断
 
-- CR-002のemail/password実認証・rate-limit・OTP route不存在のPreview証跡を承認するか。
-- Preview migration/RLS/revision/session hardeningの結果を承認するか。
-- Production Supabase schema/data、Production Vercel deployを開始してよいか（現時点は禁止）。
-- CR-001の採用APIとprovider-neutral境界を承認するか。未解決のままPhase 5へ進めない。
-
-main merge、Production migration、Production deploy、Phase 2開始は、Preview・実機レビューとSupervisor承認が完了するまで行わない。
+- CR-002 email/password実認証、Preview migration/RLS/revision/session hardening、iPhone/iPad実機受入はSupervisor承認済み。
+- Phase 1 Preview acceptanceはCOMPLETE。
+- Production rolloutは main merge → Production migration → Production専用Auth user/env設定 → Production deploy → Production verification の順で実施する。
+- Phase 2開始はProduction verification完了後にSupervisorが明示的に宣言する。
+- CR-001の採用APIとprovider-neutral境界はPhase 5開始前に確定し、未解決のままPhase 5へ進めない。
 
 ## Production deployment cleanup（2026-09-13）
 
@@ -125,3 +123,14 @@ main merge、Production migration、Production deploy、Phase 2開始は、Previ
 - `private.login_rate_limits`を追加し、Vercel `x-forwarded-for`のHMAC fingerprintだけを15分5回の共有rate limitへ保存する。
 - password設定/復旧はlocal-only interactive utilityに限定し、対象ユーザーの全app sessionを失効させてからSupabase Auth passwordを更新する。passwordは引数/env/file/log/Gitへ残さない。
 - Production Vercel / Production Supabase / main / Phase 2は変更していない。
+
+
+## Device acceptance / Preview Origin（2026-09-13）
+
+- CR-002実認証の初回確認では、一時Vercel deployment URLからのPOSTがfail-closed Origin検証により拒否された。Supabase直接の`signInWithPassword`は成功しており、credential不一致ではなかった。
+- 正規の受入URLを固定branch alias `https://nutrition-sleep-app-git-phase-1-foundation-tsuno2.vercel.app` に統一し、同originでPreviewを再deployした。
+- deployment `dpl_CNe5ZXXpXoVHcNfZC1F79cQetGaZ` はREADY / target=null、固定branch alias付与を確認。
+- 固定Preview aliasで実ユーザーのemail/passwordログインに成功。
+- iPhone実機確認PASS。
+- iPad実機の縦向き・横向き確認PASS。
+- fail-closed Originポリシーは緩和しない。一時deployment URLは実機受入・ログインURLとして使用しない。
