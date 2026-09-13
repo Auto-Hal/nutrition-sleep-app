@@ -5,7 +5,7 @@ import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
-const typeSchema = z.enum(["ingredient", "product", "supplement", "estimated_dish", "batch"]);
+const typeSchema = z.enum(["ingredient", "product", "supplement", "estimated_dish"]);
 const nutrientSchema = z.object({
   code: z.string(),
   amount: z.number().finite().min(0).nullable(),
