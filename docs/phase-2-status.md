@@ -52,7 +52,7 @@ Data APIのtable権限はauthenticatedへSELECTのみを付与し、anon/public�
 - 最新Preview deployment URL: `https://nutrition-sleep-p755o09ka-tsuno2.vercel.app`
 - 最新Preview deploymentはPR #2の現在コードを含むREADY状態
 - 固定branch alias: [nutrition-sleep-app-git-phase-2-nutrition-entry-f-9522f4-tsuno2.vercel.app](https://nutrition-sleep-app-git-phase-2-nutrition-entry-f-9522f4-tsuno2.vercel.app)
-- Preview deploymentのPR merge SHAはVercel生成の`850097c5c9b78de34afb2c49269b45e7181ef46d`。実装branchのsource headは上記実装コミット列で管理する
+- Preview deploymentのsource commitは`610ecb257bc99d4c01254dae91f7c6f9e1199452`（実装検証後のstatus文書同期コミット）。実装branchのsource headは上記実装コミット列で管理する
 - `pnpm install --frozen-lockfile`: PASS
 - `pnpm lint`: PASS
 - `pnpm typecheck`: PASS
