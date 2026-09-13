@@ -25,7 +25,7 @@ export function AppShell({ children, email }: { children: ReactNode; email?: str
     <div className="app-frame">
       <div className="app-main" style={{ paddingBottom: 0 }}>
         <div className="topbar" style={{ marginBottom: 0 }}>
-          <span className="eyebrow">{email ?? "Astra"}</span>
+          <span className="eyebrow">{email ?? "アカウント"}</span>
           <button className="button ghost" type="button" onClick={logout}>ログアウト</button>
         </div>
       </div>

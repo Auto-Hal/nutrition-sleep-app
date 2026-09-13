@@ -16,6 +16,8 @@ jobs:
       SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
       APP_SESSION_ENCRYPTION_KEY: ci-only-placeholder-32-byte-value
+      APP_ALLOWED_USER_ID: 00000000-0000-4000-8000-000000000001
+      APP_LOGIN_RATE_LIMIT_KEY: ci-only-rate-limit-key-32-byte-value
       APP_ORIGIN: http://localhost:3000
     steps:
       - uses: actions/checkout@v4

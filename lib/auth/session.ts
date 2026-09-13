@@ -39,6 +39,7 @@ function cookieOptions(maxAge: number) {
 export async function persistAuthSession(userId: string, email: string | null, accessToken: string, refreshToken: string, expiresIn: number) {
   const env = serverEnv();
   if (!env) throw new Error("Server environment is not configured");
+  if (userId !== env.allowedUserId) throw new Error("Authenticated user is not allowed");
   const sessionId = randomBytes(32).toString("base64url");
   const sessionHash = hashSessionId(sessionId);
   const now = Date.now();
@@ -50,8 +51,8 @@ export async function persistAuthSession(userId: string, email: string | null, a
   return { sessionId, email };
 }
 
-async function loadStoredSession(sessionId: string) {
-  const result = await query<StoredSession>("select session_hash, user_id, access_token_ciphertext, refresh_token_ciphertext, token_expires_at, expires_at, revoked_at, revision, refresh_lease_until from private.app_sessions where session_hash = $1 and revoked_at is null and expires_at > now()", [hashSessionId(sessionId)]);
+async function loadStoredSession(sessionId: string, allowedUserId: string) {
+  const result = await query<StoredSession>("select session_hash, user_id, access_token_ciphertext, refresh_token_ciphertext, token_expires_at, expires_at, revoked_at, revision, refresh_lease_until from private.app_sessions where session_hash = $1 and user_id = $2 and revoked_at is null and expires_at > now()", [hashSessionId(sessionId), allowedUserId]);
   return result.rows[0] ?? null;
 }
 
@@ -84,14 +85,14 @@ export async function getAppSession(): Promise<AppSession | null> {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
-  let stored = await loadStoredSession(sessionId);
+  let stored = await loadStoredSession(sessionId, env.allowedUserId);
   if (!stored) return null;
   const initialSnapshot = toRefreshSnapshot(stored);
   if (initialSnapshot.tokenExpiresAt - Date.now() < REFRESH_WINDOW_MS) {
     const resolved = await resolveRefreshRace(initialSnapshot, {
       refreshWindowMs: REFRESH_WINDOW_MS,
       load: async () => {
-        const latest = await loadStoredSession(sessionId);
+        const latest = await loadStoredSession(sessionId, env.allowedUserId);
         return latest ? toRefreshSnapshot(latest) : null;
       },
       claim: (snapshot) => claimRefresh(snapshot.value),
@@ -104,11 +105,11 @@ export async function getAppSession(): Promise<AppSession | null> {
           if (!refreshed.data.session) return null;
           const persistedRevision = await persistRefresh(current, refreshed.data.session.access_token, refreshed.data.session.refresh_token, refreshed.data.session.expires_in, env.encryptionKey);
           if (persistedRevision === null) {
-            const latest = await loadStoredSession(sessionId);
+            const latest = await loadStoredSession(sessionId, env.allowedUserId);
             return latest ? toRefreshSnapshot(latest) : null;
           }
           persisted = true;
-          const latest = await loadStoredSession(sessionId);
+          const latest = await loadStoredSession(sessionId, env.allowedUserId);
           return latest ? toRefreshSnapshot(latest) : null;
         } finally {
           if (!persisted) await releaseRefresh(current);
@@ -121,7 +122,7 @@ export async function getAppSession(): Promise<AppSession | null> {
   const accessToken = decryptSecret(stored.access_token_ciphertext, env.encryptionKey);
   const tokenExpiresAt = new Date(stored.token_expires_at).getTime();
   const { data } = await createUserClient(accessToken).auth.getUser();
-  if (!data.user || data.user.id !== stored.user_id || tokenExpiresAt <= Date.now()) return null;
+  if (!data.user || data.user.id !== stored.user_id || data.user.id !== env.allowedUserId || stored.user_id !== env.allowedUserId || tokenExpiresAt <= Date.now()) return null;
   await query("update private.app_sessions set last_seen_at = now() where session_hash = $1 and revoked_at is null", [stored.session_hash]);
   return { sessionId, sessionHash: stored.session_hash, userId: stored.user_id, email: data.user.email ?? null, accessToken, revision: stored.revision };
 }
@@ -131,4 +132,11 @@ export async function revokeAppSession() {
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (sessionId && serverEnv()) await query("update private.app_sessions set revoked_at = now(), revision = revision + 1 where session_hash = $1 and revoked_at is null", [hashSessionId(sessionId)]);
   cookieStore.set(SESSION_COOKIE, "", cookieOptions(0));
+}
+
+/** Revoke every server-side session for the single configured application user. */
+export async function revokeAllAppSessions() {
+  const env = serverEnv();
+  if (!env) throw new Error("Server environment is not configured");
+  await query("update private.app_sessions set revoked_at = now(), revision = revision + 1 where user_id = $1 and revoked_at is null", [env.allowedUserId]);
 }

@@ -5,4 +5,6 @@ import { fileURLToPath } from "node:url";
 const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
 const config = [...compat.extends("next/core-web-vitals")];
 
-export default config;
+const eslintConfig = [{ ignores: [".next/**", "node_modules/**", "playwright-report/**", "test-results/**"] }, ...config];
+
+export default eslintConfig;

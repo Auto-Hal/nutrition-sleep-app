@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "verify:env": "node scripts/verify-env.mjs"
+    "verify:env": "node scripts/verify-env.mjs",
+    "auth:admin": "node scripts/auth-admin.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.57.2",

@@ -1,4 +1,4 @@
-const required = ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "DATABASE_URL", "APP_SESSION_ENCRYPTION_KEY", "APP_ORIGIN"];
+const required = ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "DATABASE_URL", "APP_SESSION_ENCRYPTION_KEY", "APP_ALLOWED_USER_ID", "APP_LOGIN_RATE_LIMIT_KEY", "APP_ORIGIN"];
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length) {
   console.error(`Missing server environment variables: ${missing.join(", ")}`);
@@ -28,6 +28,21 @@ if (expectedRef && expectedRef !== "replace_me") {
 }
 if (Buffer.byteLength(process.env.APP_SESSION_ENCRYPTION_KEY) < 32) {
   console.error("APP_SESSION_ENCRYPTION_KEY must contain at least 32 bytes.");
+  process.exit(1);
+}
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(process.env.APP_ALLOWED_USER_ID)) {
+  console.error("APP_ALLOWED_USER_ID must be a valid UUID.");
+  process.exit(1);
+}
+if (Buffer.byteLength(process.env.APP_LOGIN_RATE_LIMIT_KEY) < 32) {
+  console.error("APP_LOGIN_RATE_LIMIT_KEY must contain at least 32 bytes.");
+  process.exit(1);
+}
+try {
+  const origin = new URL(process.env.APP_ORIGIN);
+  if (origin.protocol !== "http:" && origin.protocol !== "https:") throw new Error();
+} catch {
+  console.error("APP_ORIGIN must be an absolute http(s) URL.");
   process.exit(1);
 }
 console.log("Environment contract passed.");

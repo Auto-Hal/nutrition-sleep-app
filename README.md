@@ -1,6 +1,6 @@
 # Nutrition / Sleep App — Phase 1 Foundation
 
-This repository contains the approved Phase 1 foundation for the Astra nutrition and sleep management app. The current scope is authentication, profile storage, four-tab navigation, Supabase migrations/RLS, and the CI/Preview handoff. Meal logging, catalog/OCR, nutrition analytics, Fitbit/Google Health integration, offline sync, and export remain in later phases.
+This repository contains the approved Phase 1 foundation for the nutrition and sleep management app. The current scope is pre-provisioned email/password authentication, profile storage, four-tab navigation, Supabase migrations/RLS, and the CI/Preview handoff. Meal logging, catalog/OCR, nutrition analytics, Fitbit/Google Health integration, offline sync, and export remain in later phases.
 
 ENV-001 uses a new app-dedicated Supabase account with two Free projects: `nutrition-sleep-preview` and `nutrition-sleep-production`. The existing `Auto-Hal's Org` projects `study-graph` and `money-canvas` are out of scope and must not be changed, paused, or reused.
 
@@ -17,7 +17,7 @@ The browser talks only to same-origin Next.js routes. Supabase access and refres
 
 The migration under `supabase/migrations/` is the complete Phase 1 schema. It creates only `public.user_profiles` and the server-only `private.app_sessions` table. Run all migrations against an empty dedicated database before using the app. The pgTAP checks under `supabase/tests/phase1_rls.sql` cover the intended RLS and permission contract.
 
-`DATABASE_URL` is required by the server session repository and must point to the same environment as `SUPABASE_URL`. The production database URL must never be configured in a Preview deployment.
+`DATABASE_URL` is required by the server session repository and must point to the same environment as `SUPABASE_URL`. `APP_ALLOWED_USER_ID` identifies the one pre-provisioned Auth user, and `APP_LOGIN_RATE_LIMIT_KEY` is a server-only HMAC key for shared login throttling. The production database URL must never be configured in a Preview deployment.
 
 ## Checks
 
@@ -32,8 +32,9 @@ CI runs the same checks and a fresh local Supabase replay. Preview deployment is
 
 ## Security boundaries
 
-- `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, and `APP_SESSION_ENCRYPTION_KEY` are server-only.
+- `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `APP_SESSION_ENCRYPTION_KEY`, `APP_ALLOWED_USER_ID`, and `APP_LOGIN_RATE_LIMIT_KEY` are server-only.
 - `service_role` and provider OAuth credentials are not used by the browser and are not committed.
+- Public signup, anonymous sign-in, OTP, and Magic Link are disabled for this personal app. Password administration is local-only and interactive.
 - `auth.uid()` owns every profile row; direct profile delete is disabled in Phase 1.
 - `revision` protects profile updates from lost writes.
 - Missing values remain `NULL`; the foundation never converts an unknown health value into zero or a normal value.

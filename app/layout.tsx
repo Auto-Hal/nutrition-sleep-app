@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Astra | 栄養・睡眠管理",
+  title: "栄養・睡眠管理",
   description: "食事と睡眠を低負担で記録するための基盤",
-  applicationName: "Astra",
+  applicationName: "栄養・睡眠管理",
   manifest: "/manifest.webmanifest",
 };
 

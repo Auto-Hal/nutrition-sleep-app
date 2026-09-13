@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 
 function keyFromSecret(secret: string) {
   return createHash("sha256").update(secret).digest();
@@ -6,6 +6,11 @@ function keyFromSecret(secret: string) {
 
 export function hashSessionId(sessionId: string) {
   return createHash("sha256").update(sessionId).digest("hex");
+}
+
+/** Return a one-way fingerprint suitable for rate-limit keys. */
+export function hmacSha256(value: string, secret: string) {
+  return createHmac("sha256", secret).update(value).digest("hex");
 }
 
 export function encryptSecret(value: string, secret: string) {
