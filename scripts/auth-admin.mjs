@@ -67,30 +67,39 @@ function readSecret(prompt) {
 
 let password = "";
 let confirmation = "";
-try {
-  password = await readSecret("New password (input is hidden): ");
-  confirmation = await readSecret("Repeat password (input is hidden): ");
-  if (password.length < 12 || password.length > 1024) throw new Error("Password must be between 12 and 1024 characters.");
-  if (password !== confirmation) throw new Error("Passwords do not match.");
-
+async function revokeAndVerifySessions() {
   const db = new pg.Client({
     connectionString: DATABASE_URL,
     ssl: DATABASE_URL.includes("localhost") ? undefined : { rejectUnauthorized: false },
   });
   await db.connect();
   try {
-    // Recovery and initial setup both revoke every app session before the new
-    // credential becomes usable. No token or password is written to the DB.
     await db.query("update private.app_sessions set revoked_at = now(), revision = revision + 1 where user_id = $1 and revoked_at is null", [APP_ALLOWED_USER_ID]);
+    const result = await db.query("select count(*)::integer as active_sessions from private.app_sessions where user_id = $1 and revoked_at is null", [APP_ALLOWED_USER_ID]);
+    if (Number(result.rows[0]?.active_sessions ?? -1) !== 0) throw new Error("Existing app sessions could not be fully revoked.");
   } finally {
     await db.end();
   }
+}
+
+try {
+  password = await readSecret("New password (input is hidden): ");
+  confirmation = await readSecret("Repeat password (input is hidden): ");
+  if (password.length < 12 || password.length > 1024) throw new Error("Password must be between 12 and 1024 characters.");
+  if (password !== confirmation) throw new Error("Passwords do not match.");
+
+  // Recovery and initial setup both revoke and verify every app session before
+  // the new credential becomes usable. No token or password is written to DB.
+  await revokeAndVerifySessions();
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const { error } = await supabase.auth.admin.updateUserById(APP_ALLOWED_USER_ID, { password });
   if (error) throw new Error("Supabase rejected the password update.");
+  // A concurrent login could have created a row while Auth was updated. Revoke
+  // once more and verify zero active rows before reporting completion.
+  await revokeAndVerifySessions();
   console.log("Password updated and existing app sessions revoked.");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Password update failed.");
