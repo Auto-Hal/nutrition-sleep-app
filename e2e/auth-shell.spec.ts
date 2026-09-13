@@ -14,7 +14,7 @@ test("login shell exposes an email and password form", async ({ page }) => {
 });
 
 test("legacy OTP endpoints are not registered", async ({ request }) => {
-  for (const path of ["/api/auth/request-otp", "/api/auth/verify-otp"]) {
+  for (const path of ["/api/auth/request-otp", "/api/auth/verify-otp", "/api/auth/signup"]) {
     const response = await request.post(path, { data: {} });
     expect(response.status()).toBe(404);
   }

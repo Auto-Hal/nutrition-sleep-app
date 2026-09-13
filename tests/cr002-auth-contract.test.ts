@@ -14,6 +14,8 @@ describe("CR-002 auth boundary", () => {
     expect(route).toContain("isAllowedOrigin");
     expect(route).not.toContain("signInWithOtp");
     expect(route).not.toContain("verifyOtp");
+    expect(route).not.toContain("signUp");
+    expect(route).not.toContain("signInAnonymously");
     expect(read("components/login-form.tsx")).not.toContain("one-time-code");
     expect(read("components/login-form.tsx")).not.toContain("request-otp");
   });
@@ -41,5 +43,6 @@ describe("CR-002 auth boundary", () => {
     expect(utility).toContain("private.app_sessions");
     expect(utility).not.toContain("process.argv[3]");
     expect(utility).not.toMatch(/APP_.*PASSWORD/);
+    expect(utility.indexOf("private.app_sessions")).toBeLessThan(utility.indexOf("auth.admin.updateUserById"));
   });
 });
