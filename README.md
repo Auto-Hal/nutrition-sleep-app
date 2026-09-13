@@ -1,6 +1,6 @@
 # Nutrition / Sleep App — Phase 1 Foundation
 
-This repository contains the approved Phase 1 foundation for the nutrition and sleep management app. The current scope is pre-provisioned email/password authentication, profile storage, four-tab navigation, Supabase migrations/RLS, and the CI/Preview handoff. Meal logging, catalog/OCR, nutrition analytics, Fitbit/Google Health integration, offline sync, and export remain in later phases.
+This repository contains the approved Phase 1 foundation and the Phase 2 meal/catalog entry foundation for the nutrition and sleep management app. The Phase 2 branch adds owner-scoped Catalog, Batch, Meal CRUD and immutable nutrient snapshots. Nutrition analytics, barcode/OCR, Fitbit/Google Health integration, offline sync, and export remain in later phases.
 
 ENV-001 uses a new app-dedicated Supabase account with two Free projects: `nutrition-sleep-preview` and `nutrition-sleep-production`. The existing `Auto-Hal's Org` projects `study-graph` and `money-canvas` are out of scope and must not be changed, paused, or reused.
 
@@ -15,7 +15,7 @@ The browser talks only to same-origin Next.js routes. Supabase access and refres
 
 ## Database
 
-The migration under `supabase/migrations/` is the complete Phase 1 schema. It creates only `public.user_profiles` and the server-only `private.app_sessions` table. Run all migrations against an empty dedicated database before using the app. The pgTAP checks under `supabase/tests/phase1_rls.sql` cover the intended RLS and permission contract.
+The migrations under `supabase/migrations/` are additive and must be replayed in filename order against an empty dedicated database. Phase 1 creates the profile/session foundation; Phase 2 adds Catalog, Batch, Meal, and immutable nutrient snapshot tables. The pgTAP checks under `supabase/tests/` cover the RLS and permission contracts.
 
 `DATABASE_URL` is required by the server session repository and must point to the same environment as `SUPABASE_URL`. `APP_ALLOWED_USER_ID` identifies the one pre-provisioned Auth user, and `APP_LOGIN_RATE_LIMIT_KEY` is a server-only HMAC key for shared login throttling. The production database URL must never be configured in a Preview deployment.
 

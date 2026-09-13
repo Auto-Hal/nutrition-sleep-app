@@ -1,4 +1,5 @@
 import { ProfileForm } from "@/components/profile-form";
+import { CatalogLibrary } from "@/components/catalog-library";
 import { getAppSession } from "@/lib/auth/session";
 import { getProfile } from "@/lib/profile";
 
@@ -18,7 +19,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <a href="/settings?view=library" aria-current={view === "library" ? "page" : undefined}>Library</a>
       </nav>
       {view === "library" ? (
-        <section className="card"><h2>Library</h2><div className="empty-state">よく使う項目、Meal Preset、商品は後続Phaseで追加します。</div></section>
+        <CatalogLibrary />
       ) : (
         <ProfileForm initialProfile={profile} />
       )}
