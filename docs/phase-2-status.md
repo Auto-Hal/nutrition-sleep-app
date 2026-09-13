@@ -84,4 +84,16 @@ Data APIのtable権限はauthenticatedへSELECTのみを付与し、anon/public�
 
 `20260914010000_phase2_integrity_hardening.sql` 適用後、Preview実DBで14項目のfocused smokeをトランザクション内で実施し、全項目PASS。固定枠のactive entry保護、空枠skip、Batch専用RPC境界、nested Batch拒否、snapshotのamount/quality/provenance/source不変性、unknown保持、依存Batch再計算、品質伝播、使用中componentの単位変更拒否、user A/B/anon RLSを確認した。smokeはrollbackで終了し、実データは残していない。
 
-SupervisorによるPRレビュー、Preview上の認証済みUI操作、iPhone/iPad実機確認はこの実装報告後のゲートとして残る。Production migration、Production deploy、main merge、Phase 3開始はSupervisorの次の承認まで行わない。
+SupervisorによるPRレビュー、Preview上の認証済みUI操作、iPhone/iPad実機確認は完了。Production migration、Production deploy、main merge、Phase 3開始はProduction rollout承認まで行わない。
+
+
+## Preview device acceptance（2026-09-14）
+
+- Preview DATABASE_URLの認証不一致を修復し、固定branch aliasからの実認証を再確認。
+- Vercel runtimeで誤passwordの `POST /api/auth/login 401`、正しいpasswordの `POST /api/auth/login 200` を確認。
+- 認証後の `/today`、`/nutrition`、`/sleep`、`/settings` は200。
+- 実機操作で `POST /api/catalog 201`、`POST /api/meals 201`、`POST /api/meals/state 200` を確認。
+- iPhone実機: PASS。
+- iPad実機: PASS。
+- Phase 2 Preview acceptance COMPLETE。
+- Production rollout READY。Phase 3はProduction verification完了まで開始しない。
