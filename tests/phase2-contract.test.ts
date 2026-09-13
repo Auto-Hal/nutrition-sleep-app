@@ -45,6 +45,7 @@ describe("Phase 2 catalog and meal contract", () => {
     expect(migration).toContain("pg_advisory_xact_lock");
     expect(migration).toContain("create or replace function public.recalculate_batch_nutrients");
     expect(migration).toContain("'batch_calculation'");
+    expect(migration).toContain("batch component unit must match serving unit");
   });
 
   it("keeps all Phase 2 data owner-scoped and writes through authenticated RPCs", () => {

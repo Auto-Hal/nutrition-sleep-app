@@ -321,6 +321,7 @@ declare
   owner_id uuid := (select auth.uid());
   item public.catalog_items;
   component record;
+  component_item public.catalog_items;
   pos integer := 0;
 begin
   if owner_id is null then raise exception using errcode = '42501', message = 'authentication required'; end if;
@@ -336,7 +337,9 @@ begin
   for component in select * from jsonb_to_recordset(coalesce(p_components, '[]'::jsonb)) as x(catalog_item_id uuid, quantity numeric, quantity_unit text)
   loop
     pos := pos + 1;
-    if not exists (select 1 from public.catalog_items where id = component.catalog_item_id and user_id = owner_id and active) then raise exception using errcode = '42501', message = 'batch component is not owned by user'; end if;
+    select * into component_item from public.catalog_items where id = component.catalog_item_id and user_id = owner_id and active;
+    if component_item.id is null then raise exception using errcode = '42501', message = 'batch component is not owned by user'; end if;
+    if trim(component.quantity_unit) <> component_item.serving_unit then raise exception using errcode = '22023', message = 'batch component unit must match serving unit'; end if;
     insert into public.batch_components (batch_id, user_id, catalog_item_id, quantity, quantity_unit, position)
     values (item.id, owner_id, component.catalog_item_id, component.quantity, trim(component.quantity_unit), pos);
   end loop;
@@ -363,6 +366,7 @@ declare
   owner_id uuid := (select auth.uid());
   item public.catalog_items;
   component record;
+  component_item public.catalog_items;
   pos integer := 0;
 begin
   if owner_id is null then raise exception using errcode = '42501', message = 'authentication required'; end if;
@@ -375,7 +379,9 @@ begin
   for component in select * from jsonb_to_recordset(coalesce(p_components, '[]'::jsonb)) as x(catalog_item_id uuid, quantity numeric, quantity_unit text)
   loop
     pos := pos + 1;
-    if not exists (select 1 from public.catalog_items where id = component.catalog_item_id and user_id = owner_id and active) then raise exception using errcode = '42501', message = 'batch component is not owned by user'; end if;
+    select * into component_item from public.catalog_items where id = component.catalog_item_id and user_id = owner_id and active;
+    if component_item.id is null then raise exception using errcode = '42501', message = 'batch component is not owned by user'; end if;
+    if trim(component.quantity_unit) <> component_item.serving_unit then raise exception using errcode = '22023', message = 'batch component unit must match serving unit'; end if;
     insert into public.batch_components (batch_id, user_id, catalog_item_id, quantity, quantity_unit, position)
     values (p_batch_id, owner_id, component.catalog_item_id, component.quantity, trim(component.quantity_unit), pos);
   end loop;
