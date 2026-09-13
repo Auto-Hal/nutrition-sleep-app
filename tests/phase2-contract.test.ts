@@ -6,6 +6,7 @@ import { NUTRIENT_DEFINITIONS, nutrientPayload } from "@/lib/nutrition/catalog";
 const root = process.cwd();
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const migration = read("supabase/migrations/20260914000000_phase2_meal_catalog.sql");
+const integrityMigration = read("supabase/migrations/20260914010000_phase2_integrity_hardening.sql");
 
 describe("Phase 2 catalog and meal contract", () => {
   it("defines the complete nutrient vocabulary with explicit units", () => {
@@ -35,6 +36,12 @@ describe("Phase 2 catalog and meal contract", () => {
     expect(migration).toContain("insert into public.meal_entry_nutrient_snapshots");
     expect(migration).toContain("source_catalog_revision");
     expect(migration).toContain("revoke insert, update, delete on table public.meal_entry_nutrient_snapshots from authenticated");
+    expect(integrityMigration).toContain("add column quality text not null default 'unknown'");
+    expect(integrityMigration).toContain("add column source_uri text");
+    expect(integrityMigration).toContain("add column source_observed_at timestamptz");
+    expect(integrityMigration).toContain("alter column provenance drop not null");
+    expect(integrityMigration).toContain("coalesce(n.quality, 'unknown')");
+    expect(integrityMigration).toContain("n.source_uri");
   });
 
   it("models meal states, custom timestamps, batch calculations, and idempotency", () => {
@@ -46,6 +53,14 @@ describe("Phase 2 catalog and meal contract", () => {
     expect(migration).toContain("create or replace function public.recalculate_batch_nutrients");
     expect(migration).toContain("'batch_calculation'");
     expect(migration).toContain("batch component unit must match serving unit");
+    expect(integrityMigration).toContain("batch items must be created through the batch RPC");
+    expect(integrityMigration).toContain("batch items must be edited through the batch RPC");
+    expect(integrityMigration).toContain("batch component cannot be another batch");
+    expect(integrityMigration).toContain("perform public.recalculate_batch_nutrients");
+    expect(integrityMigration).toContain("meal with active entries must remain recorded");
+    expect(integrityMigration).toContain("meal with active entries cannot be skipped");
+    expect(read("app/api/catalog/route.ts")).not.toContain('"estimated_dish", "batch"]');
+    expect(read("components/meal-log.tsx")).toContain('(meal?.entries.length ?? 0) === 0');
   });
 
   it("keeps all Phase 2 data owner-scoped and writes through authenticated RPCs", () => {
