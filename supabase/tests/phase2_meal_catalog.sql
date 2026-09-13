@@ -1,5 +1,5 @@
 begin;
-select plan(40);
+select plan(50);
 
 select has_table('public', 'nutrient_definitions', 'nutrient definitions exist');
 select has_table('public', 'catalog_items', 'catalog items exist');
@@ -13,6 +13,10 @@ select has_table('public', 'meal_entry_nutrient_snapshots', 'immutable meal snap
 select has_column('public', 'meal_entry_nutrient_snapshots', 'amount', 'snapshot amount is nullable');
 select has_column('public', 'meal_entry_nutrient_snapshots', 'provenance', 'snapshot provenance exists');
 select has_column('public', 'meal_entry_nutrient_snapshots', 'source_catalog_revision', 'snapshot source revision exists');
+select has_column('public', 'meal_entry_nutrient_snapshots', 'quality', 'snapshot data quality exists');
+select has_column('public', 'meal_entry_nutrient_snapshots', 'source_uri', 'snapshot source URI exists');
+select has_column('public', 'meal_entry_nutrient_snapshots', 'source_observed_at', 'snapshot source timestamp exists');
+select ok((select is_nullable = 'YES' from information_schema.columns where table_schema = 'public' and table_name = 'meal_entry_nutrient_snapshots' and column_name = 'provenance'), 'unknown snapshot provenance may be NULL');
 select has_column('public', 'meal_entries', 'idempotency_key', 'meal idempotency key exists');
 select has_column('public', 'meals', 'eaten_at', 'meal eaten timestamp exists');
 
@@ -48,6 +52,12 @@ select ok((select prosecdef from pg_proc where oid = 'public.create_meal_entry(d
 select ok((select position('pg_advisory_xact_lock' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation serializes duplicate attempts');
 select ok((select position('source_catalog_revision' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation records catalog revision');
 select ok((select position('case when n.amount is null then null' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation preserves unknown nutrients');
+select ok((select position('coalesce(n.quality' in pg_get_functiondef('public.create_meal_entry(date,public.meal_type,timestamptz,uuid,numeric,text,text)'::regprocedure)) > 0), 'meal creation snapshots data quality');
+select ok((select position('batch items must be created through the batch RPC' in pg_get_functiondef('public.create_catalog_item(public.catalog_item_type,text,text,numeric,text,jsonb,text)'::regprocedure)) > 0), 'generic catalog RPC cannot create batches');
+select ok((select position('batch items must be edited through the batch RPC' in pg_get_functiondef('public.update_catalog_item(uuid,integer,text,text,numeric,text,boolean,jsonb)'::regprocedure)) > 0), 'generic catalog RPC cannot edit batches');
+select ok((select position('perform public.recalculate_batch_nutrients' in pg_get_functiondef('public.update_catalog_item(uuid,integer,text,text,numeric,text,boolean,jsonb)'::regprocedure)) > 0), 'component catalog updates refresh dependent batch nutrients');
+select ok((select position('batch component cannot be another batch' in pg_get_functiondef('public.create_batch(text,text,numeric,text,jsonb,text)'::regprocedure)) > 0), 'nested batches are rejected');
+select ok((select position('meal with active entries must remain recorded' in pg_get_functiondef('public.set_meal_state(uuid,integer,public.meal_state,timestamptz)'::regprocedure)) > 0), 'meal state RPC preserves active-entry consistency');
 
 select * from finish();
 rollback;
