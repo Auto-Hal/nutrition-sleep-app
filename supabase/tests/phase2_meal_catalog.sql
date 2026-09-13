@@ -1,5 +1,5 @@
 begin;
-select plan(36);
+select plan(40);
 
 select has_table('public', 'nutrient_definitions', 'nutrient definitions exist');
 select has_table('public', 'catalog_items', 'catalog items exist');
