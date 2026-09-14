@@ -100,6 +100,7 @@ do $$
 declare
   energy_row record;
   vitamin_d_row record;
+  calcium_row record;
   partial_row record;
 begin
   select * into energy_row
@@ -137,6 +138,23 @@ begin
   end if;
   if vitamin_d_row.missing_entry_count <> 1 then
     raise exception 'phase4 smoke: vitamin D missing coverage count incorrect';
+  end if;
+
+  select * into calcium_row
+  from public.get_nutrition_daily_summary(date '2026-09-10', date '2026-09-11')
+  where meal_date = date '2026-09-10' and nutrient_code = 'calcium';
+
+  if calcium_row.entry_count <> 2 or calcium_row.missing_entry_count <> 2 then
+    raise exception 'phase4 smoke: all-unknown calcium coverage count incorrect';
+  end if;
+  if calcium_row.known_amount <> 0 then
+    raise exception 'phase4 smoke: all-unknown calcium subtotal should remain zero only as an explicit incomplete subtotal';
+  end if;
+  if calcium_row.coverage_complete is distinct from false or calcium_row.eligible_for_reference is distinct from false then
+    raise exception 'phase4 smoke: all-unknown calcium was incorrectly eligible';
+  end if;
+  if calcium_row.quality <> 'unknown_or_incomplete' then
+    raise exception 'phase4 smoke: all-unknown calcium quality incorrect';
   end if;
 
   select * into partial_row
