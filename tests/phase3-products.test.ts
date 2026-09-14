@@ -74,6 +74,22 @@ describe("Phase 3 product ingestion", () => {
     }, "4006381333931")).toBeNull();
   });
 
+  it("does not invent a gram basis when external package units are unknown", () => {
+    expect(normalizeOpenFoodFactsProduct({
+      product_name: "単位不明の商品",
+      nutriments: { "energy-kcal_100g": 100 },
+    }, "4006381333931")).toBeNull();
+  });
+
+  it("falls back to OCR when external data has no usable nutrients", () => {
+    expect(normalizeOpenFoodFactsProduct({
+      product_name: "栄養値なし",
+      product_quantity: 100,
+      product_quantity_unit: "g",
+      nutriments: {},
+    }, "4006381333931")).toBeNull();
+  });
+
   it("models local-first resolution and external/OCR fallbacks", () => {
     expect(resolver).toContain('.from("products")');
     expect(resolver.indexOf('.from("products")')).toBeLessThan(resolver.indexOf("const external = await fetchOpenFoodFactsProduct"));
