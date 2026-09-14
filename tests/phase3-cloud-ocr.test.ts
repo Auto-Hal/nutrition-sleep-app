@@ -65,6 +65,76 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     expect(parsed.diagnostics.basis_detected).toBe(true);
   });
 
+
+  it("does not borrow a neighboring row value when OCR row grouping is wrong", () => {
+    const words: OcrWord[] = [
+      word("たんぱく質", 20, 110, 150),
+      word("5.2", 360, 112, 55),
+      word("g", 435, 112, 20),
+      word("脂質", 20, 160, 70),
+      word("2.6", 360, 160, 55),
+      word("g", 435, 160, 20),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "たんぱく質 2.6 g\n5.2 g\n脂質",
+      width: 600,
+      height: 260,
+      words,
+      // Simulate a bad OCR visual-line association even though word coordinates are correct.
+      lines: [
+        {
+          text: "たんぱく質 2.6 g",
+          words: [words[0], words[4], words[5]],
+          box: { minX: 20, minY: 110, maxX: 455, maxY: 188 },
+        },
+        {
+          text: "5.2 g",
+          words: [words[1], words[2]],
+          box: { minX: 360, minY: 112, maxX: 455, maxY: 140 },
+        },
+        {
+          text: "脂質",
+          words: [words[3]],
+          box: { minX: 20, minY: 160, maxX: 90, maxY: 188 },
+        },
+      ],
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "protein", amount: 5.2, unit: "g" },
+      { code: "fat", amount: 2.6, unit: "g" },
+    ]));
+  });
+
+  it("leaves an anchored nutrient unknown instead of stealing the next row value", () => {
+    const words: OcrWord[] = [
+      word("たんぱく質", 20, 110, 150),
+      word("脂質", 20, 160, 70),
+      word("2.6", 360, 160, 55),
+      word("g", 435, 160, 20),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "たんぱく質\n脂質 2.6 g",
+      width: 600,
+      height: 260,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.nutrients.some((nutrient) => nutrient.code === "protein")).toBe(false);
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "fat", amount: 2.6, unit: "g" },
+    ]));
+  });
+
   it("uses a server-only synchronous Cloud Vision route without persisting images", () => {
     const route = read("app/api/ocr/nutrition-label/route.ts");
     const adapter = read("lib/products/google-cloud-vision.ts");
