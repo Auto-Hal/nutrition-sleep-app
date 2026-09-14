@@ -84,6 +84,11 @@ from phase4_smoke_context;
 select public.create_skipped_meal(date '2026-09-10', 'lunch');
 select public.create_skipped_meal(date '2026-09-10', 'dinner');
 
+-- Fully skipped day: explicit zero intake is valid, not "not recorded".
+select public.create_skipped_meal(date '2026-09-12', 'breakfast');
+select public.create_skipped_meal(date '2026-09-12', 'lunch');
+select public.create_skipped_meal(date '2026-09-12', 'dinner');
+
 -- Partial day: only breakfast recorded.
 select public.create_meal_entry(
   date '2026-09-11',
@@ -101,6 +106,7 @@ declare
   energy_row record;
   vitamin_d_row record;
   calcium_row record;
+  skipped_row record;
   partial_row record;
 begin
   select * into energy_row
@@ -155,6 +161,18 @@ begin
   end if;
   if calcium_row.quality <> 'unknown_or_incomplete' then
     raise exception 'phase4 smoke: all-unknown calcium quality incorrect';
+  end if;
+
+  select * into skipped_row
+  from public.get_nutrition_daily_summary(date '2026-09-12', date '2026-09-12')
+  where meal_date = date '2026-09-12' and nutrient_code = 'energy';
+
+  if skipped_row.record_complete is distinct from true
+     or skipped_row.coverage_complete is distinct from true
+     or skipped_row.eligible_for_reference is distinct from true
+     or skipped_row.entry_count <> 0
+     or skipped_row.known_amount <> 0 then
+    raise exception 'phase4 smoke: fully skipped day was not preserved as an explicit complete zero day';
   end if;
 
   select * into partial_row
