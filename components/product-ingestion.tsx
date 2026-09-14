@@ -119,7 +119,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
     const next = file ? URL.createObjectURL(file) : null;
     ocrPreviewRef.current = next;
     setOcrPreviewUrl(next);
-  }, [replaceOcrPreview]);
+  }, []);
 
   useEffect(() => () => {
     if (ocrPreviewRef.current) URL.revokeObjectURL(ocrPreviewRef.current);
@@ -134,7 +134,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
     setNeedsOcr(false);
     setMessage(null);
     setError(null);
-  }, []);
+  }, [replaceOcrPreview]);
 
   const resolveBarcode = useCallback(async (value: string) => {
     const normalized = normalizeBarcode(value);
