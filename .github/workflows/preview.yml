@@ -40,6 +40,5 @@ jobs:
           cat > .vercel/project.json <<'JSON'
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
-      - run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      - run: pnpm dlx vercel@48.2.0 build --target=preview --yes --token=${{ secrets.VERCEL_TOKEN }}
-      - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --target=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy Preview with Vercel-managed environment
+        run: pnpm dlx vercel@48.2.0 deploy --yes --target=preview --token=${{ secrets.VERCEL_TOKEN }}
