@@ -222,3 +222,73 @@ export async function getNutritionAnalytics(
     nutrients,
   };
 }
+
+
+export async function getNutritionDayDrilldown(
+  accessToken: string,
+  mealDate: string,
+  nutrientCode: NutrientCode,
+) {
+  const client = createUserClient(accessToken);
+
+  const { data: meals, error: mealError } = await client
+    .from("meals")
+    .select("id,meal_date,meal_type,state,eaten_at")
+    .eq("meal_date", mealDate)
+    .order("eaten_at", { ascending: true, nullsFirst: true });
+  if (mealError) throw new Error(mealError.message);
+
+  const mealIds = (meals ?? []).map((meal) => meal.id);
+  if (mealIds.length === 0) {
+    return { meal_date: mealDate, nutrient_code: nutrientCode, meals: [] };
+  }
+
+  const { data: entries, error: entryError } = await client
+    .from("meal_entries")
+    .select("id,meal_id,catalog_item_id,quantity,quantity_unit,catalog_items(name,item_type)")
+    .in("meal_id", mealIds)
+    .is("voided_at", null)
+    .order("created_at");
+  if (entryError) throw new Error(entryError.message);
+
+  const entryIds = (entries ?? []).map((entry) => entry.id);
+  const snapshots = entryIds.length === 0
+    ? []
+    : (await client
+      .from("meal_entry_nutrient_snapshots")
+      .select("meal_entry_id,amount,unit,quality,provenance")
+      .in("meal_entry_id", entryIds)
+      .eq("nutrient_code", nutrientCode)).data ?? [];
+
+  const snapshotByEntry = new Map(snapshots.map((snapshot) => [snapshot.meal_entry_id, snapshot]));
+
+  const entryRows = (entries ?? []).map((entry) => {
+    const catalog = Array.isArray(entry.catalog_items) ? entry.catalog_items[0] : entry.catalog_items;
+    const snapshot = snapshotByEntry.get(entry.id);
+    return {
+      id: entry.id,
+      meal_id: entry.meal_id,
+      catalog_item_id: entry.catalog_item_id,
+      name: (catalog as { name?: string } | null)?.name ?? "項目",
+      item_type: (catalog as { item_type?: string } | null)?.item_type ?? "ingredient",
+      quantity: Number(entry.quantity),
+      quantity_unit: entry.quantity_unit,
+      amount: snapshot?.amount === null || snapshot?.amount === undefined ? null : Number(snapshot.amount),
+      unit: snapshot?.unit ?? NUTRIENT_DEFINITIONS.find((definition) => definition.code === nutrientCode)?.unit ?? "",
+      quality: snapshot?.quality ?? "unknown",
+      provenance: snapshot?.provenance ?? null,
+    };
+  });
+
+  return {
+    meal_date: mealDate,
+    nutrient_code: nutrientCode,
+    meals: (meals ?? []).map((meal) => ({
+      id: meal.id,
+      meal_type: meal.meal_type,
+      state: meal.state,
+      eaten_at: meal.eaten_at,
+      entries: entryRows.filter((entry) => entry.meal_id === meal.id),
+    })),
+  };
+}
