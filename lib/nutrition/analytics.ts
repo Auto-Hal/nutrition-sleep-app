@@ -108,7 +108,7 @@ function stableReferences(
   };
 }
 
-function aggregateQuality(rows: DailyRow[]) {
+export function aggregateNutritionQuality(rows: Array<Pick<DailyRow, "quality">>) {
   if (rows.length === 0) return "unknown_or_incomplete" as const;
   if (rows.some((row) => row.quality === "unknown_or_incomplete")) return "unknown_or_incomplete" as const;
   if (rows.some((row) => row.quality === "contains_unverified")) return "contains_unverified" as const;
@@ -204,7 +204,7 @@ export async function getNutritionAnalytics(
       average_known_amount: avg,
       average_food_amount: average(eligibleRows.map((row) => row.food_amount)),
       average_supplement_amount: average(eligibleRows.map((row) => row.supplement_amount)),
-      quality: aggregateQuality(recordCompleteRows),
+      quality: aggregateNutritionQuality(recordCompleteRows),
       percent_energy: percent,
       dri: {
         references: dri.references,
