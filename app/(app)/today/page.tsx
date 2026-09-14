@@ -41,7 +41,7 @@ export default async function TodayPage() {
             </div>
             <a className="button ghost" href="/nutrition?range=7">傾向を見る</a>
           </div>
-          {summary && summary.entry_count > 0 ? (
+          {summary && (summary.entry_count > 0 || summary.record_complete) ? (
             <div className="today-nutrition-summary">
               <div>
                 <span className="muted">既知エネルギー</span>
