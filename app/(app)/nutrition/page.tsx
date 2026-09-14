@@ -25,6 +25,16 @@ function formatAmount(value: number | null, unit: string) {
   return `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits }).format(value)} ${unit}`;
 }
 
+function dailyKnownAmount(day: {
+  entry_count: number;
+  missing_entry_count: number;
+  known_amount: number;
+}) {
+  return day.entry_count > 0 && day.entry_count === day.missing_entry_count
+    ? null
+    : day.known_amount;
+}
+
 function qualityLabel(value: string) {
   if (value === "user_verified") return "確認済み";
   if (value === "contains_unverified") return "未確認値を含む";
@@ -220,8 +230,10 @@ export default async function NutritionPage({
                     </div>
                   </div>
                   <div className="nutrition-day-value">
-                    <strong>{formatAmount(day.known_amount, day.unit)}</strong>
-                    {!day.coverage_complete && <small>既知分のみ</small>}
+                    <strong>{formatAmount(dailyKnownAmount(day), day.unit)}</strong>
+                    {dailyKnownAmount(day) === null
+                      ? <small>未登録</small>
+                      : !day.coverage_complete && <small>既知分のみ</small>}
                   </div>
                 </a>
               ))}
