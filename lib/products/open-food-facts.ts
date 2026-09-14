@@ -82,7 +82,7 @@ function normalizePackage(product: OffProduct) {
   const rawUnit = nullableText(product.product_quantity_unit)?.toLowerCase();
 
   if (!Number.isFinite(rawAmount) || rawAmount <= 0 || !rawUnit) {
-    return { amount: null, unit: null, basisUnit: "g" as const };
+    return { amount: null, unit: null, basisUnit: null };
   }
 
   if (rawUnit === "ml") return { amount: rawAmount, unit: "ml" as const, basisUnit: "ml" as const };
@@ -91,7 +91,7 @@ function normalizePackage(product: OffProduct) {
   if (rawUnit === "g") return { amount: rawAmount, unit: "g" as const, basisUnit: "g" as const };
   if (rawUnit === "kg") return { amount: rawAmount * 1_000, unit: "g" as const, basisUnit: "g" as const };
 
-  return { amount: null, unit: null, basisUnit: "g" as const };
+  return { amount: null, unit: null, basisUnit: null };
 }
 
 export function normalizeOpenFoodFactsProduct(product: OffProduct, barcode: string, observedAt = new Date().toISOString()): ExternalProductCandidate | null {
@@ -108,6 +108,8 @@ export function normalizeOpenFoodFactsProduct(product: OffProduct, barcode: stri
   });
 
   const packageInfo = normalizePackage(product);
+  if (!packageInfo.basisUnit || nutrients.length === 0) return null;
+
   return {
     barcode,
     name,
