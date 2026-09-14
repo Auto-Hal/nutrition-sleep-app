@@ -263,11 +263,13 @@ function geometryMatches(document: OcrDocument) {
       ? currentY + Math.max(24, boxHeight(anchor.box) * 1.3)
       : (currentY + nextY) / 2;
 
+    const maxVerticalDistance = Math.max(24, boxHeight(anchor.box) * 1.5);
     const candidates = values
       .filter((candidate) => {
         const valueY = centerY(candidate.box);
         return valueY >= rowTop
           && valueY < rowBottom
+          && Math.abs(valueY - currentY) <= maxVerticalDistance
           && candidate.box.minX >= anchor.box.maxX - 8;
       })
       .map((candidate) => ({
