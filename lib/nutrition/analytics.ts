@@ -256,13 +256,23 @@ export async function getNutritionDayDrilldown(
   if (entryError) throw new Error(entryError.message);
 
   const entryIds = (entries ?? []).map((entry) => entry.id);
-  const snapshots = entryIds.length === 0
-    ? []
-    : (await client
+  let snapshots: Array<{
+    meal_entry_id: string;
+    amount: number | string | null;
+    unit: string;
+    quality: string;
+    provenance: string;
+  }> = [];
+
+  if (entryIds.length > 0) {
+    const { data: snapshotData, error: snapshotError } = await client
       .from("meal_entry_nutrient_snapshots")
       .select("meal_entry_id,amount,unit,quality,provenance")
       .in("meal_entry_id", entryIds)
-      .eq("nutrient_code", nutrientCode)).data ?? [];
+      .eq("nutrient_code", nutrientCode);
+    if (snapshotError) throw new Error(snapshotError.message);
+    snapshots = snapshotData ?? [];
+  }
 
   const snapshotByEntry = new Map(snapshots.map((snapshot) => [snapshot.meal_entry_id, snapshot]));
 
@@ -313,11 +323,18 @@ export async function getTodayNutritionSummary(
   const rows = normalizeDailyRows(data);
   const energy = rows.find((row) => row.nutrient_code === "energy") ?? null;
 
+  const entryCount = energy?.entry_count ?? 0;
+  const missingEntryCount = energy?.missing_entry_count ?? 0;
+  const knownEntryCount = Math.max(0, entryCount - missingEntryCount);
+
   return {
     date,
     record_complete: energy?.record_complete ?? false,
-    energy_known_amount: energy?.known_amount ?? 0,
+    energy_known_amount: knownEntryCount > 0 || entryCount === 0
+      ? energy?.known_amount ?? 0
+      : null,
     energy_coverage_complete: energy?.coverage_complete ?? false,
-    entry_count: energy?.entry_count ?? 0,
+    entry_count: entryCount,
+    known_entry_count: knownEntryCount,
   };
 }
