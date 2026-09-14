@@ -1,59 +1,75 @@
 import type { DriReference } from "@/lib/nutrition/dri/types";
 
-export type DriPosition =
+export type AdequacyPosition =
   | "below_ear"
   | "ear_to_rda"
   | "at_or_above_rda"
   | "below_ai_indeterminate"
-  | "at_or_above_ai"
-  | "below_dg"
-  | "within_dg"
-  | "above_dg"
-  | "at_or_below_ul"
-  | "above_ul"
-  | "reference_only"
-  | "not_comparable";
+  | "at_or_above_ai";
 
-export function evaluateDriReference(reference: DriReference, amount: number): DriPosition {
-  if (!reference.comparable) return "not_comparable";
-  if (!Number.isFinite(amount) || amount < 0) return "not_comparable";
+export type DgPosition = "below_dg" | "within_dg" | "above_dg";
+export type UlPosition = "at_or_below_ul" | "above_ul";
 
-  if (reference.metric === "EER_REFERENCE") return "reference_only";
+export type DriEvaluation = {
+  adequacy: AdequacyPosition | null;
+  target: DgPosition | null;
+  upperLimit: UlPosition | null;
+  hasEnergyReference: boolean;
+  nonComparableMetrics: DriReference["metric"][];
+};
 
-  if (reference.metric === "EAR") {
-    return reference.value !== undefined && amount < reference.value
-      ? "below_ear"
-      : "ear_to_rda";
-  }
-
-  if (reference.metric === "RDA") {
-    return reference.value !== undefined && amount >= reference.value
-      ? "at_or_above_rda"
-      : "ear_to_rda";
-  }
-
-  if (reference.metric === "AI") {
-    return reference.value !== undefined && amount >= reference.value
-      ? "at_or_above_ai"
-      : "below_ai_indeterminate";
-  }
-
-  if (reference.metric === "UL") {
-    return reference.value !== undefined && amount > reference.value
-      ? "above_ul"
-      : "at_or_below_ul";
-  }
-
-  if (reference.metric === "DG") {
-    if (reference.lower !== undefined && amount < reference.lower) return "below_dg";
-    if (reference.upper !== undefined && amount > reference.upper) return "above_dg";
-    return "within_dg";
-  }
-
-  return "not_comparable";
+function comparableReference(
+  references: DriReference[],
+  metric: DriReference["metric"],
+) {
+  return references.find((reference) => reference.metric === metric && reference.comparable);
 }
 
-export function describeDriPosition(position: DriPosition) {
+export function evaluateDriSet(references: DriReference[], amount: number): DriEvaluation {
+  const result: DriEvaluation = {
+    adequacy: null,
+    target: null,
+    upperLimit: null,
+    hasEnergyReference: references.some((reference) => reference.metric === "EER_REFERENCE"),
+    nonComparableMetrics: references
+      .filter((reference) => !reference.comparable)
+      .map((reference) => reference.metric),
+  };
+
+  if (!Number.isFinite(amount) || amount < 0) return result;
+
+  const ear = comparableReference(references, "EAR");
+  const rda = comparableReference(references, "RDA");
+  const ai = comparableReference(references, "AI");
+  const dg = comparableReference(references, "DG");
+  const ul = comparableReference(references, "UL");
+
+  if (ear?.value !== undefined && rda?.value !== undefined) {
+    if (amount < ear.value) result.adequacy = "below_ear";
+    else if (amount < rda.value) result.adequacy = "ear_to_rda";
+    else result.adequacy = "at_or_above_rda";
+  } else if (ai?.value !== undefined) {
+    result.adequacy = amount >= ai.value
+      ? "at_or_above_ai"
+      : "below_ai_indeterminate";
+  } else if (rda?.value !== undefined && amount >= rda.value) {
+    result.adequacy = "at_or_above_rda";
+  }
+
+  if (dg) {
+    if (dg.lower !== undefined && amount < dg.lower) result.target = "below_dg";
+    else if (dg.upper !== undefined && amount > dg.upper) result.target = "above_dg";
+    else result.target = "within_dg";
+  }
+
+  if (ul?.value !== undefined) {
+    result.upperLimit = amount > ul.value ? "above_ul" : "at_or_below_ul";
+  }
+
+  return result;
+}
+
+export function describeDriPosition(position: AdequacyPosition | DgPosition | UlPosition) {
   switch (position) {
     case "below_ear":
       return "EAR未満";
@@ -75,9 +91,5 @@ export function describeDriPosition(position: DriPosition) {
       return "UL以下";
     case "above_ul":
       return "UL超過";
-    case "reference_only":
-      return "参考値";
-    case "not_comparable":
-      return "比較対象外";
   }
 }
