@@ -159,6 +159,34 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     ]));
   });
 
+
+  it("recovers split Japanese energy labels and one-character kcal OCR noise", () => {
+    const words: OcrWord[] = [
+      word("エ", 20, 70, 24),
+      word("ネ", 48, 70, 24),
+      word("ル", 76, 70, 24),
+      word("ギ", 104, 70, 24),
+      word("一", 132, 70, 24),
+      word("180", 360, 70, 60),
+      word("kca|", 435, 70, 70),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "エ ネ ル ギ 一 180 kca|",
+      width: 600,
+      height: 180,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "energy", amount: 180, unit: "kcal" },
+    ]));
+  });
+
   it("uses a server-only synchronous Cloud Vision route without persisting images", () => {
     const route = read("app/api/ocr/nutrition-label/route.ts");
     const adapter = read("lib/products/google-cloud-vision.ts");
