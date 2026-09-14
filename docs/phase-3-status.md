@@ -3,7 +3,7 @@
 ## 現在の状態
 
 - **Phase 2 COMPLETE**
-- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PARTIAL — CLOUD OCR MIGRATION IN PROGRESS**
+- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / CLOUD OCR DEVICE ACCEPTANCE PASS / DEVICE ACCEPTANCE PARTIAL**
 - branch: `phase/3-product-ingestion`
 - main baseline: Phase 2 completion docsを含むmain
 - ProductionはPhase 2 deploymentを維持
@@ -90,10 +90,17 @@ iPhone/iPad実機でログインおよび主要フローの起動を確認した
 - OCR撮影 / 解析フローは動作
 
 品質上の未達:
-- 栄養成分表示OCRで、実ラベルに対して脂質しか抽出されないケースを確認。Phase 3 acceptanceとしては不十分。
 - live barcode scannerは位置合わせが難しく、入力負荷が高い。
 
-このためPhase 3はCOMPLETEにしない。
+Cloud OCR corrective acceptance:
+- Google Cloud Vision + geometry-aware parserへ移行後、Pasco実画像で基準量 `1 枚` を正しく抽出。
+- energy 180 kcal / protein 5.2 g / fat 2.6 g / carbohydrate 34.0 g / salt_equivalent 0.6 g をユーザー実機確認でPASS。
+- 途中で確認されたcross-row誤代入（proteinへfat 2.6を誤代入）は、row-band geometry制約により解消。
+- 読めない値は隣接行から借用せずunknownのまま残すfail-safe behaviorを確認。
+- `kcaI` / `kca1` / `kca|` 等の既知単位OCR揺れ、および長い栄養ラベルの1文字以内のOCR揺れのみ限定正規化。
+- 数値そのものは推測・補完しない。
+
+このためOCR gateはPASS。Phase 3全体はbarcode usability / iPad regressionが残るためまだCOMPLETEにしない。
 
 改善・設計判断:
 - barcodeは高解像度camera constraints + alignment guide + 静止画decode fallbackを追加済み。
@@ -111,10 +118,10 @@ iPhone/iPad実機でログインおよび主要フローの起動を確認した
 
 ## Remaining gate
 
-1. Cloud Vision OCR adapter / parser / confirmation UI CI
+1. Cloud Vision OCR adapter / parser / confirmation UI CI COMPLETE
 2. Preview Cloud Vision secret設定・runtime注入確認 COMPLETE
-3. Pasco実画像でCloud Vision acceptance
-4. iPhone実機でOCR + barcode corrective acceptance
+3. Pasco実画像でCloud Vision acceptance COMPLETE
+4. iPhoneでbarcode corrective acceptance
 5. iPad regression確認
 6. Supervisor acceptance
 7. PR ready / main merge
