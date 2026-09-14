@@ -3,12 +3,13 @@
 ## 現在の状態
 
 - **Phase 2 COMPLETE**
-- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PASS / SUPERVISOR ACCEPTANCE PASS**
-- branch: `phase/3-product-ingestion`
-- main baseline: Phase 2 completion docsを含むmain
-- ProductionはPhase 2 deploymentを維持
+- **Phase 3 COMPLETE**
+- main merge commit: `e9da1e51925b5f085071b8912c76040c40dd42c4`
 - Preview Supabase: `pprsfxpfljdjlwdfbtqo`
-- Production Supabase: `vyvnicyupcrsmtgdyypv`（Phase 3未適用）
+- Production Supabase: `vyvnicyupcrsmtgdyypv`
+- Production deployment: `dpl_CP8BVnzM21rGZb6aXKfsYXxgm19G`
+- Production alias: `https://nutrition-sleep-app.vercel.app`
+- Production state: `READY / target=production`
 
 ## Scope
 
@@ -76,10 +77,6 @@ Supabase Advisor review:
 - Production remains untouched.
 - `GOOGLE_CLOUD_VISION_API_KEY` は正しいVercel projectのPreview scopeへ再登録済み。Preview runtimeで `configured:true` を確認済み。
 
-## Stop condition
-
-iPhone実機でclient-side OCRが安定しない場合、外部OCR provider追加を勝手に行わず、privacy/cost/securityを含む設計判断として再評価する。
-
 ## Device acceptance checkpoint（2026-09-14）
 
 iPhone/iPad実機でログインおよび主要フローの起動を確認した。
@@ -132,13 +129,46 @@ Open Food Factsだけでは日本の市販商品のcoverageが不足するため
 - 現物ラベルuser_verifiedをlower-priority sourceで上書きしない
 - provider追加はadapter追加として実装し、Product/MealEntry schemaへ直接結合しない
 
-## Remaining gate
+## Production rollout（2026-09-14）
 
-1. Cloud Vision OCR adapter / parser / confirmation UI CI COMPLETE
-2. Preview Cloud Vision secret設定・runtime注入確認 COMPLETE
-3. Pasco実画像でCloud Vision acceptance COMPLETE
-4. iPhone barcode corrective acceptance COMPLETE
-5. iPad regression確認 COMPLETE
-6. Supervisor acceptance COMPLETE
-7. PR ready / main merge
-8. Production secret設定 + Production migration/deploy/verification
+Production Supabase:
+- Phase 3 migration `phase3_products` applied.
+- Production ledger version: `20260914095733`.
+- initial migration attempt stopped before Phase 3 objects were created because Production's Supabase migration ledger lacked the `UNIQUE (idempotency_key)` constraint already present in Preview.
+- added the same non-destructive ledger constraint, confirmed no partial Phase 3 objects existed, then re-applied successfully.
+- `supabase/smoke/phase3_products.sql` PASS in rollback-only transaction.
+- Product/Catalog/MealEntry synthetic rows remaining after smoke: 0.
+- Product RLS enabled.
+- authenticated Product SELECT allowed; authenticated direct INSERT denied.
+- anon Product SELECT/INSERT denied.
+
+Production Vercel:
+- deployment: `dpl_CP8BVnzM21rGZb6aXKfsYXxgm19G`
+- commit: `e9da1e51925b5f085071b8912c76040c40dd42c4`
+- state: `READY / target=production`
+- alias: `https://nutrition-sleep-app.vercel.app`
+- Production `GOOGLE_CLOUD_VISION_API_KEY` configured as a server-side Vercel secret.
+
+Production runtime/device verification:
+- incorrect-password login: 401
+- correct-password login: 200
+- `/today`, `/nutrition`, `/sleep`, `/settings`: 200
+- `/api/catalog`, `/api/batches`, `/api/meals`: 200
+- `/api/products/resolve`: 200
+- `POST /api/ocr/nutrition-label`: 200
+- real Pasco nutrition label OCR confirmed accurate on device.
+- runtime errors during verification window: 0.
+
+## Completion
+
+Phase 3 acceptance gates are all COMPLETE:
+1. implementation CI / build / DB replay / pgTAP
+2. Preview DB acceptance
+3. Preview Cloud Vision secret and OCR acceptance
+4. iPhone barcode acceptance
+5. iPad regression acceptance
+6. Supervisor acceptance
+7. main merge
+8. Production migration / deploy / runtime verification
+
+**Phase 3 COMPLETE. Phase 4 may start.**
