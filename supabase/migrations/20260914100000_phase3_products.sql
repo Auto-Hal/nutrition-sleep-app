@@ -147,16 +147,20 @@ begin
     hashtextextended(owner_id::text || ':product:' || trim(p_barcode), 0)
   );
 
-  select c, p
-  into item, product
-  from public.catalog_items c
-  join public.products p on p.catalog_item_id = c.id
-  where c.user_id = owner_id
-    and p.user_id = owner_id
+  select p.*
+  into product
+  from public.products p
+  where p.user_id = owner_id
     and p.barcode = trim(p_barcode)
   limit 1;
 
-  if item.id is not null then
+  if product.catalog_item_id is not null then
+    select c.*
+    into item
+    from public.catalog_items c
+    where c.id = product.catalog_item_id
+      and c.user_id = owner_id;
+
     return jsonb_build_object(
       'item_id', item.id,
       'barcode', product.barcode,
