@@ -111,10 +111,13 @@ export async function recognizeWithGoogleCloudVision(image: Uint8Array): Promise
   }
 
   const response = await fetch(
-    `https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(apiKey)}`,
+    "https://vision.googleapis.com/v1/images:annotate",
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
       body: JSON.stringify({
