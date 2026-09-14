@@ -168,7 +168,14 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         if (cancelled || !videoRef.current) return;
         const reader = new BrowserMultiFormatOneDReader();
         const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } }, audio: false },
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
+            audio: false,
+          },
           videoRef.current,
           (result, error, scanControls) => {
             if (!result) {
@@ -200,6 +207,26 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
       stopScannerRef.current = null;
     };
   }, [scannerOpen, resolveBarcode]);
+
+  async function readBarcodePhoto(file: File) {
+    setBusy(true);
+    setError(null);
+    try {
+      const { BrowserMultiFormatOneDReader } = await import("@zxing/browser");
+      const reader = new BrowserMultiFormatOneDReader();
+      const url = URL.createObjectURL(file);
+      try {
+        const result = await reader.decodeFromImageUrl(url);
+        await resolveBarcode(result.getText());
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      setError("バーコードを写真から読み取れませんでした。バーコード全体が大きく、水平に写るよう撮り直してください。");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function readLabel(file: File) {
     const normalized = normalizeBarcode(barcode);
@@ -341,14 +368,27 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
       </div>
 
       <div className="form-actions">
-        <button className="button" type="button" onClick={() => setScannerOpen(true)} disabled={busy || scannerOpen}>カメラで読み取る</button>
+        <button className="button" type="button" onClick={() => setScannerOpen(true)} disabled={busy || scannerOpen}>ライブカメラで読む</button>
+        <label className="button secondary">
+          バーコードを撮影
+          <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void readBarcodePhoto(file);
+            event.currentTarget.value = "";
+          }} />
+        </label>
         <button className="button secondary" type="button" onClick={() => void resolveBarcode(barcode)} disabled={busy}>番号で検索</button>
       </div>
 
       {scannerOpen && (
         <div className="stack" aria-live="polite">
-          <video ref={videoRef} className="barcode-video" muted playsInline />
-          <p className="muted">バーコードを枠内に入れてください。</p>
+          <div className="barcode-camera-shell">
+            <video ref={videoRef} className="barcode-video" muted playsInline />
+            <div className="barcode-guide" aria-hidden="true">
+              <span />
+            </div>
+          </div>
+          <p className="muted">バーコードを横向きにし、中央の枠いっぱいに入れてください。合わせにくい場合は「バーコードを撮影」の方が確実です。</p>
           <button className="button ghost" type="button" onClick={() => setScannerOpen(false)}>カメラを閉じる</button>
         </div>
       )}
@@ -418,6 +458,9 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
       {busy && ocrProgress !== null && (
         <p className="muted" role="status">OCR解析中… {Math.round(ocrProgress * 100)}%</p>
+      )}
+      {busy && ocrProgress === null && message?.includes("解析") && (
+        <p className="muted" role="status">文字配置を変えて再解析しています…</p>
       )}
 
       {ocrCandidate && (
