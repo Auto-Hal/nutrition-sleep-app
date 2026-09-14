@@ -25,11 +25,9 @@ jobs:
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
       - name: Diagnose encrypted Preview DB target with env run
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         shell: bash
         run: |
-          npx --yes vercel@48.2.0 env run -e preview -- node - <<'NODE'
+          npx --yes vercel@48.2.0 env run -e preview --token=${{ secrets.VERCEL_TOKEN }} -- node - <<'NODE'
           const value = process.env.DATABASE_URL || "";
           if (!value) {
             console.error("DATABASE_URL was not injected.");
