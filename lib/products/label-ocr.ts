@@ -94,10 +94,8 @@ function findBasis(text: string): LabelBasis {
 
 function findNutrient(text: string, definition: ParserDefinition): CommercialNutrient | null {
   const labelAlternation = definition.labels.map(escapeRegExp).join("|");
-  const match = text.match(new RegExp(
-    \`(?:\${labelAlternation})\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(kcal|kJ|mg|ug|g)\`,
-    "i",
-  ));
+  const pattern = "(?:" + labelAlternation + ")\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(kcal|kJ|mg|ug|g)";
+  const match = text.match(new RegExp(pattern, "i"));
   if (!match) return null;
 
   const converted = convertValue(Number(match[1]), match[2], definition.targetUnit);
