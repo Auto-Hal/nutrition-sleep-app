@@ -170,9 +170,12 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         const controls = await reader.decodeFromConstraints(
           { video: { facingMode: { ideal: "environment" } }, audio: false },
           videoRef.current,
-          (result) => {
-            if (!result) return;
-            controls.stop();
+          (result, error, scanControls) => {
+            if (!result) {
+              void error;
+              return;
+            }
+            scanControls.stop();
             stopScannerRef.current = null;
             setScannerOpen(false);
             void resolveBarcode(result.getText());
