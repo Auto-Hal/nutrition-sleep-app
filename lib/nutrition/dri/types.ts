@@ -16,9 +16,13 @@ export type DriReference = {
   value?: number;
   lower?: number;
   upper?: number;
+  lowerInclusive?: boolean;
+  upperInclusive?: boolean;
   activityLevel?: DriActivityLevel;
   comparable: boolean;
   caveat?: string;
+  sourceRef?: string;
+  comparisonScope?: string;
 };
 
 export type DriProfile = {
