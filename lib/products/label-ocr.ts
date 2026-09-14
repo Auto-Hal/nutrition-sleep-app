@@ -18,24 +18,24 @@ type ParserDefinition = {
 };
 
 const DEFINITIONS: ParserDefinition[] = [
-  { code: "energy", labels: ["エネルギー", "熱量"], targetUnit: "kcal" },
-  { code: "protein", labels: ["たんぱく質", "タンパク質", "蛋白質"], targetUnit: "g" },
-  { code: "fat", labels: ["脂質"], targetUnit: "g" },
-  { code: "carbohydrate", labels: ["炭水化物"], targetUnit: "g" },
-  { code: "fiber", labels: ["食物繊維"], targetUnit: "g" },
-  { code: "calcium", labels: ["カルシウム"], targetUnit: "mg" },
-  { code: "iron", labels: ["鉄"], targetUnit: "mg" },
-  { code: "zinc", labels: ["亜鉛"], targetUnit: "mg" },
-  { code: "vitamin_a", labels: ["ビタミンA"], targetUnit: "ug_rae" },
-  { code: "vitamin_b1", labels: ["ビタミンB1"], targetUnit: "mg" },
-  { code: "vitamin_b2", labels: ["ビタミンB2"], targetUnit: "mg" },
-  { code: "vitamin_b6", labels: ["ビタミンB6"], targetUnit: "mg" },
-  { code: "vitamin_b12", labels: ["ビタミンB12"], targetUnit: "ug" },
-  { code: "vitamin_c", labels: ["ビタミンC"], targetUnit: "mg" },
-  { code: "vitamin_d", labels: ["ビタミンD"], targetUnit: "ug" },
-  { code: "vitamin_e", labels: ["ビタミンE"], targetUnit: "mg" },
-  { code: "sodium", labels: ["ナトリウム"], targetUnit: "mg" },
-  { code: "salt_equivalent", labels: ["食塩相当量"], targetUnit: "g" },
+  { code: "energy", labels: ["エネルギー", "エネルキー", "熱量", "energy"], targetUnit: "kcal" },
+  { code: "protein", labels: ["たんぱく質", "タンパク質", "蛋白質", "protein"], targetUnit: "g" },
+  { code: "fat", labels: ["脂質", "fat"], targetUnit: "g" },
+  { code: "carbohydrate", labels: ["炭水化物", "carbohydrate"], targetUnit: "g" },
+  { code: "fiber", labels: ["食物繊維", "食物せんい", "fiber"], targetUnit: "g" },
+  { code: "calcium", labels: ["カルシウム", "calcium"], targetUnit: "mg" },
+  { code: "iron", labels: ["鉄", "iron"], targetUnit: "mg" },
+  { code: "zinc", labels: ["亜鉛", "zinc"], targetUnit: "mg" },
+  { code: "vitamin_a", labels: ["ビタミンA", "vitamin A"], targetUnit: "ug_rae" },
+  { code: "vitamin_b1", labels: ["ビタミンB1", "vitamin B1"], targetUnit: "mg" },
+  { code: "vitamin_b2", labels: ["ビタミンB2", "vitamin B2"], targetUnit: "mg" },
+  { code: "vitamin_b6", labels: ["ビタミンB6", "vitamin B6"], targetUnit: "mg" },
+  { code: "vitamin_b12", labels: ["ビタミンB12", "vitamin B12"], targetUnit: "ug" },
+  { code: "vitamin_c", labels: ["ビタミンC", "vitamin C"], targetUnit: "mg" },
+  { code: "vitamin_d", labels: ["ビタミンD", "vitamin D"], targetUnit: "ug" },
+  { code: "vitamin_e", labels: ["ビタミンE", "vitamin E"], targetUnit: "mg" },
+  { code: "sodium", labels: ["ナトリウム", "sodium"], targetUnit: "mg" },
+  { code: "salt_equivalent", labels: ["食塩相当量", "食塩 相当量", "salt equivalent"], targetUnit: "g" },
 ];
 
 function normalizeText(value: string) {
@@ -45,12 +45,21 @@ function normalizeText(value: string) {
     .replace(/[，,]/g, "")
     .replace(/[：:]/g, ":")
     .replace(/[‐‑‒–—―]/g, "-")
+    .replace(/[・·]/g, ".")
     .replace(/\r/g, "\n")
-    .replace(/[ \t]+/g, " ");
+    .replace(/[ \t]+/g, " ")
+    .replace(/kca[li1]/gi, "kcal")
+    .replace(/k[jJ]/g, "kJ");
 }
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
+}
+
+function flexibleLabelPattern(label: string) {
+  return [...label]
+    .map((character) => character === " " ? "\\s*" : escapeRegExp(character))
+    .join("\\s*");
 }
 
 function convertValue(value: number, sourceUnit: string, targetUnit: CommercialNutrient["unit"]) {
@@ -93,8 +102,9 @@ function findBasis(text: string): LabelBasis {
 }
 
 function findNutrient(text: string, definition: ParserDefinition): CommercialNutrient | null {
-  const labelAlternation = definition.labels.map(escapeRegExp).join("|");
-  const pattern = "(?:" + labelAlternation + ")\\s*[:：]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(kcal|kJ|mg|ug|g)";
+  const labelAlternation = definition.labels.map(flexibleLabelPattern).join("|");
+  const separator = "[\\s:：=・.\\-()（）]{0,24}";
+  const pattern = "(?:" + labelAlternation + ")" + separator + "([0-9]+(?:\\.[0-9]+)?)\\s*(kcal|kJ|mg|ug|g)";
   const match = text.match(new RegExp(pattern, "i"));
   if (!match) return null;
 
