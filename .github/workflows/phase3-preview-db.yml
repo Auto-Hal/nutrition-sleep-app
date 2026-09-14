@@ -11,13 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  migrate-and-smoke:
+  identify-target:
     runs-on: ubuntu-latest
     environment: preview
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
       - name: Select dedicated Vercel project
         shell: bash
         run: |
@@ -27,46 +26,27 @@ jobs:
           JSON
       - name: Pull Preview environment
         run: npx --yes vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Verify Preview database target
+      - name: Print sanitized database target metadata
         shell: bash
         run: |
           set -a
           source .vercel/.env.preview.local
           set +a
           test -n "$DATABASE_URL"
+          node - <<'NODE'
+          const u = new URL(process.env.DATABASE_URL);
+          console.log(JSON.stringify({
+            protocol: u.protocol,
+            hostname: u.hostname,
+            port: u.port || null,
+            username: decodeURIComponent(u.username),
+            database: u.pathname.replace(/^\//, "")
+          }, null, 2));
+          NODE
           case "$DATABASE_URL" in
-            *pprsfxpfljdjlwdfbtqo*) ;;
-            *)
-              echo "Refusing migration: DATABASE_URL is not the dedicated Preview Supabase project." >&2
+            *vyvnicyupcrsmtgdyypv*)
+              echo "Production ref detected. Refusing all writes." >&2
               exit 1
               ;;
           esac
-          echo "Preview database target verified."
-      - name: Show migration ledger before
-        shell: bash
-        run: |
-          set -a
-          source .vercel/.env.preview.local
-          set +a
-          supabase migration list --db-url "$DATABASE_URL"
-      - name: Apply pending migrations
-        shell: bash
-        run: |
-          set -a
-          source .vercel/.env.preview.local
-          set +a
-          supabase db push --db-url "$DATABASE_URL" --yes
-      - name: Show migration ledger after
-        shell: bash
-        run: |
-          set -a
-          source .vercel/.env.preview.local
-          set +a
-          supabase migration list --db-url "$DATABASE_URL"
-      - name: Run rollback-only Phase 3 smoke
-        shell: bash
-        run: |
-          set -a
-          source .vercel/.env.preview.local
-          set +a
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/smoke/phase3_products.sql
+          echo "Diagnostic only: no database writes were performed."
