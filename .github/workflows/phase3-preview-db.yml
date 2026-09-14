@@ -1,4 +1,4 @@
-name: Phase 3 Preview DB rollout
+name: Phase 3 Preview config
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  identify-target:
+  update-origin:
     runs-on: ubuntu-latest
     environment: preview
     timeout-minutes: 10
@@ -24,25 +24,9 @@ jobs:
           cat > .vercel/project.json <<'JSON'
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
-      - name: Diagnose encrypted Preview DB target with env run
+      - name: Update Preview APP_ORIGIN
         shell: bash
         run: |
-          npx --yes vercel@latest env run -e preview --token=${{ secrets.VERCEL_TOKEN }} -- node - <<'NODE'
-          const value = process.env.DATABASE_URL || "";
-          if (!value) {
-            console.error("DATABASE_URL was not injected.");
-            process.exit(1);
-          }
-          const u = new URL(value);
-          console.log(JSON.stringify({
-            hostname: u.hostname,
-            port: u.port || null,
-            username: decodeURIComponent(u.username),
-            database: u.pathname.replace(/^\//, "")
-          }, null, 2));
-          if (value.includes("vyvnicyupcrsmtgdyypv")) {
-            console.error("Production ref detected. Refusing all writes.");
-            process.exit(2);
-          }
-          console.log("Diagnostic only: no database writes were performed.");
-          NODE
+          printf '%s\n' 'https://nutrition-sleep-app-git-phase-3-product-ingestion-tsuno2.vercel.app'             | npx --yes vercel@48.2.0 env update APP_ORIGIN preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Verify variable remains in Preview scope
+        run: npx --yes vercel@48.2.0 env ls preview --token=${{ secrets.VERCEL_TOKEN }}
