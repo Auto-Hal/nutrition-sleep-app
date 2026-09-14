@@ -24,9 +24,18 @@ jobs:
           cat > .vercel/project.json <<'JSON'
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
-      - name: Pull Preview environment
-        run: npx --yes vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Print sanitized database target metadata
+      - name: List Preview variable scopes
+        shell: bash
+        run: |
+          echo "=== generic preview ==="
+          npx --yes vercel@48.2.0 env ls preview --token=${{ secrets.VERCEL_TOKEN }}
+          echo "=== phase2 branch ==="
+          npx --yes vercel@48.2.0 env ls preview phase/2-nutrition-entry-foundation --token=${{ secrets.VERCEL_TOKEN }}
+          echo "=== phase3 branch ==="
+          npx --yes vercel@48.2.0 env ls preview phase/3-product-ingestion --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Pull Phase 2 branch Preview environment
+        run: npx --yes vercel@48.2.0 pull --yes --environment=preview --git-branch=phase/2-nutrition-entry-foundation --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Print sanitized Phase 2 database target
         shell: bash
         run: |
           set -a
@@ -36,7 +45,6 @@ jobs:
           node - <<'NODE'
           const u = new URL(process.env.DATABASE_URL);
           console.log(JSON.stringify({
-            protocol: u.protocol,
             hostname: u.hostname,
             port: u.port || null,
             username: decodeURIComponent(u.username),
