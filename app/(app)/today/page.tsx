@@ -5,7 +5,8 @@ import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
-function formatEnergy(value: number) {
+function formatEnergy(value: number | null) {
+  if (value === null) return "—";
   return new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
 }
 
@@ -44,8 +45,10 @@ export default async function TodayPage() {
             <div className="today-nutrition-summary">
               <div>
                 <span className="muted">既知エネルギー</span>
-                <strong>{formatEnergy(summary.energy_known_amount)} kcal</strong>
-                {!summary.energy_coverage_complete && <small>既知分のみ</small>}
+                <strong>{formatEnergy(summary.energy_known_amount)}{summary.energy_known_amount === null ? "" : " kcal"}</strong>
+                {summary.energy_known_amount === null
+                  ? <small>エネルギー値は未登録</small>
+                  : !summary.energy_coverage_complete && <small>既知分のみ</small>}
               </div>
               <span className={`pill ${summary.record_complete ? "" : "pending"}`}>
                 {summary.record_complete ? "食事記録 完了" : "食事記録 途中"}
