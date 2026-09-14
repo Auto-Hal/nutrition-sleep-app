@@ -5,7 +5,7 @@
 - Phase 1 COMPLETE
 - Phase 2 COMPLETE
 - Phase 3 COMPLETE
-- **Phase 4 IMPLEMENTED / CI PASS / PREVIEW DB ACCEPTED / PREVIEW DEVICE ACCEPTANCE PENDING**
+- **Phase 4 IMPLEMENTED / CI PASS / PREVIEW DB ACCEPTED / PREVIEW APP READY / DEVICE ACCEPTANCE PENDING**
 - branch: `phase/4-nutrition-analytics`
 - PR: #6 (Draft)
 - main baseline: `172e0470f733439ccfc3933221d0b68b187a6b99`
@@ -110,20 +110,17 @@ Direct Preview DB verification:
 
 ## Preview application gate
 
-Current blocker is operational, not implementation-related:
-
-- Vercel Free daily deployment limit reached:
-  `api-deployments-free-per-day` / more than 100 deployments.
-- Existing Phase 4 Preview deploy attempts therefore cannot publish the latest reviewed head until the quota window resets.
-
-Do not weaken security or bypass the Vercel project boundary to work around this limit.
+- Previous Vercel Free daily deployment limit has reset.
+- Latest reviewed implementation head `2f8897e60d7800a2b5f65b2f86de9543c0bdff12`:
+  - CI PASS
+  - Preview workflow retry PASS
+  - deployment `dpl_CbLSUggyHfgbZWMLNuMQZjuxsXzh` READY
+- This status-only commit triggers one normal branch deployment so the stable Phase 4 branch alias points at the reviewed implementation.
 
 ## Remaining gate
 
-1. Final branch CI green after the last fixture/status commits.
-2. Vercel quota reset.
-3. Latest Phase 4 Preview deployment READY.
-4. iPhone acceptance:
+1. Stable Phase 4 Preview branch deployment READY.
+2. iPhone acceptance:
    - default 30-day view
    - 7 / 30 / 90 switching
    - complete/incomplete day behavior
@@ -131,10 +128,10 @@ Do not weaken security or bypass the Vercel project boundary to work around this
    - food/supplement split
    - nutrient → day → meal → item drilldown
    - Today lightweight nutrition summary
-5. iPad regression.
-6. Supervisor acceptance.
-7. PR #6 ready / main merge.
-8. Production Phase 4 migration / deploy / runtime verification.
+3. iPad regression.
+4. Supervisor acceptance.
+5. PR #6 ready / main merge.
+6. Production Phase 4 migration / deploy / runtime verification.
 
 ## Excluded
 
