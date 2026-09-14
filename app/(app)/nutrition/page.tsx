@@ -175,6 +175,8 @@ export default async function NutritionPage({
                     {nutrient.percent_energy !== null && (
                       <div className="nutrition-meta">
                         エネルギー比 {new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(nutrient.percent_energy)}%
+                        <span aria-hidden="true"> · </span>
+                        評価 {nutrient.percent_energy_eligible_days}日
                       </div>
                     )}
                     {labels.length > 0 && (
