@@ -3,7 +3,7 @@
 ## 現在の状態
 
 - **Phase 2 COMPLETE**
-- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PARTIAL — QUALITY IMPROVEMENT IN PROGRESS**
+- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PARTIAL — CLOUD OCR MIGRATION IN PROGRESS**
 - branch: `phase/3-product-ingestion`
 - main baseline: Phase 2 completion docsを含むmain
 - ProductionはPhase 2 deploymentを維持
@@ -26,7 +26,11 @@ Product:
 
 - native `BarcodeDetector` 単独依存は採用しない。
 - barcode scannerは `@zxing/browser`。
-- OCRはclient-side Tesseract.js adapterとし、画像は永続保存しない。
+- client-side Tesseract.jsは実機精度不足のため標準経路から撤回。
+- Phase 3 MVP OCRはGoogle Cloud Vision同期 `DOCUMENT_TEXT_DETECTION`。
+- 画像はiPhone側で縮小/JPEG再エンコードし、3MB未満にして認証済みserver routeへ送る。
+- Cloud Vision responseはprovider-neutral OCR documentへ正規化し、座標からvisual rowを再構成して栄養表示専用parserへ渡す。
+- 画像はアプリDB/Storageへ永続保存しない。
 - external DBはOpen Food Facts API v3。
 - resolution orderはlocal → external → OCR。
 - external dataはunverified、user-confirmed labelはuser_verified。
@@ -90,18 +94,27 @@ iPhone/iPad実機でログインおよび主要フローの起動を確認した
 
 このためPhase 3はCOMPLETEにしない。
 
-改善方針:
-- OCR parserを、OCR由来の空白・改行・表記揺れに耐えるよう拡張。
-- TesseractはrotateAuto + explicit PSM + 弱い初回結果のみalternate layoutで再解析。
-- live scannerは高解像度camera constraints + alignment guideを追加。
-- barcode photo capture fallbackを追加し、live scannerへ無理に合わせなくてもよい導線にする。
-- 上記のbounded client-side改善後もOCRが実用精度に達しない場合、外部OCR providerをprivacy/cost/securityを含むAstra級設計判断として再評価する。
+改善・設計判断:
+- barcodeは高解像度camera constraints + alignment guide + 静止画decode fallbackを追加済み。
+- bounded Tesseract改善後も、実画像で主要項目を十分抽出できなかった。
+- Astra比較の結果、Phase 3 MVPはGoogle Cloud Vision同期OCR + 栄養表示専用parser + ユーザー確認へ移行する。
+- Pasco実画像のacceptance ground truth:
+  - 表示基準: 1枚当たり
+  - energy 180 kcal
+  - protein 5.2 g
+  - fat 2.6 g
+  - carbohydrate 34.0 g
+  - salt_equivalent 0.6 g
+- 画像自体はGitへ保存せず、正解値とsynthetic OCR layout fixtureだけをtestへ持つ。
+- Cloud Visionでも実用精度に達しない場合のみ、Azure Document Intelligence Layout / Multimodal Vision APIを次候補として再評価する。
 
 ## Remaining gate
 
-1. OCR / barcode usability corrective CI + Preview deployment
-2. iPhone実機でcorrective acceptance
-3. iPad regression確認
-4. Supervisor acceptance
-5. PR ready / main merge
-6. Production migration + Production deployment + Production verification
+1. Cloud Vision OCR adapter / parser / confirmation UI CI
+2. Previewへ `GOOGLE_CLOUD_VISION_API_KEY` をsecretとして設定
+3. Pasco実画像でCloud Vision acceptance
+4. iPhone実機でOCR + barcode corrective acceptance
+5. iPad regression確認
+6. Supervisor acceptance
+7. PR ready / main merge
+8. Production secret設定 + Production migration/deploy/verification
