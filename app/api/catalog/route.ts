@@ -5,7 +5,7 @@ import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
-const typeSchema = z.enum(["ingredient", "product", "supplement", "estimated_dish"]);
+const typeSchema = z.enum(["ingredient", "estimated_dish"]);
 const nutrientSchema = z.object({
   code: z.string(),
   amount: z.number().finite().min(0).nullable(),
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   const { data: items, error } = await query;
   if (error) return NextResponse.json({ error: "カタログを取得できませんでした。" }, { status: 500 });
   const ids = (items ?? []).map((item) => item.id);
-  const nutrients = ids.length === 0 ? [] : (await client.from("item_nutrients").select("catalog_item_id,nutrient_code,amount,unit,provenance,quality").in("catalog_item_id", ids)).data ?? [];
+  const nutrients = ids.length === 0 ? [] : (await client.from("item_nutrients").select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at").in("catalog_item_id", ids)).data ?? [];
   const result = (items ?? []).map((item) => ({ ...item, nutrients: nutrients.filter((nutrient) => nutrient.catalog_item_id === item.id) }));
   return NextResponse.json({ items: result });
 }

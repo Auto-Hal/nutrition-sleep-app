@@ -30,6 +30,8 @@ export type NutrientValue = {
   unit: string;
   provenance: string;
   quality: string;
+  source_uri?: string | null;
+  source_observed_at?: string | null;
 };
 
 export type CatalogItem = {

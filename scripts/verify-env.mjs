@@ -13,9 +13,10 @@ const publicKeyNames = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_GOOGLE_CLOUD_VISION_API_KEY",
 ];
 if (publicKeyNames.some((key) => process.env[key])) {
-  console.error("Supabase URL or keys must not be exposed as public environment variables.");
+  console.error("Server credentials must not be exposed as public environment variables.");
   process.exit(1);
 }
 const expectedRef = process.env.EXPECTED_SUPABASE_PROJECT_REF;

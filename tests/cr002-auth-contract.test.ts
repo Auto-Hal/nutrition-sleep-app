@@ -22,8 +22,13 @@ describe("CR-002 auth boundary", () => {
 
   it("fails closed for state-changing origins", () => {
     const request = read("lib/security/request.ts");
-    expect(request).toContain("if (!origin || !configuredOrigin) return false");
-    expect(request).toContain("return origin === configuredOrigin");
+    expect(request).toContain('if (!origin) return false');
+    expect(request).toContain('allowedRequestOrigins().has(origin)');
+    expect(request).toContain('process.env.APP_ORIGIN');
+    expect(request).toContain('process.env.VERCEL_ENV === "preview"');
+    expect(request).toContain('process.env.VERCEL_BRANCH_URL');
+    expect(request).toContain('process.env.VERCEL_URL');
+    expect(request).not.toContain('"*"');
   });
 
   it("does not issue a cookie before session persistence succeeds", () => {
