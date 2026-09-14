@@ -74,7 +74,7 @@ Supabase Advisor review:
 - latest verified Preview deployment before this docs-only update: `dpl_Gjn7Df1atdgNS62NVzg33UwKkXPX`
 - implementation CI: lint/typecheck/unit/build/fresh DB replay/pgTAP PASS
 - Production remains untouched.
-- `GOOGLE_CLOUD_VISION_API_KEY` は正しいVercel projectのPreview scopeへ再登録済み。runtime注入確認を実施中。
+- `GOOGLE_CLOUD_VISION_API_KEY` は正しいVercel projectのPreview scopeへ再登録済み。Preview runtimeで `configured:true` を確認済み。
 
 ## Stop condition
 
@@ -112,7 +112,7 @@ iPhone/iPad実機でログインおよび主要フローの起動を確認した
 ## Remaining gate
 
 1. Cloud Vision OCR adapter / parser / confirmation UI CI
-2. Previewへ `GOOGLE_CLOUD_VISION_API_KEY` をsecretとして設定
+2. Preview Cloud Vision secret設定・runtime注入確認 COMPLETE
 3. Pasco実画像でCloud Vision acceptance
 4. iPhone実機でOCR + barcode corrective acceptance
 5. iPad regression確認
