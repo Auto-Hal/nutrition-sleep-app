@@ -59,7 +59,7 @@ function convertValue(value: number, sourceUnit: string, targetUnit: CommercialN
 
   if (targetUnit === "kcal") {
     if (unit === "kcal") return value;
-    if (unit === "kj") return value / 4.184;
+    if (unit === "kj") return Math.round((value / 4.184) * 1_000_000) / 1_000_000;
     return null;
   }
 
