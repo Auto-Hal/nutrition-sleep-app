@@ -52,6 +52,37 @@ describe("Phase 3 nutrition label OCR parser", () => {
     ]));
   });
 
+
+  it("tolerates OCR-inserted spaces, line breaks, and common energy label confusion", () => {
+    const parsed = parseNutritionLabelText(`
+      栄養成分表示 1 食 当たり
+      エ ネ ル キ ー : 215 kcaI
+      たんぱく
+      質 : 7.4 g
+      脂 質 : 9.2 g
+      炭 水 化 物 : 24.1 g
+      食 塩 相 当 量 : 1.2 g
+    `);
+
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "energy", amount: 215, unit: "kcal" },
+      { code: "protein", amount: 7.4, unit: "g" },
+      { code: "fat", amount: 9.2, unit: "g" },
+      { code: "carbohydrate", amount: 24.1, unit: "g" },
+      { code: "salt_equivalent", amount: 1.2, unit: "g" },
+    ]));
+  });
+
+  it("parses English fallback labels when Japanese OCR is lost", () => {
+    const parsed = parseNutritionLabelText("Energy 80 kcal Protein 3.2 g Fat 1.5 g Carbohydrate 12 g");
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "energy", amount: 80, unit: "kcal" },
+      { code: "protein", amount: 3.2, unit: "g" },
+      { code: "fat", amount: 1.5, unit: "g" },
+      { code: "carbohydrate", amount: 12, unit: "g" },
+    ]));
+  });
+
   it("falls back to one serving when label basis cannot be resolved", () => {
     const parsed = parseNutritionLabelText("カルシウム 100mg");
     expect(parsed.basis).toEqual({ serving_size: 1, serving_unit: "serving" });
