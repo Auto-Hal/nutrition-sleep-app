@@ -149,7 +149,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         ? "外部商品DBを利用できません。現物ラベルから登録できます。"
         : "商品DBに見つかりませんでした。現物ラベルを撮影してください。");
     } catch (requestError) {
-      setNeedsOcr(true);
+      setNeedsOcr(false);
       setError(requestError instanceof Error ? requestError.message : "商品検索に失敗しました。");
     } finally {
       setBusy(false);
@@ -164,9 +164,9 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
     void (async () => {
       try {
-        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        const { BrowserMultiFormatOneDReader } = await import("@zxing/browser");
         if (cancelled || !videoRef.current) return;
-        const reader = new BrowserMultiFormatReader();
+        const reader = new BrowserMultiFormatOneDReader();
         const controls = await reader.decodeFromConstraints(
           { video: { facingMode: { ideal: "environment" } }, audio: false },
           videoRef.current,
@@ -399,7 +399,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         </div>
       )}
 
-      {(needsOcr || (!externalCandidate && !localItem && !ocrCandidate && isValidGtin(normalizeBarcode(barcode)))) && (
+      {needsOcr && !ocrCandidate && (
         <div className="stack">
           <p className="muted">商品DBにない場合は、栄養成分表示を撮影して登録できます。</p>
           <label className="button secondary">
