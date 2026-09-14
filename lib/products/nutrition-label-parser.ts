@@ -69,7 +69,49 @@ function normalizeToken(value: string) {
     .normalize("NFKC")
     .replace(/[μµ]/g, "u")
     .replace(/[\s:：=・.()（）\-]/g, "")
+    .replace(/一/g, "ー")
     .toLowerCase();
+}
+
+function editDistanceAtMostOne(left: string, right: string) {
+  if (left === right) return true;
+  if (Math.abs(left.length - right.length) > 1) return false;
+
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < left.length && j < right.length) {
+    if (left[i] === right[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    edits += 1;
+    if (edits > 1) return false;
+
+    if (left.length > right.length) i += 1;
+    else if (right.length > left.length) j += 1;
+    else {
+      i += 1;
+      j += 1;
+    }
+  }
+
+  if (i < left.length || j < right.length) edits += 1;
+  return edits <= 1;
+}
+
+function labelMatches(phrase: string, label: string) {
+  const normalizedPhrase = normalizeToken(phrase);
+  const normalizedLabel = normalizeToken(label);
+  if (normalizedPhrase === normalizedLabel) return true;
+
+  // Fuzzy matching is intentionally limited to longer known nutrition labels.
+  // It repairs one-character OCR noise without making short labels such as 鉄 ambiguous.
+  return normalizedLabel.length >= 4
+    && normalizedPhrase.length >= 4
+    && editDistanceAtMostOne(normalizedPhrase, normalizedLabel);
 }
 
 function unionBox(boxes: OcrBox[]): OcrBox {
@@ -111,13 +153,11 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
   for (const line of document.lines) {
     const words = [...line.words].sort((a, b) => a.box.minX - b.box.minX);
     for (let start = 0; start < words.length; start += 1) {
-      for (let length = 1; length <= 3 && start + length <= words.length; length += 1) {
+      for (let length = 1; length <= 6 && start + length <= words.length; length += 1) {
         const phraseWords = words.slice(start, start + length);
         const phrase = phraseWords.map((word) => word.text).join("");
-        const normalizedPhrase = normalizeToken(phrase);
-
         for (const definition of ANCHORS) {
-          const matched = definition.labels.some((label) => normalizeToken(label) === normalizedPhrase);
+          const matched = definition.labels.some((label) => labelMatches(phrase, label));
           if (!matched) continue;
 
           candidates.push({
@@ -153,11 +193,18 @@ function normalizeUnit(value: string) {
     .normalize("NFKC")
     .replace(/[μµ]/g, "u")
     .replace(/[.,:;]$/g, "")
+    .replace(/[^a-zA-Z0-9|!]/g, "")
     .trim()
     .toLowerCase()
-    .replace(/^kca[i1l]$/, "kcal");
+    .replace(/[|!1i]$/g, "l");
 
-  if (unit === "kcal" || unit === "kj" || unit === "mg" || unit === "ug" || unit === "g") return unit;
+  if (unit === "g") return "g";
+
+  for (const expected of ["kcal", "kj", "mg", "ug"] as const) {
+    if (unit === expected) return expected;
+    if (unit.length >= 2 && editDistanceAtMostOne(unit, expected)) return expected;
+  }
+
   return null;
 }
 
@@ -169,7 +216,7 @@ function parseCombinedValue(value: string) {
     .replace(/kca[li1]/gi, "kcal")
     .trim();
 
-  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kca[i1l]|kJ|mg|ug|g)$/i);
+  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*([^\s]+)$/i);
   if (!match) return null;
   const unit = normalizeUnit(match[2]);
   if (!unit) return null;
