@@ -59,14 +59,15 @@ export function CatalogLibrary() {
     finally { setBusy(false); }
   }
 
-  async function deactivate(item: CatalogItem) {
+  async function setActive(item: CatalogItem, active: boolean) {
     setBusy(true); setMessage(null); setError(null);
     try {
-      const response = await fetch(`/api/catalog/${item.id}/active`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ expected_revision: item.revision, active: false }) });
+      const response = await fetch(`/api/catalog/${item.id}/active`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ expected_revision: item.revision, active }) });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "無効化できませんでした。");
-      await load(); setMessage("無効化しました。過去の履歴は保持されています。");
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "無効化に失敗しました。"); }
+      if (!response.ok) throw new Error(result.error ?? "状態を更新できませんでした。");
+      await load();
+      setMessage(active ? "再有効化しました。" : "無効化しました。過去の履歴は保持されています。");
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "状態更新に失敗しました。"); }
     finally { setBusy(false); }
   }
 
@@ -101,7 +102,7 @@ export function CatalogLibrary() {
         </div>}
         {message && <p className="muted" role="status">{message}</p>}{error && <p className="error-text" role="alert">{error}</p>}
       </section>
-      <section className="card" aria-labelledby="catalog-list-title"><div className="section-heading"><h2 id="catalog-list-title">登録済み項目</h2><span className="pill">{items.filter((item) => item.active).length}件</span></div>{items.length === 0 ? <div className="empty-state">まだ項目がありません。</div> : <div className="catalog-list">{items.map((item) => <div className={`catalog-row ${item.active ? "" : "inactive"}`} key={item.id}><div><strong>{item.name}</strong><div className="muted">{typeLabels[item.item_type]} · {item.serving_size} {item.serving_unit}{item.brand ? ` · ${item.brand}` : ""}</div></div><div className="meal-actions"><span className={`pill ${item.active ? "" : "pending"}`}>{item.active ? "有効" : "無効"}</span>{item.item_type !== "product" && item.item_type !== "supplement" && <button className="button secondary" type="button" onClick={() => startEdit(item)}>編集</button>}{item.active && <button className="button ghost" type="button" onClick={() => deactivate(item)} disabled={busy}>無効化</button>}</div></div>)}</div>}</section>
+      <section className="card" aria-labelledby="catalog-list-title"><div className="section-heading"><h2 id="catalog-list-title">登録済み項目</h2><span className="pill">{items.filter((item) => item.active).length}件</span></div>{items.length === 0 ? <div className="empty-state">まだ項目がありません。</div> : <div className="catalog-list">{items.map((item) => <div className={`catalog-row ${item.active ? "" : "inactive"}`} key={item.id}><div><strong>{item.name}</strong><div className="muted">{typeLabels[item.item_type]} · {item.serving_size} {item.serving_unit}{item.brand ? ` · ${item.brand}` : ""}</div></div><div className="meal-actions"><span className={`pill ${item.active ? "" : "pending"}`}>{item.active ? "有効" : "無効"}</span>{item.item_type !== "product" && item.item_type !== "supplement" && <button className="button secondary" type="button" onClick={() => startEdit(item)}>編集</button>}<button className="button ghost" type="button" onClick={() => void setActive(item, !item.active)} disabled={busy}>{item.active ? "無効化" : "再有効化"}</button></div></div>)}</div>}</section>
     </div>
   );
 }
