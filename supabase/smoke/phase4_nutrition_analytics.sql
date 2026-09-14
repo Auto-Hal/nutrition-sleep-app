@@ -60,6 +60,7 @@ set supplement_id = (
     null,
     timestamptz '2026-09-10 07:00:00+09',
     '[
+      {"code":"energy","amount":0,"unit":"kcal","provenance":"ocr","quality":"user_verified"},
       {"code":"vitamin_d","amount":10,"unit":"ug","provenance":"ocr","quality":"user_verified"}
     ]'::jsonb,
     'phase4-smoke-supplement'
