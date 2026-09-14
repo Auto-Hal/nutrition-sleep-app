@@ -132,7 +132,7 @@ function normalizeDailyRows(data: unknown): DailyRow[] {
   }));
 }
 
-function percentEnergy(
+export function calculatePercentEnergy(
   nutrientCode: NutrientCode,
   nutrientRows: DailyRow[],
   energyRows: Map<string, DailyRow>,
@@ -140,22 +140,30 @@ function percentEnergy(
   const factor = nutrientCode === "fat" ? 9
     : nutrientCode === "protein" || nutrientCode === "carbohydrate" ? 4
       : null;
-  if (factor === null) return null;
+  if (factor === null) {
+    return { value: null, eligibleDays: 0 };
+  }
 
   let nutrientTotal = 0;
   let energyTotal = 0;
-  let matched = 0;
+  let eligibleDays = 0;
 
   for (const row of nutrientRows) {
     const energy = energyRows.get(row.meal_date);
     if (!row.eligible_for_reference || !energy?.eligible_for_reference || energy.known_amount <= 0) continue;
     nutrientTotal += row.known_amount * factor;
     energyTotal += energy.known_amount;
-    matched += 1;
+    eligibleDays += 1;
   }
 
-  if (matched === 0 || energyTotal <= 0) return null;
-  return (nutrientTotal / energyTotal) * 100;
+  if (eligibleDays === 0 || energyTotal <= 0) {
+    return { value: null, eligibleDays: 0 };
+  }
+
+  return {
+    value: (nutrientTotal / energyTotal) * 100,
+    eligibleDays,
+  };
 }
 
 export async function getNutritionAnalytics(
@@ -187,14 +195,16 @@ export async function getNutritionAnalytics(
     const recordCompleteRows = nutrientRows.filter((row) => row.record_complete);
     const eligibleDates = eligibleRows.map((row) => row.meal_date);
     const dri = stableReferences(profile, definition.code, eligibleDates);
-    const percent = percentEnergy(definition.code, nutrientRows, energyRows);
+    const percentEnergyResult = calculatePercentEnergy(definition.code, nutrientRows, energyRows);
 
     const directReferences = dri.references.filter((reference) => reference.unit === definition.unit);
     const percentReferences = dri.references.filter((reference) => reference.unit === "percent_energy");
 
     const avg = average(eligibleRows.map((row) => row.known_amount));
     const directEvaluation = avg === null ? null : evaluateDriSet(directReferences, avg);
-    const percentEvaluation = percent === null ? null : evaluateDriSet(percentReferences, percent);
+    const percentEvaluation = percentEnergyResult.value === null
+      ? null
+      : evaluateDriSet(percentReferences, percentEnergyResult.value);
 
     return {
       code: definition.code,
@@ -205,7 +215,8 @@ export async function getNutritionAnalytics(
       average_food_amount: average(eligibleRows.map((row) => row.food_amount)),
       average_supplement_amount: average(eligibleRows.map((row) => row.supplement_amount)),
       quality: aggregateNutritionQuality(recordCompleteRows),
-      percent_energy: percent,
+      percent_energy: percentEnergyResult.value,
+      percent_energy_eligible_days: percentEnergyResult.eligibleDays,
       dri: {
         references: dri.references,
         stable: dri.stable,
