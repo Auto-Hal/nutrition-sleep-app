@@ -8,6 +8,8 @@ const root = process.cwd();
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const migration = read("supabase/migrations/20260914100000_phase3_products.sql");
 const resolver = read("app/api/products/resolve/route.ts");
+const ingestion = read("components/product-ingestion.tsx");
+const ocrClient = read("lib/products/ocr-client.ts");
 
 describe("Phase 3 product ingestion", () => {
   it("normalizes and validates GTIN check digits", () => {
@@ -96,6 +98,22 @@ describe("Phase 3 product ingestion", () => {
     expect(resolver).toContain('status: "not_found", fallback: "ocr"');
     expect(resolver).toContain('status: "external_unavailable"');
     expect(resolver).toContain('fallback: "ocr"');
+  });
+
+
+  it("provides barcode photo fallback and higher-resolution live capture guidance", () => {
+    expect(ingestion).toContain("バーコードを撮影");
+    expect(ingestion).toContain("decodeFromImageUrl");
+    expect(ingestion).toContain('width: { ideal: 1920 }');
+    expect(ingestion).toContain('height: { ideal: 1080 }');
+    expect(ingestion).toContain("barcode-guide");
+  });
+
+  it("retries weak OCR with alternate page segmentation and auto rotation", () => {
+    expect(ocrClient).toContain("rotateAuto: true");
+    expect(ocrClient).toContain("PSM.SINGLE_BLOCK");
+    expect(ocrClient).toContain("PSM.AUTO");
+    expect(ocrClient).toContain("nutrients.length >= 5");
   });
 
   it("enforces owner-scoped product metadata and atomic RPC writes", () => {
