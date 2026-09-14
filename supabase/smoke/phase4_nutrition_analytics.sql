@@ -45,18 +45,26 @@ set food_id = (
 
 update phase4_smoke_context
 set supplement_id = (
-  public.create_catalog_item(
+  public.create_product_item(
     'supplement',
+    '2999999999991',
     'Phase 4 synthetic supplement',
     null,
     1,
     'serving',
+    null,
+    null,
+    null,
+    'label_ocr',
+    'phase4_smoke',
+    null,
+    timestamptz '2026-09-10 07:00:00+09',
     '[
-      {"code":"vitamin_d","amount":10,"unit":"ug","provenance":"user_entered","quality":"user_verified"}
+      {"code":"vitamin_d","amount":10,"unit":"ug","provenance":"ocr","quality":"user_verified"}
     ]'::jsonb,
     'phase4-smoke-supplement'
-  )
-).id;
+  )->>'item_id'
+)::uuid;
 
 -- Complete fixed day: breakfast recorded; lunch and dinner explicitly skipped.
 select public.create_meal_entry(
