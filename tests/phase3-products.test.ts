@@ -92,6 +92,8 @@ describe("Phase 3 product ingestion", () => {
     expect(migration).toContain("create or replace function public.create_product_item");
     expect(migration).toContain("create or replace function public.update_product_item");
     expect(migration).toContain("lower-priority source cannot overwrite current product data");
+    expect(migration).toContain("commercial items must be created through the product RPC");
+    expect(migration).toContain("commercial items must be edited through the product RPC");
     expect(migration).toContain("when 'manufacturer_official' then 1");
     expect(migration).toContain("when 'label_ocr' then 2");
     expect(migration).toContain("else 4");
