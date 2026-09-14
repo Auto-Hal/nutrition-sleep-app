@@ -96,3 +96,22 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
 .subnav a[aria-current="page"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 @media (min-width: 720px) { .app-main { padding-top: 38px; } .bottom-nav { left: 50%; width: min(720px, 100%); transform: translateX(-50%); border-right: 1px solid var(--line); border-left: 1px solid var(--line); border-radius: 18px 18px 0 0; } }
 @media (max-width: 520px) { .meal-row, .catalog-row { align-items: flex-start; flex-direction: column; } .meal-actions { justify-content: flex-start; } .nutrient-grid { grid-template-columns: 1fr; } .component-row { grid-template-columns: 1fr 1fr; } .component-row select { grid-column: 1 / -1; } }
+
+.nutrition-caption { margin-bottom: 0; font-size: 0.8rem; }
+.nutrition-list { display: grid; margin-top: 8px; }
+.nutrition-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 0; border-top: 1px solid var(--line); }
+.nutrition-row:first-child { border-top: 0; }
+.nutrition-row[aria-current="page"] { margin: 0 -10px; padding-right: 10px; padding-left: 10px; border-radius: 12px; background: var(--accent-soft); }
+.nutrition-row-main { min-width: 0; display: grid; gap: 5px; }
+.nutrition-row-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nutrition-value { font-size: 1.14rem; font-weight: 760; font-variant-numeric: tabular-nums; }
+.nutrition-meta { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.nutrition-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.nutrition-chevron { color: var(--muted); font-size: 1.5rem; }
+.nutrition-days, .nutrition-items { display: grid; }
+.nutrition-day, .nutrition-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.nutrition-day:first-child, .nutrition-item:first-child { border-top: 0; }
+.nutrition-day[aria-current="page"] { margin: 0 -10px; padding-right: 10px; padding-left: 10px; border-radius: 10px; background: var(--accent-soft); }
+.nutrition-day-value { display: grid; gap: 2px; justify-items: end; text-align: right; font-variant-numeric: tabular-nums; }
+.nutrition-day-value small { color: var(--muted); }
+.nutrition-meal { border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
