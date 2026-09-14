@@ -6,6 +6,21 @@ import { createUserClient } from "@/lib/supabase/user";
 
 export type NutritionRange = 7 | 30 | 90;
 
+type RawDailyRow = {
+  meal_date: string;
+  nutrient_code: NutrientCode;
+  unit: string;
+  record_complete: boolean;
+  entry_count: number | string;
+  missing_entry_count: number | string;
+  known_amount: number | string;
+  food_amount: number | string;
+  supplement_amount: number | string;
+  coverage_complete: boolean;
+  eligible_for_reference: boolean;
+  quality: "user_verified" | "contains_unverified" | "unknown_or_incomplete";
+};
+
 type DailyRow = {
   meal_date: string;
   nutrient_code: NutrientCode;
@@ -146,7 +161,8 @@ export async function getNutritionAnalytics(
   });
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []).map((row) => ({
+  const rawRows = (data ?? []) as RawDailyRow[];
+  const rows = rawRows.map((row: RawDailyRow) => ({
     ...row,
     entry_count: Number(row.entry_count),
     missing_entry_count: Number(row.missing_entry_count),
