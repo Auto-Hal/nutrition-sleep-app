@@ -9,7 +9,8 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const migration = read("supabase/migrations/20260914100000_phase3_products.sql");
 const resolver = read("app/api/products/resolve/route.ts");
 const ingestion = read("components/product-ingestion.tsx");
-const ocrClient = read("lib/products/ocr-client.ts");
+const cloudOcrRoute = read("app/api/ocr/nutrition-label/route.ts");
+const cloudVisionAdapter = read("lib/products/google-cloud-vision.ts");
 
 describe("Phase 3 product ingestion", () => {
   it("normalizes and validates GTIN check digits", () => {
@@ -109,11 +110,12 @@ describe("Phase 3 product ingestion", () => {
     expect(ingestion).toContain("barcode-guide");
   });
 
-  it("retries weak OCR with alternate page segmentation and auto rotation", () => {
-    expect(ocrClient).toContain("rotateAuto: true");
-    expect(ocrClient).toContain("PSM.SINGLE_BLOCK");
-    expect(ocrClient).toContain("PSM.AUTO");
-    expect(ocrClient).toContain("nutrients.length >= 5");
+  it("routes label OCR through authenticated server-side Cloud Vision", () => {
+    expect(cloudOcrRoute).toContain("isAllowedOrigin");
+    expect(cloudOcrRoute).toContain("getAppSession");
+    expect(cloudOcrRoute).toContain("recognizeWithGoogleCloudVision");
+    expect(cloudVisionAdapter).toContain("DOCUMENT_TEXT_DETECTION");
+    expect(cloudVisionAdapter).toContain("GOOGLE_CLOUD_VISION_API_KEY");
   });
 
   it("enforces owner-scoped product metadata and atomic RPC writes", () => {
