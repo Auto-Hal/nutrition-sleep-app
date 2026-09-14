@@ -439,6 +439,194 @@ grant execute on function public.update_product_item(
   public.product_source_type, text, text, timestamptz, jsonb
 ) to authenticated;
 
+-- Phase 3 boundary hardening: Product/Supplement writes must use the commercial RPCs.
+-- Keep the Phase 2 generic RPC signatures for Ingredient/EstimatedDish callers.
+
+create or replace function public.create_catalog_item(
+  p_item_type public.catalog_item_type,
+  p_name text,
+  p_brand text,
+  p_serving_size numeric,
+  p_serving_unit text,
+  p_nutrients jsonb,
+  p_idempotency_key text default null
+)
+returns public.catalog_items
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  owner_id uuid := (select auth.uid());
+  item public.catalog_items;
+  n record;
+begin
+  if owner_id is null then
+    raise exception using errcode = '42501', message = 'authentication required';
+  end if;
+  if p_item_type = 'batch' then
+    raise exception using errcode = '22023', message = 'batch items must be created through the batch RPC';
+  end if;
+  if p_item_type in ('product', 'supplement') then
+    raise exception using errcode = '22023', message = 'commercial items must be created through the product RPC';
+  end if;
+
+  if p_idempotency_key is not null then
+    select * into item
+    from public.catalog_items
+    where user_id = owner_id and idempotency_key = p_idempotency_key;
+    if item.id is not null then return item; end if;
+  end if;
+
+  insert into public.catalog_items (
+    user_id, item_type, name, brand, serving_size, serving_unit, idempotency_key
+  )
+  values (
+    owner_id, p_item_type, trim(p_name), nullif(trim(p_brand), ''),
+    p_serving_size, trim(p_serving_unit), p_idempotency_key
+  )
+  returning * into item;
+
+  for n in
+    select *
+    from jsonb_to_recordset(coalesce(p_nutrients, '[]'::jsonb))
+      as x(
+        code text,
+        amount numeric,
+        unit text,
+        provenance text,
+        source_uri text,
+        source_observed_at timestamptz,
+        quality text
+      )
+  loop
+    if not exists (
+      select 1
+      from public.nutrient_definitions d
+      where d.code = n.code and d.unit = n.unit
+    ) then
+      raise exception using errcode = '22023', message = 'invalid nutrient code or unit';
+    end if;
+
+    insert into public.item_nutrients (
+      catalog_item_id, user_id, nutrient_code, amount, unit, provenance,
+      source_uri, source_observed_at, quality
+    )
+    values (
+      item.id, owner_id, n.code, n.amount, n.unit,
+      coalesce(n.provenance, 'user_entered'),
+      n.source_uri, n.source_observed_at, coalesce(n.quality, 'unknown')
+    );
+  end loop;
+
+  return item;
+end;
+$$;
+
+create or replace function public.update_catalog_item(
+  p_catalog_item_id uuid,
+  p_expected_revision integer,
+  p_name text,
+  p_brand text,
+  p_serving_size numeric,
+  p_serving_unit text,
+  p_active boolean,
+  p_nutrients jsonb
+)
+returns public.catalog_items
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  owner_id uuid := (select auth.uid());
+  item public.catalog_items;
+  n record;
+  dependent record;
+begin
+  if owner_id is null then
+    raise exception using errcode = '42501', message = 'authentication required';
+  end if;
+
+  select * into item
+  from public.catalog_items
+  where id = p_catalog_item_id and user_id = owner_id
+  for update;
+
+  if item.id is null or item.revision <> p_expected_revision then
+    raise exception using errcode = '40001', message = 'catalog revision conflict';
+  end if;
+  if item.item_type = 'batch' then
+    raise exception using errcode = '22023', message = 'batch items must be edited through the batch RPC';
+  end if;
+  if item.item_type in ('product', 'supplement') then
+    raise exception using errcode = '22023', message = 'commercial items must be edited through the product RPC';
+  end if;
+  if item.serving_unit <> trim(p_serving_unit)
+     and exists (
+       select 1
+       from public.batch_components bc
+       where bc.catalog_item_id = item.id and bc.user_id = owner_id
+     ) then
+    raise exception using errcode = '22023', message = 'serving unit cannot change while item is used by a batch';
+  end if;
+
+  update public.catalog_items
+  set name = trim(p_name),
+      brand = nullif(trim(p_brand), ''),
+      serving_size = p_serving_size,
+      serving_unit = trim(p_serving_unit),
+      active = p_active
+  where id = item.id and user_id = owner_id
+  returning * into item;
+
+  delete from public.item_nutrients
+  where catalog_item_id = item.id and user_id = owner_id;
+
+  for n in
+    select *
+    from jsonb_to_recordset(coalesce(p_nutrients, '[]'::jsonb))
+      as x(
+        code text,
+        amount numeric,
+        unit text,
+        provenance text,
+        source_uri text,
+        source_observed_at timestamptz,
+        quality text
+      )
+  loop
+    if not exists (
+      select 1
+      from public.nutrient_definitions d
+      where d.code = n.code and d.unit = n.unit
+    ) then
+      raise exception using errcode = '22023', message = 'invalid nutrient code or unit';
+    end if;
+
+    insert into public.item_nutrients (
+      catalog_item_id, user_id, nutrient_code, amount, unit, provenance,
+      source_uri, source_observed_at, quality
+    )
+    values (
+      item.id, owner_id, n.code, n.amount, n.unit,
+      coalesce(n.provenance, 'user_entered'),
+      n.source_uri, n.source_observed_at, coalesce(n.quality, 'unknown')
+    );
+  end loop;
+
+  for dependent in
+    select distinct bc.batch_id
+    from public.batch_components bc
+    where bc.catalog_item_id = item.id and bc.user_id = owner_id
+  loop
+    perform public.recalculate_batch_nutrients(dependent.batch_id);
+  end loop;
+
+  return item;
+end;
+$$;
+
 create or replace function public.set_catalog_item_active(
   p_catalog_item_id uuid,
   p_expected_revision integer,
