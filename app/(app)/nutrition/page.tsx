@@ -3,6 +3,7 @@ import { getAppSession } from "@/lib/auth/session";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
 import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
+import { dailyDisplayAmount } from "@/lib/nutrition/presentation";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
@@ -23,20 +24,6 @@ function formatAmount(value: number | null, unit: string) {
   if (value === null) return "—";
   const maximumFractionDigits = Math.abs(value) < 10 ? 2 : 1;
   return `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits }).format(value)} ${unit}`;
-}
-
-function dailyKnownAmount(day: {
-  record_complete: boolean;
-  entry_count: number;
-  missing_entry_count: number;
-  known_amount: number;
-}) {
-  if (day.entry_count === 0) {
-    return day.record_complete ? 0 : null;
-  }
-  return day.entry_count === day.missing_entry_count
-    ? null
-    : day.known_amount;
 }
 
 function qualityLabel(value: string) {
@@ -237,8 +224,8 @@ export default async function NutritionPage({
                     </div>
                   </div>
                   <div className="nutrition-day-value">
-                    <strong>{formatAmount(dailyKnownAmount(day), day.unit)}</strong>
-                    {dailyKnownAmount(day) === null
+                    <strong>{formatAmount(dailyDisplayAmount(day), day.unit)}</strong>
+                    {dailyDisplayAmount(day) === null
                       ? <small>未登録</small>
                       : !day.coverage_complete && <small>既知分のみ</small>}
                   </div>
