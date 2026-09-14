@@ -147,7 +147,7 @@ begin
     hashtextextended(owner_id::text || ':product:' || trim(p_barcode), 0)
   );
 
-  select c.*, p.*
+  select c, p
   into item, product
   from public.catalog_items c
   join public.products p on p.catalog_item_id = c.id
