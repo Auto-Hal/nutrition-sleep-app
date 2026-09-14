@@ -135,6 +135,30 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     ]));
   });
 
+
+  it("accepts common OCR confusion in kcal units without weakening row pairing", () => {
+    const words: OcrWord[] = [
+      word("エネルギー", 20, 70, 150),
+      word("180", 360, 70, 60),
+      word("kcaI", 435, 70, 70),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "エネルギー 180 kcaI",
+      width: 600,
+      height: 180,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "energy", amount: 180, unit: "kcal" },
+    ]));
+  });
+
   it("uses a server-only synchronous Cloud Vision route without persisting images", () => {
     const route = read("app/api/ocr/nutrition-label/route.ts");
     const adapter = read("lib/products/google-cloud-vision.ts");
