@@ -114,6 +114,19 @@ describe("Phase 4 DRI 2025 adult reference model", () => {
     expect(resolved.unavailableReason).toContain("月経状況");
   });
 
+  it("resolves female iron from age 65 when the official table no longer branches by menstrual status", () => {
+    const resolved = resolveDri2025(
+      { birthDate: "1957-01-01", sex: "female", activityLevel: "moderate" },
+      "2026-09-14",
+      "iron",
+    );
+
+    expect(resolved.references).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metric: "EAR", value: 5.0, unit: "mg" }),
+      expect.objectContaining({ metric: "RDA", value: 6.0, unit: "mg" }),
+    ]));
+  });
+
   it("contains adult salt-equivalent DG for both sexes", () => {
     const male = DRI_2025_ADULT_REFERENCES.find((reference) =>
       reference.nutrientCode === "salt_equivalent"
