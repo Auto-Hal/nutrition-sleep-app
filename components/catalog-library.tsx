@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { NUTRIENT_DEFINITIONS, nutrientFormValues, nutrientPayload, type CatalogItem, type CatalogItemType } from "@/lib/nutrition/catalog";
+import { ProductIngestion } from "@/components/product-ingestion";
 
 const typeLabels: Record<CatalogItemType, string> = { ingredient: "食材", product: "市販品", supplement: "サプリ", estimated_dish: "外食・推定", batch: "Batch" };
 const blankNutrients = () => Object.fromEntries(NUTRIENT_DEFINITIONS.map(({ code }) => [code, ""]));
@@ -61,7 +62,7 @@ export function CatalogLibrary() {
   async function deactivate(item: CatalogItem) {
     setBusy(true); setMessage(null); setError(null);
     try {
-      const response = await fetch(`/api/catalog/${item.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ expected_revision: item.revision, name: item.name, brand: item.brand, serving_size: item.serving_size, serving_unit: item.serving_unit, active: false, nutrients: item.nutrients }) });
+      const response = await fetch(`/api/catalog/${item.id}/active`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ expected_revision: item.revision, active: false }) });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "無効化できませんでした。");
       await load(); setMessage("無効化しました。過去の履歴は保持されています。");
@@ -84,10 +85,11 @@ export function CatalogLibrary() {
   const componentChoices = items.filter((item) => item.item_type !== "batch" && item.active);
   return (
     <div className="stack">
+      <ProductIngestion onSaved={load} />
       <section className="card">
         <div className="section-heading"><div><h2>Library</h2><p className="muted">食品・サプリ・外食推定値は現在値として管理します。</p></div><div className="form-actions"><button className={`button ${mode === "item" ? "" : "secondary"}`} type="button" onClick={startCreate}>項目を追加</button><button className={`button ${mode === "batch" ? "" : "secondary"}`} type="button" onClick={() => { setMode("batch"); setEditing(null); setEditingBatch(null); setBatchForm({ name: "", dish_name: "", servings: "1", serving_unit: "serving" }); setComponents([{ catalog_item_id: "", quantity: "1", quantity_unit: "serving" }]); setMessage(null); setError(null); }}>Batchを作成</button></div></div>
         {mode === "item" ? <div className="form library-form">
-          <div className="grid-2"><div className="field"><label htmlFor="catalog-type">種類</label><select id="catalog-type" value={form.item_type} onChange={(event) => setForm((current) => ({ ...current, item_type: event.target.value as Exclude<CatalogItemType, "batch"> }))}>{(["ingredient", "product", "supplement", "estimated_dish"] as const).map((type) => <option key={type} value={type}>{typeLabels[type]}</option>)}</select></div><div className="field"><label htmlFor="catalog-name">名前</label><input id="catalog-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div></div>
+          <div className="grid-2"><div className="field"><label htmlFor="catalog-type">種類</label><select id="catalog-type" value={form.item_type} onChange={(event) => setForm((current) => ({ ...current, item_type: event.target.value as Exclude<CatalogItemType, "batch"> }))}>{(["ingredient", "estimated_dish"] as const).map((type) => <option key={type} value={type}>{typeLabels[type]}</option>)}</select></div><div className="field"><label htmlFor="catalog-name">名前</label><input id="catalog-name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div></div>
           <div className="grid-2"><div className="field"><label htmlFor="catalog-brand">メーカー・店名（任意）</label><input id="catalog-brand" value={form.brand} onChange={(event) => setForm((current) => ({ ...current, brand: event.target.value }))} /></div><div className="field"><label htmlFor="catalog-serving">基準量</label><div className="inline-fields"><input id="catalog-serving" type="number" min="0.001" step="0.001" value={form.serving_size} onChange={(event) => setForm((current) => ({ ...current, serving_size: event.target.value }))} /><input aria-label="基準単位" value={form.serving_unit} onChange={(event) => setForm((current) => ({ ...current, serving_unit: event.target.value }))} /></div></div></div>
           <fieldset className="nutrient-fieldset"><legend>栄養値（基準量あたり。空欄はunknown、0はゼロ）</legend><div className="nutrient-grid">{NUTRIENT_DEFINITIONS.map((definition) => <div className="field" key={definition.code}><label htmlFor={`nutrient-${definition.code}`}>{definition.label}（{definition.unit}）</label><input id={`nutrient-${definition.code}`} type="number" min="0" step="any" value={form.nutrients[definition.code] ?? ""} onChange={(event) => setForm((current) => ({ ...current, nutrients: { ...current.nutrients, [definition.code]: event.target.value } }))} /></div>)}</div></fieldset>
           <div className="form-actions"><button className="button" type="button" onClick={saveItem} disabled={busy}>{busy ? "保存中…" : editing ? "更新する" : "登録する"}</button></div>
@@ -99,7 +101,7 @@ export function CatalogLibrary() {
         </div>}
         {message && <p className="muted" role="status">{message}</p>}{error && <p className="error-text" role="alert">{error}</p>}
       </section>
-      <section className="card" aria-labelledby="catalog-list-title"><div className="section-heading"><h2 id="catalog-list-title">登録済み項目</h2><span className="pill">{items.filter((item) => item.active).length}件</span></div>{items.length === 0 ? <div className="empty-state">まだ項目がありません。</div> : <div className="catalog-list">{items.map((item) => <div className={`catalog-row ${item.active ? "" : "inactive"}`} key={item.id}><div><strong>{item.name}</strong><div className="muted">{typeLabels[item.item_type]} · {item.serving_size} {item.serving_unit}{item.brand ? ` · ${item.brand}` : ""}</div></div><div className="meal-actions"><span className={`pill ${item.active ? "" : "pending"}`}>{item.active ? "有効" : "無効"}</span><button className="button secondary" type="button" onClick={() => startEdit(item)}>編集</button>{item.active && <button className="button ghost" type="button" onClick={() => deactivate(item)} disabled={busy}>無効化</button>}</div></div>)}</div>}</section>
+      <section className="card" aria-labelledby="catalog-list-title"><div className="section-heading"><h2 id="catalog-list-title">登録済み項目</h2><span className="pill">{items.filter((item) => item.active).length}件</span></div>{items.length === 0 ? <div className="empty-state">まだ項目がありません。</div> : <div className="catalog-list">{items.map((item) => <div className={`catalog-row ${item.active ? "" : "inactive"}`} key={item.id}><div><strong>{item.name}</strong><div className="muted">{typeLabels[item.item_type]} · {item.serving_size} {item.serving_unit}{item.brand ? ` · ${item.brand}` : ""}</div></div><div className="meal-actions"><span className={`pill ${item.active ? "" : "pending"}`}>{item.active ? "有効" : "無効"}</span>{item.item_type !== "product" && item.item_type !== "supplement" && <button className="button secondary" type="button" onClick={() => startEdit(item)}>編集</button>}{item.active && <button className="button ghost" type="button" onClick={() => deactivate(item)} disabled={busy}>無効化</button>}</div></div>)}</div>}</section>
     </div>
   );
 }
