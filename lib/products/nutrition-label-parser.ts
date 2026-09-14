@@ -149,7 +149,14 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
 }
 
 function normalizeUnit(value: string) {
-  const unit = value.normalize("NFKC").replace(/[μµ]/g, "u").trim().toLowerCase();
+  const unit = value
+    .normalize("NFKC")
+    .replace(/[μµ]/g, "u")
+    .replace(/[.,:;]$/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/^kca[i1l]$/, "kcal");
+
   if (unit === "kcal" || unit === "kj" || unit === "mg" || unit === "ug" || unit === "g") return unit;
   return null;
 }
@@ -162,9 +169,11 @@ function parseCombinedValue(value: string) {
     .replace(/kca[li1]/gi, "kcal")
     .trim();
 
-  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kcal|kJ|mg|ug|g)$/i);
+  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kca[i1l]|kJ|mg|ug|g)$/i);
   if (!match) return null;
-  return { amount: Number(match[1]), unit: match[2].toLowerCase() };
+  const unit = normalizeUnit(match[2]);
+  if (!unit) return null;
+  return { amount: Number(match[1]), unit };
 }
 
 function parseNumber(value: string) {
