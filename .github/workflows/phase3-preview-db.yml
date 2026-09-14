@@ -15,14 +15,24 @@ jobs:
     runs-on: ubuntu-latest
     environment: preview
     timeout-minutes: 15
-    env:
-      DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
+      - name: Select dedicated Vercel project
+        shell: bash
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'JSON'
+          {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
+          JSON
+      - name: Pull Preview environment
+        run: npx --yes vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
       - name: Verify Preview database target
         shell: bash
         run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
           test -n "$DATABASE_URL"
           case "$DATABASE_URL" in
             *pprsfxpfljdjlwdfbtqo*) ;;
@@ -33,10 +43,30 @@ jobs:
           esac
           echo "Preview database target verified."
       - name: Show migration ledger before
-        run: supabase migration list --db-url "$DATABASE_URL"
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          supabase migration list --db-url "$DATABASE_URL"
       - name: Apply pending migrations
-        run: supabase db push --db-url "$DATABASE_URL" --yes
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          supabase db push --db-url "$DATABASE_URL" --yes
       - name: Show migration ledger after
-        run: supabase migration list --db-url "$DATABASE_URL"
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          supabase migration list --db-url "$DATABASE_URL"
       - name: Run rollback-only Phase 3 smoke
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/smoke/phase3_products.sql
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/smoke/phase3_products.sql
