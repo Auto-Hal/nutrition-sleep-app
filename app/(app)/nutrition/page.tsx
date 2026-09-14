@@ -178,6 +178,9 @@ export default async function NutritionPage({
                       <span aria-hidden="true"> · </span>
                       サプリ {formatAmount(nutrient.average_supplement_amount, nutrient.unit)}
                     </div>
+                    <div className="nutrition-meta">
+                      データ品質 {qualityLabel(nutrient.quality)}
+                    </div>
                     {nutrient.percent_energy !== null && (
                       <div className="nutrition-meta">
                         エネルギー比 {new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(nutrient.percent_energy)}%
