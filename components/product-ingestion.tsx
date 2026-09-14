@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { isValidGtin, normalizeBarcode } from "@/lib/products/barcode";
-import { parseNutritionLabelText } from "@/lib/products/label-ocr";
-import { recognizeNutritionLabel } from "@/lib/products/ocr-client";
+import { prepareNutritionLabelImage } from "@/lib/products/image-prep";
 import type { CommercialNutrient, ExternalProductCandidate } from "@/lib/products/open-food-facts";
 
 type ProductItemType = "product" | "supplement";
@@ -62,6 +61,19 @@ type ResolveResponse =
   | { status: "external_unavailable"; reason: string; fallback: "ocr" }
   | { error: string };
 
+type OcrResponse = {
+  provider: string;
+  source_observed_at: string;
+  basis: { serving_size: number; serving_unit: string };
+  nutrients: CommercialNutrient[];
+  diagnostics: {
+    matched_nutrient_count: number;
+    basis_detected: boolean;
+  };
+  error?: string;
+  code?: string;
+};
+
 type NutrientDraft = Record<NutrientCode, string>;
 
 function nutrientDraft(values: CommercialNutrient[]): NutrientDraft {
@@ -95,17 +107,30 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [needsOcr, setNeedsOcr] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState<number | null>(null);
+  const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stopScannerRef = useRef<(() => void) | null>(null);
+  const ocrPreviewRef = useRef<string | null>(null);
+
+  const replaceOcrPreview = useCallback((file: File | null) => {
+    if (ocrPreviewRef.current) URL.revokeObjectURL(ocrPreviewRef.current);
+    const next = file ? URL.createObjectURL(file) : null;
+    ocrPreviewRef.current = next;
+    setOcrPreviewUrl(next);
+  }, [replaceOcrPreview]);
+
+  useEffect(() => () => {
+    if (ocrPreviewRef.current) URL.revokeObjectURL(ocrPreviewRef.current);
+  }, []);
 
   const resetResolution = useCallback(() => {
     setExternalCandidate(null);
     setLocalItem(null);
     setOcrCandidate(null);
     setOcrNutrients(nutrientDraft([]));
+    replaceOcrPreview(null);
     setNeedsOcr(false);
     setMessage(null);
     setError(null);
@@ -237,16 +262,22 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
     setBusy(true);
     setError(null);
-    setMessage("ラベルを解析しています。画像自体は保存しません。");
-    setOcrProgress(0);
+    setMessage("画像を最適化しています。元画像は保存しません。");
 
     try {
-      const rawText = await recognizeNutritionLabel(file, ({ progress }) => {
-        if (progress !== null) setOcrProgress(progress);
+      const prepared = await prepareNutritionLabelImage(file);
+      replaceOcrPreview(prepared);
+      setMessage("Google Cloud Visionで栄養成分表示を解析しています…");
+
+      const body = new FormData();
+      body.set("image", prepared);
+      const response = await fetch("/api/ocr/nutrition-label", {
+        method: "POST",
+        body,
       });
-      const parsed = parseNutritionLabelText(rawText);
-      if (parsed.nutrients.length === 0) {
-        throw new Error("栄養値を読み取れませんでした。明るい場所でラベル全体を撮り直してください。");
+      const parsed = await response.json() as OcrResponse;
+      if (!response.ok) {
+        throw new Error(parsed.error ?? "Cloud OCRに失敗しました。");
       }
 
       const draft: DraftCandidate = {
@@ -259,21 +290,24 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         package_amount: externalCandidate?.package_amount ?? localItem?.product.package_amount ?? null,
         package_unit: externalCandidate?.package_unit ?? localItem?.product.package_unit ?? null,
         source_type: "label_ocr",
-        source_provider: "device_ocr",
+        source_provider: parsed.provider,
         source_uri: null,
-        source_observed_at: new Date().toISOString(),
+        source_observed_at: parsed.source_observed_at,
         nutrients: parsed.nutrients,
       };
       setOcrCandidate(draft);
       setOcrNutrients(nutrientDraft(parsed.nutrients));
       setNeedsOcr(false);
-      setMessage("OCR結果です。現物ラベルと見比べて確認・修正してください。");
+
+      const basisMessage = parsed.diagnostics.basis_detected
+        ? `基準量: ${parsed.basis.serving_size} ${parsed.basis.serving_unit}`
+        : "基準量は読み取れなかったため確認してください";
+      setMessage(`Cloud OCRで${parsed.diagnostics.matched_nutrient_count}項目を抽出しました（${basisMessage}）。画像と照合し、誤りだけ修正して保存してください。`);
     } catch (requestError) {
       setNeedsOcr(true);
       setError(requestError instanceof Error ? requestError.message : "OCRに失敗しました。");
     } finally {
       setBusy(false);
-      setOcrProgress(null);
     }
   }
 
@@ -314,6 +348,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
       setExternalCandidate(null);
       setLocalItem(null);
       setOcrCandidate(null);
+      replaceOcrPreview(null);
       setNeedsOcr(false);
       setMessage("Libraryに保存しました。次回から同じバーコードは自前DBから解決します。");
     } catch (requestError) {
@@ -444,7 +479,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
       {needsOcr && !ocrCandidate && (
         <div className="stack">
-          <p className="muted">商品DBにない場合は、栄養成分表示を撮影して登録できます。</p>
+          <p className="muted">商品DBにない場合は、栄養成分表示が画面の大半を占め、反射が少なくなるよう近づいて撮影してください。</p>
           <label className="button secondary">
             栄養成分表示を撮影
             <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
@@ -456,15 +491,14 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         </div>
       )}
 
-      {busy && ocrProgress !== null && (
-        <p className="muted" role="status">OCR解析中… {Math.round(ocrProgress * 100)}%</p>
-      )}
-      {busy && ocrProgress === null && message?.includes("解析") && (
-        <p className="muted" role="status">文字配置を変えて再解析しています…</p>
-      )}
-
       {ocrCandidate && (
         <div className="form library-form stack">
+          {ocrPreviewUrl && (
+            <figure className="ocr-preview-frame">
+              <img className="ocr-preview" src={ocrPreviewUrl} alt="確認用の栄養成分表示" />
+              <figcaption className="muted">この画像とOCR候補を見比べて確認してください。画像は保存しません。</figcaption>
+            </figure>
+          )}
           <div className="grid-2">
             <div className="field">
               <label htmlFor="ocr-product-name">商品名</label>
