@@ -101,9 +101,21 @@ raw external response全体は永続化せず、必要な正規化metadataのみ
 
 ラベル撮影はiPhoneで安定する `<input type="file" accept="image/*" capture="environment">` を基本入口とする。
 
-OCRはPhase 3初期実装では **client-side adapter** とし、Tesseract.jsをdynamic importして日本語/英数字を解析する。画像はOCR処理後に破棄し、DBへ保存しない。
+実機評価でclient-side Tesseract.jsは日本語の栄養成分表に対して実用精度へ達しなかったため、Phase 3 MVPの標準経路は **Google Cloud Visionの同期 `DOCUMENT_TEXT_DETECTION`** へ変更する。
 
-OCR結果から以下を抽出する。
+構成:
+1. iPhone側で撮影画像を最大辺2200px程度へ縮小し、JPEGへ再エンコードしてEXIF等を除去。
+2. Vercel Functionの4.5MB request上限を超えないよう3MB未満へ圧縮。
+3. 認証済みserver routeへmultipart upload。
+4. serverからCloud Vision `images:annotate` を同期呼び出し。
+5. provider固有responseを、文字・座標・confidenceを含むprovider-neutral OCR documentへ正規化。
+6. 座標からvisual rowを再構成し、栄養表示専用parserでlabel/value/unit/basisを抽出。
+7. 画像と候補を同一確認画面でユーザー確認し、必要箇所だけ修正。
+8. 確認後のみ既存Product RPCで保存。
+
+画像はアプリDB/Storageへ保存しない。同期Cloud Visionへ送るだけで、OCR後はクライアントの確認用object URLも破棄する。
+
+抽出対象:
 - エネルギー
 - たんぱく質
 - 脂質
@@ -111,25 +123,27 @@ OCR結果から以下を抽出する。
 - 食物繊維
 - ナトリウム / 食塩相当量
 - 対応可能なCa / Fe / Zn / vitamins
-
-解析値は必ずconfirmation画面を通す。OCRだけで自動確定しない。
+- 「1枚当たり」「100g当たり」等の基準量
 
 保存時:
 - provenance: `ocr`
 - quality: user confirmation後に `user_verified`
-- source type: label_ocr
+- source type: `label_ocr`
+- source provider: `google_cloud_vision`
 - source image自体は保存しない
+- unknownは0に補完しない
 
-### 6. OCR stop condition
+### 6. OCR provider boundary / stop condition
 
-Tesseract.js方式は実装前後にiPhone実機で短いdevice spikeを行う。
+OCR provider固有JSONをProduct schemaやUIへ直接結合しない。共通OCR document → nutrition parser → confirmationという境界を維持する。
 
-以下のいずれかに該当した場合は、Phase 3を無理に完了扱いにせずOCR provider設計を再評価する。
-- iPhone Safari/PWAでworker/WASMが安定しない
-- 日本語ラベルの主要数値を確認UIへ渡せない程度に認識率が低い
-- memory/runtimeが実用上許容できない
+Cloud Vision導入後も、実画像で以下が満たせない場合はPhase 3を無理に完了扱いにしない。
+- 主要5項目＋基準量の大半を安定して確認画面へ渡せない
+- 表の行/列対応を頻繁に取り違える
+- p95の確認画面表示までの待ち時間が実用上長すぎる
+- 誤読をunknownより優先して確定候補に出す
 
-この場合のみ、外部OCR service追加という新しいprivacy/cost/security判断をAstra級設計テーマとして切り出す。
+その場合はAzure Document Intelligence LayoutまたはMultimodal Vision APIを補助/代替providerとしてAstra級設計判断で再評価する。
 
 ### 7. Atomic write / source precedence
 
@@ -152,7 +166,11 @@ Product保存はCatalog + product metadata + nutrientsを同一transactionで処
   - confirmed candidateをatomic保存
 - `PATCH /api/products/[id]`
   - source precedence + revision conflictを維持
-- OCR解析はclient-sideを基本とし、raw image upload APIは作らない
+- `POST /api/ocr/nutrition-label`
+  - 認証済みmultipart image upload
+  - 3MB以下のJPEG/PNG/WebP
+  - Google Cloud Vision同期OCR
+  - raw imageは永続保存しない
 
 すべて既存server-side session + Origin validationを維持する。
 
@@ -205,7 +223,9 @@ Phase 3 migrationはfresh replay可能なadditive migrationとして追加する
 - Open Food Facts normalization
 - unit conversion
 - unknown ≠ 0
-- OCR text parser
+- OCR visual-row grouping
+- nutrition label parser
+- Pasco実画像由来の正解値fixture（画像自体はGitへ保存しない）
 - source-priority comparison
 
 ### Contract
