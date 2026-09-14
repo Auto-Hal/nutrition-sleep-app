@@ -153,6 +153,10 @@ export const DRI_2025_ADULT_REFERENCES: DriReference[] = [
 
   ...point("iron", "male", "EAR", "mg", [5.5, 6.0, 6.0, 5.5, 5.5]),
   ...point("iron", "male", "RDA", "mg", [7.0, 7.5, 7.0, 7.0, 6.5]),
+  // For women under 65, the official adult table differs by menstrual status,
+  // which is not present in Profile. From 65 onward the table has one value set.
+  ...point("iron", "female", "EAR", "mg", [null, null, null, 5.0, 4.5]),
+  ...point("iron", "female", "RDA", "mg", [null, null, null, 6.0, 5.5]),
 
   ...point("zinc", "male", "EAR", "mg", [7.5, 8.0, 8.0, 7.5, 7.5]),
   ...point("zinc", "male", "RDA", "mg", [9.0, 9.5, 9.5, 9.0, 9.0]),
