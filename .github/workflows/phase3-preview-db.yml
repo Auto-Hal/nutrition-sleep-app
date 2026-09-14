@@ -24,37 +24,27 @@ jobs:
           cat > .vercel/project.json <<'JSON'
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
-      - name: List Preview variable scopes
+      - name: Diagnose encrypted Preview DB target with env run
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         shell: bash
         run: |
-          echo "=== generic preview ==="
-          npx --yes vercel@48.2.0 env ls preview --token=${{ secrets.VERCEL_TOKEN }}
-          echo "=== phase2 branch ==="
-          npx --yes vercel@48.2.0 env ls preview phase/2-nutrition-entry-foundation --token=${{ secrets.VERCEL_TOKEN }}
-          echo "=== phase3 branch ==="
-          npx --yes vercel@48.2.0 env ls preview phase/3-product-ingestion --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Pull Phase 2 branch Preview environment
-        run: npx --yes vercel@48.2.0 pull --yes --environment=preview --git-branch=phase/2-nutrition-entry-foundation --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Print sanitized Phase 2 database target
-        shell: bash
-        run: |
-          set -a
-          source .vercel/.env.preview.local
-          set +a
-          test -n "$DATABASE_URL"
-          node - <<'NODE'
-          const u = new URL(process.env.DATABASE_URL);
+          npx --yes vercel@48.2.0 env run -e preview -- node - <<'NODE'
+          const value = process.env.DATABASE_URL || "";
+          if (!value) {
+            console.error("DATABASE_URL was not injected.");
+            process.exit(1);
+          }
+          const u = new URL(value);
           console.log(JSON.stringify({
             hostname: u.hostname,
             port: u.port || null,
             username: decodeURIComponent(u.username),
             database: u.pathname.replace(/^\//, "")
           }, null, 2));
+          if (value.includes("vyvnicyupcrsmtgdyypv")) {
+            console.error("Production ref detected. Refusing all writes.");
+            process.exit(2);
+          }
+          console.log("Diagnostic only: no database writes were performed.");
           NODE
-          case "$DATABASE_URL" in
-            *vyvnicyupcrsmtgdyypv*)
-              echo "Production ref detected. Refusing all writes." >&2
-              exit 1
-              ;;
-          esac
-          echo "Diagnostic only: no database writes were performed."
