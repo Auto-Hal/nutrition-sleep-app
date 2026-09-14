@@ -1,0 +1,78 @@
+name: Phase 3 Preview DB rollout
+
+on:
+  push:
+    branches:
+      - phase/3-product-ingestion
+    paths:
+      - .github/workflows/phase3-preview-db.yml
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+      - name: Select dedicated Vercel project
+        shell: bash
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'JSON'
+          {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
+          JSON
+      - name: Pull Preview environment
+        run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Verify Preview database target
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          test -n "$DATABASE_URL"
+          case "$DATABASE_URL" in
+            *pprsfxpfljdjlwdfbtqo*) ;;
+            *)
+              echo "Refusing migration: DATABASE_URL is not the dedicated Preview Supabase project." >&2
+              exit 1
+              ;;
+          esac
+          echo "Preview database target verified."
+      - name: Show migration ledger before
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          supabase migration list --db-url "$DATABASE_URL"
+      - name: Apply pending migrations
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          supabase db push --db-url "$DATABASE_URL" --yes
+      - name: Show migration ledger after
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          supabase migration list --db-url "$DATABASE_URL"
+      - name: Run rollback-only Phase 3 smoke
+        shell: bash
+        run: |
+          set -a
+          source .vercel/.env.preview.local
+          set +a
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/smoke/phase3_products.sql
