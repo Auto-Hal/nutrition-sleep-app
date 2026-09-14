@@ -77,7 +77,12 @@ h3 { margin-bottom: 6px; font-size: 1rem; }
 .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .error-text { color: var(--danger); font-size: 0.87rem; }
 
-.barcode-video { width: 100%; min-height: 220px; max-height: 360px; border-radius: 14px; background: #10201c; object-fit: cover; }
+.barcode-camera-shell { position: relative; overflow: hidden; border-radius: 14px; background: #10201c; }
+.barcode-video { display: block; width: 100%; min-height: 240px; max-height: 380px; background: #10201c; object-fit: cover; }
+.barcode-guide { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.barcode-guide::before { content: ""; position: absolute; inset: 0; background: rgb(0 0 0 / 22%); }
+.barcode-guide span { position: relative; width: min(78%, 430px); aspect-ratio: 3.2 / 1; border: 3px solid rgb(255 255 255 / 92%); border-radius: 12px; box-shadow: 0 0 0 999px rgb(0 0 0 / 24%); }
+.barcode-guide span::after { content: ""; position: absolute; top: 50%; right: 8px; left: 8px; height: 2px; transform: translateY(-50%); background: rgb(255 255 255 / 82%); }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; border: 0 !important; }
 label.button { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .auth-page { min-height: 100svh; display: grid; place-items: center; padding: 24px 18px; }
