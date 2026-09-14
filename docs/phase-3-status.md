@@ -3,7 +3,7 @@
 ## 現在の状態
 
 - **Phase 2 COMPLETE**
-- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / CLOUD OCR DEVICE ACCEPTANCE PASS / DEVICE ACCEPTANCE PARTIAL**
+- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PASS / SUPERVISOR ACCEPTANCE PASS**
 - branch: `phase/3-product-ingestion`
 - main baseline: Phase 2 completion docsを含むmain
 - ProductionはPhase 2 deploymentを維持
@@ -86,11 +86,12 @@ iPhone/iPad実機でログインおよび主要フローの起動を確認した
 
 確認できたこと:
 - Preview login PASS
-- barcode camera起動 / 読み取り自体は動作
-- OCR撮影 / 解析フローは動作
-
-品質上の未達:
-- live barcode scannerは位置合わせが難しく、入力負荷が高い。
+- barcode camera起動 / 読み取り PASS
+- barcode反応速度は実用上良好
+- barcodeは反対向きからも読み取り可能
+- barcode photo fallbackあり
+- OCR撮影 / 解析フロー PASS
+- iPad layout / regression PASS
 
 Cloud OCR corrective acceptance:
 - Google Cloud Vision + geometry-aware parserへ移行後、Pasco実画像で基準量 `1 枚` を正しく抽出。
@@ -100,7 +101,7 @@ Cloud OCR corrective acceptance:
 - `kcaI` / `kca1` / `kca|` 等の既知単位OCR揺れ、および長い栄養ラベルの1文字以内のOCR揺れのみ限定正規化。
 - 数値そのものは推測・補完しない。
 
-このためOCR gateはPASS。Phase 3全体はbarcode usability / iPad regressionが残るためまだCOMPLETEにしない。
+OCR gate / barcode usability / iPad regressionはすべてPASS。Phase 3 Preview device acceptance COMPLETE。
 
 改善・設計判断:
 - barcodeは高解像度camera constraints + alignment guide + 静止画decode fallbackを追加済み。
@@ -116,13 +117,28 @@ Cloud OCR corrective acceptance:
 - 画像自体はGitへ保存せず、正解値とsynthetic OCR layout fixtureだけをtestへ持つ。
 - Cloud Visionでも実用精度に達しない場合のみ、Azure Document Intelligence Layout / Multimodal Vision APIを次候補として再評価する。
 
+## Post-Phase 3 external product coverage backlog
+
+Open Food Factsだけでは日本の市販商品のcoverageが不足するため、Phase 3完了を阻害しない改善項目として外部商品source拡張をbacklog化する。
+
+候補:
+- GS1 Japan 産業横断レジストリー Web API
+- その他、利用規約・料金・栄養項目coverage・commercial use条件を満たすapproved provider
+
+原則:
+- local DB → approved external providers → Cloud Vision OCR の順序を維持
+- providerを増やしてもunknownを0補完しない
+- 外部DB値はunverifiedのまま
+- 現物ラベルuser_verifiedをlower-priority sourceで上書きしない
+- provider追加はadapter追加として実装し、Product/MealEntry schemaへ直接結合しない
+
 ## Remaining gate
 
 1. Cloud Vision OCR adapter / parser / confirmation UI CI COMPLETE
 2. Preview Cloud Vision secret設定・runtime注入確認 COMPLETE
 3. Pasco実画像でCloud Vision acceptance COMPLETE
-4. iPhoneでbarcode corrective acceptance
-5. iPad regression確認
-6. Supervisor acceptance
+4. iPhone barcode corrective acceptance COMPLETE
+5. iPad regression確認 COMPLETE
+6. Supervisor acceptance COMPLETE
 7. PR ready / main merge
 8. Production secret設定 + Production migration/deploy/verification
