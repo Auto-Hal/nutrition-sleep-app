@@ -26,8 +26,37 @@ type DraftCandidate = {
   nutrients: CommercialNutrient[];
 };
 
+type LocalProductItem = {
+  id: string;
+  item_type: ProductItemType;
+  name: string;
+  brand: string | null;
+  serving_size: number;
+  serving_unit: string;
+  active: boolean;
+  revision: number;
+  product: {
+    barcode: string;
+    manufacturer: string | null;
+    package_amount: number | null;
+    package_unit: string | null;
+    source_type: "manufacturer_official" | "label_ocr" | "external_database";
+    source_provider: string;
+    source_uri: string | null;
+    source_observed_at: string;
+    confirmed_at: string;
+  };
+  nutrients: Array<{
+    nutrient_code: NutrientCode;
+    amount: number | null;
+    unit: string;
+    provenance: string;
+    quality: string;
+  }>;
+};
+
 type ResolveResponse =
-  | { status: "local"; item: { name: string; active: boolean } }
+  | { status: "local"; item: LocalProductItem }
   | { status: "external"; candidate: ExternalProductCandidate }
   | { status: "not_found"; fallback: "ocr" }
   | { status: "external_unavailable"; reason: string; fallback: "ocr" }
@@ -60,6 +89,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
   const [barcode, setBarcode] = useState("");
   const [itemType, setItemType] = useState<ProductItemType>("product");
   const [externalCandidate, setExternalCandidate] = useState<ExternalProductCandidate | null>(null);
+  const [localItem, setLocalItem] = useState<LocalProductItem | null>(null);
   const [ocrCandidate, setOcrCandidate] = useState<DraftCandidate | null>(null);
   const [ocrNutrients, setOcrNutrients] = useState<NutrientDraft>(() => nutrientDraft([]));
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -73,6 +103,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
   const resetResolution = useCallback(() => {
     setExternalCandidate(null);
+    setLocalItem(null);
     setOcrCandidate(null);
     setOcrNutrients(nutrientDraft([]));
     setNeedsOcr(false);
@@ -99,8 +130,10 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
       }
 
       if (result.status === "local") {
+        setLocalItem(result.item);
+        setItemType(result.item.item_type);
         setMessage(result.item.active
-          ? `「${result.item.name}」はLibraryに登録済みです。`
+          ? `「${result.item.name}」はLibraryに登録済みです。現物ラベルで更新する場合のみ下から撮影してください。`
           : `「${result.item.name}」はLibraryに登録済みですが、現在は無効です。`);
         return;
       }
@@ -186,16 +219,15 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         throw new Error("栄養値を読み取れませんでした。明るい場所でラベル全体を撮り直してください。");
       }
 
-      const base = externalCandidate;
       const draft: DraftCandidate = {
         barcode: normalized,
-        name: base?.name ?? "",
-        brand: base?.brand ?? null,
-        manufacturer: base?.manufacturer ?? null,
+        name: externalCandidate?.name ?? localItem?.name ?? "",
+        brand: externalCandidate?.brand ?? localItem?.brand ?? null,
+        manufacturer: externalCandidate?.manufacturer ?? localItem?.product.manufacturer ?? null,
         serving_size: parsed.basis.serving_size,
         serving_unit: parsed.basis.serving_unit,
-        package_amount: base?.package_amount ?? null,
-        package_unit: base?.package_unit ?? null,
+        package_amount: externalCandidate?.package_amount ?? localItem?.product.package_amount ?? null,
+        package_unit: externalCandidate?.package_unit ?? localItem?.product.package_unit ?? null,
         source_type: "label_ocr",
         source_provider: "device_ocr",
         source_uri: null,
@@ -219,32 +251,38 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/products", {
-        method: "POST",
+      const common = {
+        name: candidate.name,
+        brand: candidate.brand,
+        serving_size: candidate.serving_size,
+        serving_unit: candidate.serving_unit,
+        manufacturer: candidate.manufacturer,
+        package_amount: candidate.package_amount,
+        package_unit: candidate.package_unit,
+        source_type: candidate.source_type,
+        source_provider: candidate.source_provider,
+        source_uri: candidate.source_uri,
+        source_observed_at: candidate.source_observed_at,
+        nutrients,
+      };
+      const updatingLocal = Boolean(
+        localItem
+        && localItem.product.barcode === candidate.barcode
+        && candidate.source_type === "label_ocr",
+      );
+      const response = await fetch(updatingLocal ? `/api/products/${localItem!.id}` : "/api/products", {
+        method: updatingLocal ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          item_type: itemType,
-          barcode: candidate.barcode,
-          name: candidate.name,
-          brand: candidate.brand,
-          serving_size: candidate.serving_size,
-          serving_unit: candidate.serving_unit,
-          manufacturer: candidate.manufacturer,
-          package_amount: candidate.package_amount,
-          package_unit: candidate.package_unit,
-          source_type: candidate.source_type,
-          source_provider: candidate.source_provider,
-          source_uri: candidate.source_uri,
-          source_observed_at: candidate.source_observed_at,
-          nutrients,
-          idempotency_key: crypto.randomUUID(),
-        }),
+        body: JSON.stringify(updatingLocal
+          ? { ...common, expected_revision: localItem!.revision, active: localItem!.active }
+          : { ...common, item_type: itemType, barcode: candidate.barcode, idempotency_key: crypto.randomUUID() }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "商品を保存できませんでした。");
 
       await onSaved();
       setExternalCandidate(null);
+      setLocalItem(null);
       setOcrCandidate(null);
       setNeedsOcr(false);
       setMessage("Libraryに保存しました。次回から同じバーコードは自前DBから解決します。");
@@ -312,6 +350,26 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         </div>
       )}
 
+      {localItem && !ocrCandidate && (
+        <div className="stack">
+          <div className="catalog-row">
+            <div>
+              <strong>{localItem.name}</strong>
+              <div className="muted">{localItem.brand ?? "ブランド不明"} · 登録済みLibrary</div>
+              <div className="muted">現在のsource: {localItem.product.source_type}</div>
+            </div>
+          </div>
+          <label className="button secondary">
+            現物ラベルで更新
+            <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void readLabel(file);
+              event.currentTarget.value = "";
+            }} />
+          </label>
+        </div>
+      )}
+
       {externalCandidate && !ocrCandidate && (
         <div className="stack">
           <div className="catalog-row">
@@ -341,7 +399,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         </div>
       )}
 
-      {(needsOcr || (!externalCandidate && !ocrCandidate && isValidGtin(normalizeBarcode(barcode)))) && (
+      {(needsOcr || (!externalCandidate && !localItem && !ocrCandidate && isValidGtin(normalizeBarcode(barcode)))) && (
         <div className="stack">
           <p className="muted">商品DBにない場合は、栄養成分表示を撮影して登録できます。</p>
           <label className="button secondary">
