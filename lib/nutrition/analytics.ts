@@ -184,6 +184,7 @@ export async function getNutritionAnalytics(
   const nutrients = NUTRIENT_DEFINITIONS.map((definition) => {
     const nutrientRows = rows.filter((row) => row.nutrient_code === definition.code);
     const eligibleRows = nutrientRows.filter((row) => row.eligible_for_reference);
+    const recordCompleteRows = nutrientRows.filter((row) => row.record_complete);
     const eligibleDates = eligibleRows.map((row) => row.meal_date);
     const dri = stableReferences(profile, definition.code, eligibleDates);
     const percent = percentEnergy(definition.code, nutrientRows, energyRows);
@@ -203,7 +204,7 @@ export async function getNutritionAnalytics(
       average_known_amount: avg,
       average_food_amount: average(eligibleRows.map((row) => row.food_amount)),
       average_supplement_amount: average(eligibleRows.map((row) => row.supplement_amount)),
-      quality: aggregateQuality(eligibleRows),
+      quality: aggregateQuality(recordCompleteRows),
       percent_energy: percent,
       dri: {
         references: dri.references,
