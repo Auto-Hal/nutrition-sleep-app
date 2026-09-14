@@ -120,6 +120,18 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function normalizeDailyRows(data: unknown): DailyRow[] {
+  const rawRows = Array.isArray(data) ? data as RawDailyRow[] : [];
+  return rawRows.map((row: RawDailyRow) => ({
+    ...row,
+    entry_count: Number(row.entry_count),
+    missing_entry_count: Number(row.missing_entry_count),
+    known_amount: Number(row.known_amount),
+    food_amount: Number(row.food_amount),
+    supplement_amount: Number(row.supplement_amount),
+  }));
+}
+
 function percentEnergy(
   nutrientCode: NutrientCode,
   nutrientRows: DailyRow[],
@@ -161,15 +173,7 @@ export async function getNutritionAnalytics(
   });
   if (error) throw new Error(error.message);
 
-  const rawRows = (data ?? []) as RawDailyRow[];
-  const rows = rawRows.map((row: RawDailyRow) => ({
-    ...row,
-    entry_count: Number(row.entry_count),
-    missing_entry_count: Number(row.missing_entry_count),
-    known_amount: Number(row.known_amount),
-    food_amount: Number(row.food_amount),
-    supplement_amount: Number(row.supplement_amount),
-  })) as DailyRow[];
+  const rows = normalizeDailyRows(data);
 
   const energyRows = new Map(
     rows.filter((row) => row.nutrient_code === "energy").map((row) => [row.meal_date, row]),
@@ -290,5 +294,30 @@ export async function getNutritionDayDrilldown(
       eaten_at: meal.eaten_at,
       entries: entryRows.filter((entry) => entry.meal_id === meal.id),
     })),
+  };
+}
+
+
+export async function getTodayNutritionSummary(
+  accessToken: string,
+  timeZone: string,
+  now = new Date(),
+) {
+  const date = localDateInTimeZone(timeZone, now);
+  const { data, error } = await createUserClient(accessToken).rpc("get_nutrition_daily_summary", {
+    p_start_date: date,
+    p_end_date: date,
+  });
+  if (error) throw new Error(error.message);
+
+  const rows = normalizeDailyRows(data);
+  const energy = rows.find((row) => row.nutrient_code === "energy") ?? null;
+
+  return {
+    date,
+    record_complete: energy?.record_complete ?? false,
+    energy_known_amount: energy?.known_amount ?? 0,
+    energy_coverage_complete: energy?.coverage_complete ?? false,
+    entry_count: energy?.entry_count ?? 0,
   };
 }
