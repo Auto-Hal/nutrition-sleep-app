@@ -3,7 +3,7 @@
 ## 現在の状態
 
 - **Phase 2 COMPLETE**
-- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PENDING**
+- **Phase 3 IMPLEMENTED / PREVIEW DB ACCEPTED / DEVICE ACCEPTANCE PARTIAL — QUALITY IMPROVEMENT IN PROGRESS**
 - branch: `phase/3-product-ingestion`
 - main baseline: Phase 2 completion docsを含むmain
 - ProductionはPhase 2 deploymentを維持
@@ -75,18 +75,33 @@ Supabase Advisor review:
 
 iPhone実機でclient-side OCRが安定しない場合、外部OCR provider追加を勝手に行わず、privacy/cost/securityを含む設計判断として再評価する。
 
+## Device acceptance checkpoint（2026-09-14）
+
+iPhone/iPad実機でログインおよび主要フローの起動を確認した。
+
+確認できたこと:
+- Preview login PASS
+- barcode camera起動 / 読み取り自体は動作
+- OCR撮影 / 解析フローは動作
+
+品質上の未達:
+- 栄養成分表示OCRで、実ラベルに対して脂質しか抽出されないケースを確認。Phase 3 acceptanceとしては不十分。
+- live barcode scannerは位置合わせが難しく、入力負荷が高い。
+
+このためPhase 3はCOMPLETEにしない。
+
+改善方針:
+- OCR parserを、OCR由来の空白・改行・表記揺れに耐えるよう拡張。
+- TesseractはrotateAuto + explicit PSM + 弱い初回結果のみalternate layoutで再解析。
+- live scannerは高解像度camera constraints + alignment guideを追加。
+- barcode photo capture fallbackを追加し、live scannerへ無理に合わせなくてもよい導線にする。
+- 上記のbounded client-side改善後もOCRが実用精度に達しない場合、外部OCR providerをprivacy/cost/securityを含むAstra級設計判断として再評価する。
+
 ## Remaining gate
 
-1. latest docs-only Preview deployment READY確認
-2. iPhone/iPad real-device acceptance
-   - login
-   - barcode camera permission / scanning
-   - local DB hit
-   - Open Food Facts hit
-   - not-found → OCR fallback
-   - OCR confirmation/edit
-   - Product/Supplement Library persistence
-   - Today intake from saved Product
-3. Supervisor acceptance
-4. PR ready / main merge
-5. Production migration + Production deployment + Production verification
+1. OCR / barcode usability corrective CI + Preview deployment
+2. iPhone実機でcorrective acceptance
+3. iPad regression確認
+4. Supervisor acceptance
+5. PR ready / main merge
+6. Production migration + Production deployment + Production verification
