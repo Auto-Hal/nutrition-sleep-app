@@ -435,6 +435,42 @@ grant execute on function public.update_product_item(
   public.product_source_type, text, text, timestamptz, jsonb
 ) to authenticated;
 
+create or replace function public.set_catalog_item_active(
+  p_catalog_item_id uuid,
+  p_expected_revision integer,
+  p_active boolean
+)
+returns public.catalog_items
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  owner_id uuid := (select auth.uid());
+  item public.catalog_items;
+begin
+  if owner_id is null then
+    raise exception using errcode = '42501', message = 'authentication required';
+  end if;
+
+  update public.catalog_items
+  set active = p_active
+  where id = p_catalog_item_id
+    and user_id = owner_id
+    and revision = p_expected_revision
+  returning * into item;
+
+  if item.id is null then
+    raise exception using errcode = '40001', message = 'catalog revision conflict';
+  end if;
+
+  return item;
+end;
+$$;
+
+revoke all on function public.set_catalog_item_active(uuid, integer, boolean) from public, anon;
+grant execute on function public.set_catalog_item_active(uuid, integer, boolean) to authenticated;
+
 comment on table public.products
   is 'Owner-scoped commercial metadata for Product/Supplement. Source priority is official > confirmed label OCR > external DB.';
 comment on column public.products.confirmed_at
