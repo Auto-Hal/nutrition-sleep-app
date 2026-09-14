@@ -9,7 +9,7 @@
 - branch: `phase/4-nutrition-analytics`
 - PR: #6 (Draft)
 - main baseline: `172e0470f733439ccfc3933221d0b68b187a6b99`
-- latest reviewed implementation head before this status update: `30e94bc72605e0c92c8e1016fef6ee3b63b08c0a`
+- latest implementation head before this status update: `4ae4f42115190118c3a402d950e59d3e54bd5317`
 
 ## Implemented scope
 
@@ -65,6 +65,12 @@ The following issues were found and corrected during review:
 6. Nutrition Overview:
    - data quality is shown independently from nutrient amount.
 
+7. Percent-energy DG eligibility:
+   - protein/fat/carbohydrate direct nutrient eligible days remain separate from percent-energy eligible days;
+   - percent-energy evaluation counts only days where both the nutrient and energy are eligible;
+   - unknown/incomplete energy never becomes a zero-energy eligible day;
+   - the UI exposes the actual percent-energy eligible day count.
+
 ## DRI source review
 
 Primary authority:
@@ -111,15 +117,15 @@ Direct Preview DB verification:
 ## Preview application gate
 
 - Previous Vercel Free daily deployment limit has reset.
-- Latest reviewed implementation head `2f8897e60d7800a2b5f65b2f86de9543c0bdff12`:
-  - CI PASS
-  - Preview workflow retry PASS
-  - deployment `dpl_CbLSUggyHfgbZWMLNuMQZjuxsXzh` READY
-- This status-only commit triggers one normal branch deployment so the stable Phase 4 branch alias points at the reviewed implementation.
+- P4-R1 was implemented after the prior READY Preview:
+  - percent-energy eligible-day count is now explicit;
+  - regression coverage was added for nutrient-complete / energy-incomplete days;
+  - no DB schema or migration change was required.
+- Latest branch Preview and CI must be green before device acceptance.
 
 ## Remaining gate
 
-1. Stable Phase 4 Preview branch deployment READY.
+1. Latest Phase 4 Preview branch deployment READY and CI green.
 2. iPhone acceptance:
    - default 30-day view
    - 7 / 30 / 90 switching
