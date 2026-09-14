@@ -5,7 +5,7 @@
 - Phase 1 COMPLETE
 - Phase 2 COMPLETE
 - Phase 3 COMPLETE
-- **Phase 4 IMPLEMENTED / CI PASS / PREVIEW DB ACCEPTED / PREVIEW APP READY / DEVICE ACCEPTANCE PENDING**
+- **Phase 4 IMPLEMENTED / PREVIEW VALIDATED / ASTRA DESIGN REVIEW PENDING / DEVICE ACCEPTANCE BLOCKED**
 - branch: `phase/4-nutrition-analytics`
 - PR: #6 (Draft)
 - main baseline: `172e0470f733439ccfc3933221d0b68b187a6b99`
@@ -123,10 +123,31 @@ Direct Preview DB verification:
   - no DB schema or migration change was required.
 - Latest branch Preview and CI must be green before device acceptance.
 
+## Astra design-review gate
+
+The original Supervisor workflow requires Astra review before Phase 4 device acceptance.
+Implementation advanced before that gate was formally recorded, so Phase 4 is temporarily held here.
+
+Astra must review the implemented design against the Phase 4 plan and return:
+- decisions;
+- invariants;
+- required changes;
+- explicit non-goals;
+- acceptance criteria;
+- migration decision.
+
+Until Supervisor accepts that review:
+- do not begin iPhone/iPad acceptance;
+- do not mark PR #6 Ready;
+- do not merge to main;
+- do not touch Production;
+- do not start Phase 5.
+
 ## Remaining gate
 
-1. Latest Phase 4 Preview branch deployment READY and CI green.
-2. iPhone acceptance:
+1. Astra design review and Supervisor acceptance of the design result.
+2. Latest Phase 4 Preview branch deployment READY and CI green after any required corrections.
+3. iPhone acceptance:
    - default 30-day view
    - 7 / 30 / 90 switching
    - complete/incomplete day behavior
@@ -134,10 +155,10 @@ Direct Preview DB verification:
    - food/supplement split
    - nutrient → day → meal → item drilldown
    - Today lightweight nutrition summary
-3. iPad regression.
-4. Supervisor acceptance.
-5. PR #6 ready / main merge.
-6. Production Phase 4 migration / deploy / runtime verification.
+4. iPad regression.
+5. Supervisor implementation acceptance.
+6. PR #6 ready / main merge.
+7. Production Phase 4 migration / deploy / runtime verification.
 
 ## Excluded
 
