@@ -22,8 +22,8 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 2 | COMPLETE | Catalog, Batch, Meal/MealEntry, immutable nutrient snapshots, Today meal entry |
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
-| Phase 4.5 | IN PROGRESS | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | QUEUED AFTER 4.5 / CR-001 GATE | Sleep domain and current official health-provider integration |
+| Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
+| Phase 5 | NEXT / CR-001 GATE | Sleep domain and current official health-provider integration |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
@@ -64,18 +64,33 @@ Acceptance completed in Preview, iPhone, iPad and Production for:
 
 ## Phase 4.5 — Interaction Performance / UX Hardening
 
+**Status: COMPLETE — 2026-09-15**
+
 Goal: remove avoidable wait time from current Nutrition/Today interactions before Phase 5 expands the runtime surface.
 
-Scope:
+Delivered:
 - server-confirmed optimistic meal/skip UI;
 - no blocking Catalog/Meals refetch after successful meal writes;
-- non-blocking Today nutrition refresh;
+- Today nutrition card updates immediately with provisional known-energy feedback, then reconciles against the authoritative summary;
+- Today whole-page refresh removed from the post-write path;
+- Today bootstrap parallelized and MealLog server-hydrated;
 - request-scoped RSC session deduplication;
-- client-side internal navigation and immediate loading feedback.
+- client-side tab/internal navigation with prefetch and non-blocking pending feedback;
+- Vercel Functions moved from US East to `hnd1` (Tokyo), aligning Production compute with Production Supabase in Tokyo.
+
+Final Preview measurement after regional alignment:
+- meal write: 1294 ms total;
+- Today nutrition authoritative reconciliation: 443 ms total.
+
+Acceptance completed:
+- application CI PASS;
+- fresh Supabase replay / pgTAP PASS;
+- Preview READY;
+- iPhone touched-flow PASS;
+- iPad touched-flow PASS;
+- Supervisor acceptance PASS.
 
 Visual redesign (colors, card layout, typography and full design-system polish) remains Phase 6.
-
-Acceptance requires CI, Preview, iPhone/iPad touched-flow regression and Supervisor approval.
 
 ## Phase 5 — Sleep / Health Provider
 
