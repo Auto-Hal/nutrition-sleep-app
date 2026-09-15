@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
-import { getNutritionSummaryForDate } from "@/lib/nutrition/analytics";
 import { isAllowedOrigin } from "@/lib/security/request";
 
 const mealType = z.enum(["breakfast", "lunch", "dinner", "custom"]);
@@ -57,13 +56,5 @@ export async function POST(request: Request) {
   });
   if (result.error) return NextResponse.json({ error: "食事記録を保存できませんでした。" }, { status: result.error.code === "23505" ? 409 : 400 });
 
-  const summaryStartedAt = performance.now();
-  const summary = await getNutritionSummaryForDate(session.accessToken, parsed.data.meal_date);
-  const responseCompletedAt = performance.now();
-  console.info("[perf] meal-write-summary", {
-    summary_ms: Math.round(responseCompletedAt - summaryStartedAt),
-    total_with_summary_ms: Math.round(responseCompletedAt - startedAt),
-  });
-
-  return NextResponse.json({ result: result.data, summary }, { status: 201 });
+  return NextResponse.json({ result: result.data }, { status: 201 });
 }
