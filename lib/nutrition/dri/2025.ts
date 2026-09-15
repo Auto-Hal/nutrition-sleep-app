@@ -15,7 +15,14 @@ function point(
   metric: DriReference["metric"],
   unit: DriReference["unit"],
   values: Array<number | null>,
-  options: { comparable?: boolean; caveat?: string } = {},
+  options: {
+    comparable?: boolean;
+    caveat?: string;
+    lowerInclusive?: boolean;
+    upperInclusive?: boolean;
+    comparisonScope?: string;
+    sourceRef?: string;
+  } = {},
 ): DriReference[] {
   return ADULT_BANDS.flatMap((band, index) => {
     const value = values[index];
@@ -31,6 +38,10 @@ function point(
       value,
       comparable: options.comparable ?? true,
       caveat: options.caveat,
+      lowerInclusive: options.lowerInclusive,
+      upperInclusive: options.upperInclusive,
+      comparisonScope: options.comparisonScope,
+      sourceRef: options.sourceRef ?? `MHLW DRI 2025 corrected report: ${nutrientCode}`,
     }];
   });
 }
@@ -41,6 +52,7 @@ function range(
   metric: "DG",
   unit: DriReference["unit"],
   values: Array<[number, number]>,
+  options: { lowerInclusive?: boolean; upperInclusive?: boolean; sourceRef?: string } = {},
 ): DriReference[] {
   return ADULT_BANDS.map((band, index) => ({
     edition: "2025" as const,
@@ -52,7 +64,10 @@ function range(
     unit,
     lower: values[index][0],
     upper: values[index][1],
+    lowerInclusive: options.lowerInclusive ?? true,
+    upperInclusive: options.upperInclusive ?? true,
     comparable: true,
+    sourceRef: options.sourceRef ?? `MHLW DRI 2025 corrected report: ${nutrientCode}`,
   }));
 }
 
@@ -70,7 +85,9 @@ function minimum(
     metric: "DG" as const,
     unit: "g" as const,
     lower: values[index],
+    lowerInclusive: true,
     comparable: true,
+    sourceRef: `MHLW DRI 2025 corrected report: ${nutrientCode}`,
   }));
 }
 
@@ -79,6 +96,7 @@ function maximum(
   sex: DriSex,
   unit: DriReference["unit"],
   values: number[],
+  options: { upperInclusive?: boolean; sourceRef?: string } = {},
 ): DriReference[] {
   return ADULT_BANDS.map((band, index) => ({
     edition: "2025" as const,
@@ -89,7 +107,9 @@ function maximum(
     metric: "DG" as const,
     unit,
     upper: values[index],
+    upperInclusive: options.upperInclusive ?? true,
     comparable: true,
+    sourceRef: options.sourceRef ?? `MHLW DRI 2025 corrected report: ${nutrientCode}`,
   }));
 }
 
@@ -113,6 +133,8 @@ function energy(
       activityLevel,
       comparable: false,
       caveat: "エネルギー過不足は摂取量と推定必要量の単純比較だけでは判定しない。",
+      comparisonScope: "reference_only",
+      sourceRef: "MHLW DRI 2025 corrected report: energy",
     }];
   });
 }
@@ -184,10 +206,18 @@ export const DRI_2025_ADULT_REFERENCES: DriReference[] = [
 
   ...point("vitamin_b6", "male", "EAR", "mg", [1.2, 1.2, 1.2, 1.2, 1.2]),
   ...point("vitamin_b6", "male", "RDA", "mg", [1.5, 1.5, 1.5, 1.4, 1.4]),
-  ...point("vitamin_b6", "male", "UL", "mg", [55, 60, 60, 55, 50]),
+  ...point("vitamin_b6", "male", "UL", "mg", [55, 60, 60, 55, 50], {
+    comparable: false,
+    caveat: "ULはピリドキシン相当量として示されるため、現在のtracked vitamin_b6値との化学形態対応を確認できるまでreference-onlyとする。",
+    comparisonScope: "pyridoxine_equivalent",
+  }),
   ...point("vitamin_b6", "female", "EAR", "mg", [1.0, 1.0, 1.0, 1.0, 1.0]),
   ...point("vitamin_b6", "female", "RDA", "mg", [1.2, 1.2, 1.2, 1.2, 1.2]),
-  ...point("vitamin_b6", "female", "UL", "mg", [45, 45, 45, 45, 40]),
+  ...point("vitamin_b6", "female", "UL", "mg", [45, 45, 45, 45, 40], {
+    comparable: false,
+    caveat: "ULはピリドキシン相当量として示されるため、現在のtracked vitamin_b6値との化学形態対応を確認できるまでreference-onlyとする。",
+    comparisonScope: "pyridoxine_equivalent",
+  }),
 
   ...point("vitamin_b12", "male", "AI", "ug", [4.0, 4.0, 4.0, 4.0, 4.0]),
   ...point("vitamin_b12", "female", "AI", "ug", [4.0, 4.0, 4.0, 4.0, 4.0]),
@@ -210,14 +240,18 @@ export const DRI_2025_ADULT_REFERENCES: DriReference[] = [
   ...point("sodium", "male", "EAR", "mg", [600, 600, 600, 600, 600]),
   ...point("sodium", "female", "EAR", "mg", [600, 600, 600, 600, 600]),
 
-  ...maximum("salt_equivalent", "male", "g", [7.5, 7.5, 7.5, 7.5, 7.5]),
-  ...maximum("salt_equivalent", "female", "g", [6.5, 6.5, 6.5, 6.5, 6.5]),
+  ...maximum("salt_equivalent", "male", "g", [7.5, 7.5, 7.5, 7.5, 7.5], { upperInclusive: false }),
+  ...maximum("salt_equivalent", "female", "g", [6.5, 6.5, 6.5, 6.5, 6.5], { upperInclusive: false }),
 ];
 
 export const DRI_2025_SOURCE = {
   edition: "2025",
+  revision: "report-corrected-2025-03-25",
   period: "FY2025-FY2029",
   authority: "厚生労働省",
+  reportPublishedOn: "2024-10-11",
+  correctionsReflectedOn: "2025-03-25",
   url: "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/kenkou/eiyou/syokuji_kijyun.html",
+  reportUrl: "https://www.mhlw.go.jp/stf/newpage_44138.html",
   legalTableUrl: "https://www.mhlw.go.jp/web/t_doc?dataId=78ab4652&dataType=0",
 } as const;
