@@ -11,13 +11,13 @@ describe("Phase 4 daily nutrition presentation semantics", () => {
     })).toBeNull();
   });
 
-  it("preserves a fully skipped complete day as explicit zero", () => {
+  it("does not infer zero intake from a fully skipped complete fixed-slot day", () => {
     expect(dailyDisplayAmount({
       record_complete: true,
       entry_count: 0,
       missing_entry_count: 0,
       known_amount: 0,
-    })).toBe(0);
+    })).toBeNull();
   });
 
   it("keeps an all-unknown nutrient unknown", () => {
