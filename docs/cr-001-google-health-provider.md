@@ -1,6 +1,6 @@
 # CR-001 — Phase 5 Health Provider Contract
 
-Status: **READY FOR USER APPROVAL**  
+Status: **APPROVED**  
 Date: 2026-09-16  
 Owner: Supervisor / ChatGPT Sol  
 Scope: Phase 5 provider, OAuth, sleep-ingestion and synchronization contract only. No Sleep schema migration or runtime implementation is authorized by this document until approval.
@@ -360,9 +360,9 @@ Astra should be invoked later only if implementation uncovers a material issue a
 
 ## 12. CR-001 gate
 
-CR-001 is **READY FOR USER APPROVAL**.
+CR-001 is **APPROVED — 2026-09-16**.
 
-Approval authorizes Phase 5 implementation under the constraints above.
+User approval authorizes Phase 5 implementation under the constraints above.
 
 It does not authorize:
 - Fitbit Web API implementation;
