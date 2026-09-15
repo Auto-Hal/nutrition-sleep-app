@@ -46,7 +46,7 @@ describe("Sleep analytics", () => {
       stages: [],
       outOfBedSegments: [],
       timeZone: "Asia/Tokyo",
-      range: 3 as 7,
+      range: 7,
       endDate: "2026-09-16",
     });
 
