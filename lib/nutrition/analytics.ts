@@ -364,12 +364,10 @@ export async function getNutritionDayDrilldown(
 }
 
 
-export async function getTodayNutritionSummary(
+export async function getNutritionSummaryForDate(
   accessToken: string,
-  timeZone: string,
-  now = new Date(),
+  date: string,
 ) {
-  const date = localDateInTimeZone(timeZone, now);
   const { data, error } = await createUserClient(accessToken).rpc("get_nutrition_daily_summary", {
     p_start_date: date,
     p_end_date: date,
@@ -393,4 +391,14 @@ export async function getTodayNutritionSummary(
     entry_count: entryCount,
     known_entry_count: knownEntryCount,
   };
+}
+
+export type TodayNutritionSummary = Awaited<ReturnType<typeof getNutritionSummaryForDate>>;
+
+export async function getTodayNutritionSummary(
+  accessToken: string,
+  timeZone: string,
+  now = new Date(),
+) {
+  return getNutritionSummaryForDate(accessToken, localDateInTimeZone(timeZone, now));
 }
