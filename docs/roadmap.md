@@ -1,6 +1,6 @@
 # Nutrition / Sleep App Roadmap
 
-Updated: 2026-09-14
+Updated: 2026-09-15
 
 This document is the implementation roadmap after Phase 3 completion. It does not replace the MVP requirements; it records the delivery order, phase boundaries, and acceptance gates.
 
@@ -21,15 +21,17 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 1 | COMPLETE | Auth, Profile, server-side sessions, RLS, environment separation, 4-tab PWA foundation |
 | Phase 2 | COMPLETE | Catalog, Batch, Meal/MealEntry, immutable nutrient snapshots, Today meal entry |
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
-| Phase 4 | NEXT | Nutrition analytics and Japanese DRIs 2025 |
-| Phase 5 | PLANNED | Sleep domain and current official health-provider integration |
+| Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
+| Phase 5 | NEXT / CR-001 GATE | Sleep domain and current official health-provider integration |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
 
+**Status: COMPLETE — 2026-09-15**
+
 Goal: turn existing MealEntry snapshots into useful, non-diagnostic nutrition trends.
 
-Planned capabilities:
+Delivered capabilities:
 
 - Japanese Dietary Reference Intakes 2025 reference model.
 - EAR / RDA / AI / DG / UL semantics kept distinct.
@@ -50,7 +52,7 @@ Planned capabilities:
 - Energy is shown as a reference, not as a simple deficiency/excess judgement.
 - No persisted derived summary table unless profiling demonstrates a need; prefer derivation from immutable snapshots.
 
-Acceptance requires Preview and real-device verification of:
+Acceptance completed in Preview, iPhone, iPad and Production for:
 - partial day behavior;
 - skipped meal behavior;
 - unknown nutrient behavior;
