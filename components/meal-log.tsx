@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import { applyMealEntryWrite, applyMealStateWrite, type MealEntryWriteResult, type MealStateWriteResult } from "@/lib/nutrition/meal-optimistic";
 
@@ -22,12 +21,13 @@ export function MealLog({
   date,
   initialItems,
   initialMeals,
+  onCommitted,
 }: {
   date: string;
   initialItems: CatalogItem[];
   initialMeals: Meal[];
+  onCommitted?: () => void;
 }) {
-  const router = useRouter();
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [composer, setComposer] = useState<MealType | null>(null);
@@ -35,7 +35,7 @@ export function MealLog({
   const [quantity, setQuantity] = useState("1");
   const [customAt, setCustomAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [busy, setBusy] = useState(false);
-  const [refreshing, startRefresh] = useTransition();
+  const [pendingMealType, setPendingMealType] = useState<MealType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
  
@@ -46,10 +46,6 @@ export function MealLog({
   useEffect(() => {
     setMeals(initialMeals);
   }, [initialMeals]);
-
-  function refreshTodaySummary() {
-    startRefresh(() => router.refresh());
-  }
 
   function openComposer(type: MealType) {
     setComposer(type);
@@ -62,35 +58,52 @@ export function MealLog({
 
   async function addEntry() {
     const item = items.find((candidate) => candidate.id === itemId);
-    if (!composer || !item) { setError("先にLibraryで項目を登録してください。"); return; }
-    setBusy(true); setError(null); setMessage(null);
+    const saveType = composer;
+    if (!saveType || !item) { setError("先にLibraryで項目を登録してください。"); return; }
+
+    const eatenAt = saveType === "custom" ? new Date(customAt).toISOString() : new Date().toISOString();
+    const numericQuantity = Number(quantity);
+
+    setBusy(true);
+    setPendingMealType(saveType);
+    setError(null);
+    setMessage("保存中…");
+    setComposer(null);
+
     try {
-      const eatenAt = composer === "custom" ? new Date(customAt).toISOString() : new Date().toISOString();
-      const numericQuantity = Number(quantity);
       const response = await fetch("/api/meals", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-        meal_date: date, meal_type: composer, eaten_at: eatenAt, catalog_item_id: item.id,
+        meal_date: date, meal_type: saveType, eaten_at: eatenAt, catalog_item_id: item.id,
         quantity: numericQuantity, quantity_unit: item.serving_unit, idempotency_key: crypto.randomUUID(),
       }) });
       const payload = (await response.json()) as { result?: MealEntryWriteResult; error?: string };
       const saved = payload.result;
       if (!response.ok || !saved) throw new Error(payload.error ?? "食事記録を保存できませんでした。");
+
       setMeals((current) => applyMealEntryWrite(current, {
         date,
-        mealType: composer,
+        mealType: saveType,
         eatenAt,
         item,
         quantity: numericQuantity,
         result: saved,
       }));
-      setComposer(null);
       setMessage("記録しました");
-      refreshTodaySummary();
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。"); }
-    finally { setBusy(false); }
+      onCommitted?.();
+    } catch (requestError) {
+      setMessage(null);
+      setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。");
+      setComposer(saveType);
+    } finally {
+      setPendingMealType(null);
+      setBusy(false);
+    }
   }
 
   async function setSkipped(type: Exclude<MealType, "custom">) {
-    setBusy(true); setError(null); setMessage(null);
+    setBusy(true);
+    setPendingMealType(type);
+    setError(null);
+    setMessage("保存中…");
     try {
       const response = await fetch("/api/meals/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meal_date: date, meal_type: type, state: "skipped" }) });
       const payload = (await response.json()) as { meal?: MealStateWriteResult; error?: string };
@@ -98,9 +111,14 @@ export function MealLog({
       if (!response.ok || !savedMeal) throw new Error(payload.error ?? "食事状態を保存できませんでした。");
       setMeals((current) => applyMealStateWrite(current, savedMeal));
       setMessage("skippedとして記録しました");
-      refreshTodaySummary();
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。"); }
-    finally { setBusy(false); }
+      onCommitted?.();
+    } catch (requestError) {
+      setMessage(null);
+      setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。");
+    } finally {
+      setPendingMealType(null);
+      setBusy(false);
+    }
   }
 
   const selected = items.find((item) => item.id === itemId);
@@ -114,14 +132,14 @@ export function MealLog({
             const meal = meals.find((candidate) => candidate.meal_type === type);
             return <div className="meal-row" key={type}>
               <div><strong>{label}</strong><div className="meal-items">{meal?.entries.map((entry) => <span key={entry.id}>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>)}</div></div>
-              <div className="meal-actions"><span className={`pill ${meal?.state === "skipped" ? "pending" : ""}`}>{stateLabel(meal?.state)}</span><button className="button secondary" type="button" onClick={() => openComposer(type)} disabled={busy}>追加</button>{(meal?.entries.length ?? 0) === 0 && meal?.state !== "skipped" && <button className="button ghost" type="button" onClick={() => setSkipped(type)} disabled={busy}>skipped</button>}</div>
+              <div className="meal-actions"><span className={`pill ${pendingMealType === type || meal?.state === "skipped" ? "pending" : ""}`}>{pendingMealType === type ? "保存中…" : stateLabel(meal?.state)}</span><button className="button secondary" type="button" onClick={() => openComposer(type)} disabled={busy}>追加</button>{(meal?.entries.length ?? 0) === 0 && meal?.state !== "skipped" && <button className="button ghost" type="button" onClick={() => setSkipped(type)} disabled={busy}>skipped</button>}</div>
             </div>;
           })}
           {meals.filter((meal) => meal.meal_type === "custom").flatMap((meal) => meal.entries.map((entry) => <div className="meal-row" key={entry.id}><div><strong>追加</strong><div className="meal-items"><span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span></div></div><span className="pill">{meal.eaten_at ? new Date(meal.eaten_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : "時刻未設定"}</span></div>))}
+          {pendingMealType === "custom" && <div className="meal-row"><div><strong>追加</strong><div className="meal-items"><span>保存処理中</span></div></div><span className="pill pending">保存中…</span></div>}
         </div>
         {items.length === 0 && <p className="empty-state">Libraryで食品やサプリを1件登録すると、ここから2〜3タップで記録できます。</p>}
         {message && <p className="muted" role="status">{message}</p>}
-        {refreshing && <p className="muted sync-status" role="status">栄養サマリーを更新中…</p>}
         {error && <p className="error-text" role="alert">{error}</p>}
       </section>
 
