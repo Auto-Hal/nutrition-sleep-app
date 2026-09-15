@@ -13,6 +13,9 @@ concurrency:
 
 jobs:
   deploy:
+    # VERCEL_TOKEN is currently stored in the GitHub preview environment.
+    # Vercel itself is still pulled/built/deployed with the production target.
+    environment: preview
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
