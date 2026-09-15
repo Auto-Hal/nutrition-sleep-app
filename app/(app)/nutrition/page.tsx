@@ -29,7 +29,14 @@ function formatAmount(value: number | null, unit: string) {
 function qualityLabel(value: string) {
   if (value === "user_verified") return "確認済み";
   if (value === "contains_unverified") return "未確認値を含む";
+  if (value === "not_applicable") return "評価対象なし";
   return "不完全";
+}
+
+function mealStateLabel(value: string) {
+  if (value === "recorded") return "記録済み";
+  if (value === "skipped") return "スキップ";
+  return "未記録";
 }
 
 function mealTypeLabel(value: string) {
@@ -165,18 +172,32 @@ export default async function NutritionPage({
                       {formatAmount(nutrient.average_known_amount, nutrient.unit)}
                     </div>
                     <div className="nutrition-meta">
-                      食事 {formatAmount(nutrient.average_food_amount, nutrient.unit)}
+                      食品 {formatAmount(nutrient.average_food_amount, nutrient.unit)}
                       <span aria-hidden="true"> · </span>
                       サプリ {formatAmount(nutrient.average_supplement_amount, nutrient.unit)}
+                      {nutrient.average_unclassified_amount !== null && nutrient.average_unclassified_amount > 0 && (
+                        <>
+                          <span aria-hidden="true"> · </span>
+                          由来内訳未確定 {formatAmount(nutrient.average_unclassified_amount, nutrient.unit)}
+                        </>
+                      )}
                     </div>
                     <div className="nutrition-meta">
-                      データ品質 {qualityLabel(nutrient.quality)}
+                      平均のデータ品質 {qualityLabel(nutrient.quality)}
+                      {nutrient.excluded_coverage_days > 0 && (
+                        <> · 栄養値欠損で除外 {nutrient.excluded_coverage_days}日</>
+                      )}
+                      {nutrient.empty_complete_days > 0 && (
+                        <> · 摂取項目なしで比較対象外 {nutrient.empty_complete_days}日</>
+                      )}
                     </div>
                     {nutrient.percent_energy !== null && (
                       <div className="nutrition-meta">
                         エネルギー比 {new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(nutrient.percent_energy)}%
                         <span aria-hidden="true"> · </span>
                         評価 {nutrient.percent_energy_eligible_days}日
+                        <span aria-hidden="true"> · </span>
+                        品質 {qualityLabel(nutrient.percent_energy_quality)}
                       </div>
                     )}
                     {labels.length > 0 && (
@@ -187,6 +208,11 @@ export default async function NutritionPage({
                     {nutrient.dri.unavailable_reason && (
                       <div className="nutrition-meta">{nutrient.dri.unavailable_reason}</div>
                     )}
+                    {nutrient.dri.references.filter((reference) => !reference.comparable && reference.caveat).map((reference) => (
+                      <div className="nutrition-meta" key={`${reference.metric}-${reference.caveat}`}>
+                        {reference.metric}: {reference.caveat}
+                      </div>
+                    ))}
                   </div>
                   <span className="nutrition-chevron" aria-hidden="true">›</span>
                 </a>
@@ -222,13 +248,15 @@ export default async function NutritionPage({
                     <div className="nutrition-meta">
                       {day.record_complete ? "食事記録 完全" : "食事記録 不完全"}
                       <span aria-hidden="true"> · </span>
-                      {day.coverage_complete ? "栄養値 完全" : "栄養値 不完全"}
+                      {day.entry_count === 0
+                        ? "摂取項目なし"
+                        : day.coverage_complete ? "栄養値 完全" : "栄養値 不完全"}
                     </div>
                   </div>
                   <div className="nutrition-day-value">
                     <strong>{formatAmount(dailyDisplayAmount(day), day.unit)}</strong>
                     {dailyDisplayAmount(day) === null
-                      ? <small>未登録</small>
+                      ? <small>{day.entry_count === 0 ? "0摂取とは判定しません" : "栄養値不明"}</small>
                       : !day.coverage_complete && <small>既知分のみ</small>}
                   </div>
                 </a>
@@ -255,7 +283,7 @@ export default async function NutritionPage({
                 <div className="nutrition-meal" key={meal.id}>
                   <div className="section-heading">
                     <strong>{mealTypeLabel(meal.meal_type)}</strong>
-                    <span className="pill">{meal.state === "skipped" ? "スキップ" : "記録済み"}</span>
+                    <span className="pill">{mealStateLabel(meal.state)}</span>
                   </div>
                   {meal.entries.length === 0 ? (
                     <p className="muted nutrition-caption">摂取項目なし</p>
@@ -272,7 +300,10 @@ export default async function NutritionPage({
                           </div>
                           <div className="nutrition-day-value">
                             <strong>{formatAmount(entry.amount, entry.unit)}</strong>
-                            <small>{entry.amount === null ? "未登録" : qualityLabel(entry.quality)}</small>
+                            <small>{entry.amount === null ? "栄養値不明" : qualityLabel(entry.quality)}</small>
+                            {entry.provenance && <small>由来: {entry.provenance}</small>}
+                            {entry.source_uri && <small>出典: {entry.source_uri}</small>}
+                            {entry.source_observed_at && <small>確認時点: {entry.source_observed_at}</small>}
                           </div>
                         </div>
                       ))}
