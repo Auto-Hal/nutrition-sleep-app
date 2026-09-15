@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { getAppSession } from "@/lib/auth/session";
+import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProtectedLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const session = await getAppSession();
+  const session = await getAppSessionForRsc();
   if (!session) redirect("/login");
 
   return (

@@ -1,19 +1,48 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useState, useTransition } from "react";
 
 const tabs = [
   { href: "/today", label: "Today", icon: "◷" },
   { href: "/nutrition", label: "Nutrition", icon: "◌" },
   { href: "/sleep", label: "Sleep", icon: "☾" },
   { href: "/settings", label: "Settings", icon: "⚙" },
-] as const;
+] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: string }>;
 
 export function AppShell({ children, email }: { children: ReactNode; email?: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [isNavigating, startNavigation] = useTransition();
+
+  useEffect(() => {
+    for (const tab of tabs) router.prefetch(tab.href);
+  }, [router]);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  function navigateTab(event: MouseEvent<HTMLAnchorElement>, href: Route) {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+
+    const active = pathname === href || (href === "/settings" && pathname.startsWith("/settings"));
+    if (active) return;
+
+    event.preventDefault();
+    setPendingHref(href);
+    startNavigation(() => router.push(href));
+  }
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -22,7 +51,7 @@ export function AppShell({ children, email }: { children: ReactNode; email?: str
   }
 
   return (
-    <div className="app-frame">
+    <div className="app-frame" aria-busy={isNavigating || undefined}>
       <div className="app-main" style={{ paddingBottom: 0 }}>
         <div className="topbar" style={{ marginBottom: 0 }}>
           <span className="eyebrow">{email ?? "アカウント"}</span>
@@ -33,7 +62,24 @@ export function AppShell({ children, email }: { children: ReactNode; email?: str
       <nav className="bottom-nav" aria-label="メインナビゲーション">
         {tabs.map((tab) => {
           const active = pathname === tab.href || (tab.href === "/settings" && pathname.startsWith("/settings"));
-          return <Link key={tab.href} className="nav-link" href={tab.href} aria-current={active ? "page" : undefined}><span className="nav-icon" aria-hidden="true">{tab.icon}</span><span>{tab.label}</span></Link>;
+          const pending = pendingHref === tab.href && isNavigating;
+          return (
+            <Link
+              key={tab.href}
+              className="nav-link"
+              href={tab.href}
+              prefetch
+              aria-current={active ? "page" : undefined}
+              aria-label={pending ? `${tab.label} 読み込み中` : tab.label}
+              data-pending={pending ? "true" : undefined}
+              onClick={(event) => navigateTab(event, tab.href)}
+              onPointerEnter={() => router.prefetch(tab.href)}
+              onTouchStart={() => router.prefetch(tab.href)}
+            >
+              <span className="nav-icon" aria-hidden="true">{pending ? "•" : tab.icon}</span>
+              <span>{tab.label}</span>
+            </Link>
+          );
         })}
       </nav>
     </div>
