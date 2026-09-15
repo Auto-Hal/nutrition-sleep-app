@@ -27,7 +27,7 @@ This branch begins with:
 - user-owned provider connection metadata;
 - private encrypted OAuth credential storage;
 - normalized SleepSession storage;
-- separate stage and short-awakening interval tables;
+- separate stage and out-of-bed interval tables;
 - owner-scoped read RLS;
 - authenticated write privileges removed;
 - pgTAP security/schema contract;
@@ -36,3 +36,15 @@ This branch begins with:
 No Google OAuth request is issued in this batch.
 No Preview or Production secret is changed by the migration itself.
 No Production database change is permitted before Preview/device acceptance.
+
+
+## Google Health v4 REST contract correction
+
+The canonical v4 REST resource was re-checked immediately before adapter implementation.
+
+- the official resource field is `outOfBedSegments`, not `shortAwakenings`;
+- CLASSIC sleep can contain `ASLEEP` and `RESTLESS` stages;
+- Sleep metadata exposes processing/stage status, nap/manual-edit flags and external ID;
+- Sleep summary exposes minutes in sleep period, asleep, awake, latency and after-wakeup values.
+
+The foundation receives an additive corrective migration before Production. No Production Sleep schema exists yet.

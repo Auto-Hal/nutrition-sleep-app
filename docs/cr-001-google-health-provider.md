@@ -41,10 +41,10 @@ The current contract can contain:
 - sleep type such as STAGES or CLASSIC;
 - non-overlapping stage intervals;
 - stage values including LIGHT, DEEP, REM and AWAKE for staged sleep;
-- short awakenings that may overlap the primary stage timeline;
+- canonical v4 REST `outOfBedSegments`, which may overlap the primary stage timeline;
 - provider-derived summary metrics such as minutes asleep, sleep efficiency and latency when available.
 
-Short awakenings must not be forced into the non-overlapping stage table because the provider explicitly allows them to overlap surrounding stages.
+The generated v4 REST resource treats `outOfBedSegments` separately from the non-overlapping stage table because they may overlap stages. The Sleep guide also uses the conceptual term “short awakenings”; implementation follows the generated REST resource field names.
 
 ### Compatible devices
 
@@ -199,9 +199,9 @@ Unique key:
 
 Stages for one STAGES session are expected to describe the provider's primary non-overlapping timeline.
 
-### `sleep_short_awakenings`
+### `sleep_out_of_bed_segments`
 
-Store separately because they can overlap stage intervals.
+Store separately because the canonical v4 REST resource permits these intervals to overlap stage intervals.
 
 ### Date semantics
 
