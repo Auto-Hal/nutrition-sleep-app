@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 
 const fixedMeals: Array<{ type: Exclude<MealType, "custom">; label: string }> = [
@@ -10,17 +11,14 @@ const fixedMeals: Array<{ type: Exclude<MealType, "custom">; label: string }> = 
 ];
 const itemTypeLabel: Record<CatalogItem["item_type"], string> = { ingredient: "食材", product: "市販品", supplement: "サプリ", estimated_dish: "外食・推定", batch: "Batch" };
 
-function today() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
-}
-
 function stateLabel(state: MealState | undefined) {
   if (state === "skipped") return "skipped";
   if (state === "recorded") return "登録済み";
   return "未登録";
 }
 
-export function MealLog() {
+export function MealLog({ date }: { date: string }) {
+  const router = useRouter();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [composer, setComposer] = useState<MealType | null>(null);
@@ -30,8 +28,7 @@ export function MealLog() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const date = useMemo(() => today(), []);
-
+ 
   const load = useCallback(async () => {
     const [catalogResponse, mealsResponse] = await Promise.all([fetch("/api/catalog"), fetch(`/api/meals?date=${date}`)]);
     if (!catalogResponse.ok || !mealsResponse.ok) throw new Error("食事データを取得できませんでした。");
@@ -63,7 +60,7 @@ export function MealLog() {
       }) });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "食事記録を保存できませんでした。");
-      await load(); setComposer(null); setMessage("記録しました");
+      await load(); router.refresh(); setComposer(null); setMessage("記録しました");
     } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。"); }
     finally { setBusy(false); }
   }
@@ -74,7 +71,7 @@ export function MealLog() {
       const response = await fetch("/api/meals/state", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meal_date: date, meal_type: type, state: "skipped" }) });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "食事状態を保存できませんでした。");
-      await load(); setMessage("skippedとして記録しました");
+      await load(); router.refresh(); setMessage("skippedとして記録しました");
     } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。"); }
     finally { setBusy(false); }
   }
