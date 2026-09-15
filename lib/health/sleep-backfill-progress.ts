@@ -31,28 +31,37 @@ export async function initializeGoogleHealthBackfill(
   cursorEndDate: string,
 ) {
   assertAllowedUser(userId);
-  const result = await query(
+  const initialized = await query<BackfillRow>(
     `update public.health_provider_connections
         set backfill_target_start_date = $2::date,
             backfill_cursor_end_date = $3::date,
-            backfill_started_at = coalesce(backfill_started_at, now()),
-            backfill_completed_at = null
+            backfill_started_at = now()
       where user_id = $1
         and provider = 'google_health'
-        and backfill_completed_at is null
-        and (
-          backfill_target_start_date is null
-          or (
-            backfill_target_start_date = $2::date
-            and backfill_cursor_end_date is not null
-          )
-        )
+        and backfill_target_start_date is null
+        and backfill_cursor_end_date is null
       returning backfill_target_start_date, backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, targetStartDate, cursorEndDate],
   );
-  const row = result.rows[0] as BackfillRow | undefined;
-  if (!row) throw new Error("Google Health backfill cannot be initialized");
+  if (initialized.rows[0]) return initialized.rows[0];
+
+  const existing = await query<BackfillRow>(
+    `select backfill_target_start_date, backfill_cursor_end_date,
+            backfill_started_at, backfill_completed_at
+       from public.health_provider_connections
+      where user_id = $1 and provider = 'google_health'`,
+    [userId],
+  );
+  const row = existing.rows[0];
+  if (
+    !row
+    || row.backfill_target_start_date !== targetStartDate
+    || !row.backfill_cursor_end_date
+    || !row.backfill_started_at
+  ) {
+    throw new Error("Google Health backfill cannot be initialized");
+  }
   return row;
 }
 
