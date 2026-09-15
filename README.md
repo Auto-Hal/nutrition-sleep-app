@@ -1,12 +1,13 @@
 # Nutrition / Sleep App
 
-Current status: **Phase 1–4 COMPLETE / Phase 5 NEXT (CR-001 gate)**.
+Current status: **Phase 1–4.5 COMPLETE / Phase 5 NEXT (CR-001 gate)**.
 
 Implemented:
 - Phase 1: Auth, Profile, server-side sessions, RLS, Preview/Production separation, 4-tab PWA foundation.
 - Phase 2: Catalog, Batch, Meal/MealEntry, immutable nutrient snapshots, Today meal entry.
 - Phase 3: Product ingestion, barcode scanning, Open Food Facts, Google Cloud Vision nutrition-label OCR, Product Library, provenance/source priority.
 - Phase 4: Nutrition analytics, Japanese Dietary Reference Intakes 2025, 7/30/90-day trends, completeness/quality semantics, food/supplement/source-unclassified split, and drilldown.
+- Phase 4.5: interaction-performance hardening, optimistic Today feedback, client navigation/prefetch, server-hydrated Today bootstrap, and Tokyo-region Vercel Functions.
 
 Next:
 - Phase 5: Sleep domain and current supported health-provider integration under CR-001.
