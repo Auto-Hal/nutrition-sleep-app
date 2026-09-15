@@ -21,12 +21,16 @@ export function MealLog({
   date,
   initialItems,
   initialMeals,
+  onPendingNutrition,
   onCommitted,
+  onFailed,
 }: {
   date: string;
   initialItems: CatalogItem[];
   initialMeals: Meal[];
+  onPendingNutrition?: (delta: { energyAmount: number | null; energyKnown: boolean }) => void;
   onCommitted?: () => void;
+  onFailed?: () => void;
 }) {
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
@@ -63,7 +67,13 @@ export function MealLog({
 
     const eatenAt = saveType === "custom" ? new Date(customAt).toISOString() : new Date().toISOString();
     const numericQuantity = Number(quantity);
+    const energy = item.nutrients.find((nutrient) => nutrient.code === "energy");
+    const energyKnown = energy?.amount !== null && energy?.amount !== undefined;
+    const energyAmount = energyKnown
+      ? Number(energy.amount) * (numericQuantity / item.serving_size)
+      : null;
 
+    onPendingNutrition?.({ energyAmount, energyKnown });
     setBusy(true);
     setPendingMealType(saveType);
     setError(null);
@@ -90,6 +100,7 @@ export function MealLog({
       setMessage("記録しました");
       onCommitted?.();
     } catch (requestError) {
+      onFailed?.();
       setMessage(null);
       setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。");
       setComposer(saveType);
