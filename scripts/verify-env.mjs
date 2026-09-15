@@ -14,6 +14,8 @@ const publicKeyNames = [
   "NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "NEXT_PUBLIC_GOOGLE_CLOUD_VISION_API_KEY",
+  "NEXT_PUBLIC_PROVIDER_TOKEN_ENCRYPTION_KEY",
+  "NEXT_PUBLIC_GOOGLE_HEALTH_CLIENT_SECRET",
 ];
 if (publicKeyNames.some((key) => process.env[key])) {
   console.error("Server credentials must not be exposed as public environment variables.");
@@ -29,6 +31,10 @@ if (expectedRef && expectedRef !== "replace_me") {
 }
 if (Buffer.byteLength(process.env.APP_SESSION_ENCRYPTION_KEY) < 32) {
   console.error("APP_SESSION_ENCRYPTION_KEY must contain at least 32 bytes.");
+  process.exit(1);
+}
+if (process.env.PROVIDER_TOKEN_ENCRYPTION_KEY && Buffer.byteLength(process.env.PROVIDER_TOKEN_ENCRYPTION_KEY) < 32) {
+  console.error("PROVIDER_TOKEN_ENCRYPTION_KEY must contain at least 32 bytes when configured.");
   process.exit(1);
 }
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(process.env.APP_ALLOWED_USER_ID)) {

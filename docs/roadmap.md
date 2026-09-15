@@ -1,6 +1,6 @@
 # Nutrition / Sleep App Roadmap
 
-Updated: 2026-09-15
+Updated: 2026-09-16
 
 This document is the implementation roadmap after Phase 3 completion. It does not replace the MVP requirements; it records the delivery order, phase boundaries, and acceptance gates.
 
@@ -23,7 +23,7 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | READY TO START / CR-001 APPROVED | Sleep domain and current official health-provider integration |
+| Phase 5 | IN PROGRESS | Sleep domain and Google Health integration (CR-001 approved) |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics

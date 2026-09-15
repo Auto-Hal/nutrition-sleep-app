@@ -16,3 +16,12 @@ export function requiredServerEnv() {
   if (!env) throw new Error("Server environment is not configured");
   return env;
 }
+
+
+export function requiredProviderTokenEncryptionKey() {
+  const key = process.env.PROVIDER_TOKEN_ENCRYPTION_KEY;
+  if (!key || new TextEncoder().encode(key).byteLength < 32) {
+    throw new Error("PROVIDER_TOKEN_ENCRYPTION_KEY is not configured");
+  }
+  return key;
+}
