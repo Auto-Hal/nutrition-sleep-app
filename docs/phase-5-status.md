@@ -76,3 +76,18 @@ Implemented without requiring provider credentials:
 - out-of-bed segments are displayed as observed continuity data;
 - timing variability is descriptive only;
 - Sleep page no longer uses the Phase 5 placeholder.
+
+
+## Initial history / resumable backfill
+
+Implemented on the Phase 5 branch:
+- recent correction sync = current civil date + previous 2 dates;
+- first-connect fast path = most recent 14 civil dates;
+- initial analytics horizon = 90 civil dates total;
+- remaining history is fetched backwards in 14-day chunks;
+- target/cursor/start/completion state persists on the Google Health connection;
+- the backfill cursor advances only after a successful provider window;
+- an interrupted or failed backfill repeats the same unfinished window on retry;
+- cursor advancement uses an expected-current-cursor condition to detect concurrent workers.
+
+No scheduler or real provider token is required for these planning/progress tests.

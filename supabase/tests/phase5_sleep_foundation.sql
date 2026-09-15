@@ -1,5 +1,5 @@
 begin;
-select plan(50);
+select plan(56);
 
 select has_table('public', 'health_provider_connections', 'provider connection metadata exists');
 select has_table('private', 'health_provider_credentials', 'provider credentials are server-only');
@@ -8,6 +8,12 @@ select has_table('public', 'sleep_stage_intervals', 'sleep stage intervals exist
 select has_table('public', 'sleep_out_of_bed_segments', 'out-of-bed segments exist');
 
 select has_column('public', 'health_provider_connections', 'granted_scopes', 'granted OAuth scopes are recorded');
+select has_column('public', 'health_provider_connections', 'initial_recent_sync_completed_at', 'initial recent sync completion is recorded');
+select has_column('public', 'health_provider_connections', 'backfill_target_start_date', 'backfill target start exists');
+select has_column('public', 'health_provider_connections', 'backfill_cursor_end_date', 'backfill cursor exists');
+select has_column('public', 'health_provider_connections', 'backfill_started_at', 'backfill start timestamp exists');
+select has_column('public', 'health_provider_connections', 'backfill_completed_at', 'backfill completion timestamp exists');
+select has_check('public', 'health_provider_connections', 'health_provider_connections_backfill_cursor_check', 'backfill cursor ordering is constrained');
 select has_column('private', 'health_provider_credentials', 'refresh_token_ciphertext', 'refresh token ciphertext exists');
 select has_column('private', 'health_provider_credentials', 'key_version', 'credential key version exists');
 select has_column('public', 'sleep_sessions', 'provider_payload_hash', 'provider payload hash exists');
