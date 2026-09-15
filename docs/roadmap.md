@@ -22,13 +22,13 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 2 | COMPLETE | Catalog, Batch, Meal/MealEntry, immutable nutrient snapshots, Today meal entry |
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
-| Phase 4.5 | MERGED / PROD DEPLOY PENDING | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | QUEUED AFTER 4.5 / CR-001 GATE | Sleep domain and current official health-provider integration |
+| Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
+| Phase 5 | NEXT / CR-001 GATE | Sleep domain and current official health-provider integration |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
 
-**Status: MERGED / PRODUCTION DEPLOY PENDING — 2026-09-15**
+**Status: COMPLETE**
 
 Goal: turn existing MealEntry snapshots into useful, non-diagnostic nutrition trends.
 
@@ -64,7 +64,7 @@ Acceptance completed in Preview, iPhone, iPad and Production for:
 
 ## Phase 4.5 — Interaction Performance / UX Hardening
 
-**Status: COMPLETE — 2026-09-15**
+**Status: COMPLETE — 2026-09-16**
 
 Goal: remove avoidable wait time from current Nutrition/Today interactions before Phase 5 expands the runtime surface.
 
@@ -91,7 +91,14 @@ Acceptance completed:
 - Supervisor acceptance PASS;
 - PR #7 merged to main.
 
-Final Production deployment remains pending because Vercel Free rejected deployment creation after the daily deployment quota was exhausted. The Production build itself passed. Phase 5 must not start until Production deploy/runtime verification completes.
+Final Production verification completed after quota recovery:
+- Production deployment READY;
+- Production alias updated;
+- Functions region `hnd1` (Tokyo);
+- `/login` HTTP 200;
+- relevant runtime errors: 0.
+
+Phase 5 is now the next phase, with CR-001 still mandatory before implementation.
 
 Visual redesign (colors, card layout, typography and full design-system polish) remains Phase 6.
 
