@@ -121,9 +121,12 @@ export async function getAppSession(): Promise<AppSession | null> {
   }
   const accessToken = decryptSecret(stored.access_token_ciphertext, env.encryptionKey);
   const tokenExpiresAt = new Date(stored.token_expires_at).getTime();
-  const { data } = await createUserClient(accessToken).auth.getUser();
+  const [userResult] = await Promise.all([
+    createUserClient(accessToken).auth.getUser(),
+    query("update private.app_sessions set last_seen_at = now() where session_hash = $1 and revoked_at is null", [stored.session_hash]),
+  ]);
+  const { data } = userResult;
   if (!data.user || data.user.id !== stored.user_id || data.user.id !== env.allowedUserId || stored.user_id !== env.allowedUserId || tokenExpiresAt <= Date.now()) return null;
-  await query("update private.app_sessions set last_seen_at = now() where session_hash = $1 and revoked_at is null", [stored.session_hash]);
   return { sessionId, sessionHash: stored.session_hash, userId: stored.user_id, email: data.user.email ?? null, accessToken, revision: stored.revision };
 }
 
