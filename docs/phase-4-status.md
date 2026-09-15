@@ -5,11 +5,11 @@
 - Phase 1 COMPLETE
 - Phase 2 COMPLETE
 - Phase 3 COMPLETE
-- **Phase 4 IMPLEMENTED / PREVIEW VALIDATED / ASTRA DESIGN REVIEW PENDING / DEVICE ACCEPTANCE BLOCKED**
+- **Phase 4 ASTRA APPROVED WITH REQUIRED CORRECTIONS / IMPLEMENTATION VERIFICATION IN PROGRESS / DEVICE ACCEPTANCE BLOCKED**
 - branch: `phase/4-nutrition-analytics`
 - PR: #6 (Draft)
 - main baseline: `172e0470f733439ccfc3933221d0b68b187a6b99`
-- latest implementation head before this status update: `4ae4f42115190118c3a402d950e59d3e54bd5317`
+- latest implementation head before this status update: `13a1f5dbb710e0710ca50c2c2b50ad9cc88ca0e6`
 
 ## Implemented scope
 
@@ -34,7 +34,7 @@
 - not_recorded != skipped
 - meal completeness != nutrient coverage completeness
 - all-unknown nutrient values are displayed as unknown, not zero
-- a fully skipped fixed-meal day remains an explicit complete zero-intake day
+- a fully skipped fixed-meal day remains record-complete but, with no active entry, is not interpreted as whole-day zero intake and is comparison-ineligible
 - AI below threshold is not called deficiency
 - energy intake vs EER alone is not classified as deficiency/excess
 - historical MealEntry snapshots are not mutated
@@ -123,31 +123,40 @@ Direct Preview DB verification:
   - no DB schema or migration change was required.
 - Latest branch Preview and CI must be green before device acceptance.
 
-## Astra design-review gate
+## Astra design-review result
 
-The original Supervisor workflow requires Astra review before Phase 4 device acceptance.
-Implementation advanced before that gate was formally recorded, so Phase 4 is temporarily held here.
+- Verdict: **APPROVE WITH REQUIRED CORRECTIONS**
+- Supervisor decision: accepted as the binding Phase 4 design.
+- R1 empty skipped-day semantics: implemented, verification pending.
+- R2 exclusive salt DG boundary: implemented, verification pending.
+- R3 Batch source-unclassified split: implemented, verification pending.
+- R4 metric-specific DRI applicability/caveats: implemented, verification pending.
+- R5 selective age-boundary stability: implemented with unit tests, verification pending.
+- R6 eligible-set quality semantics: implemented, verification pending.
+- R7 drilldown/Today state and source consistency: implemented, verification pending.
+- R8 DRI revision/API traceability and ledger evidence: implemented/documented; Preview ledger recheck pending.
 
-Astra must review the implemented design against the Phase 4 plan and return:
-- decisions;
-- invariants;
-- required changes;
-- explicit non-goals;
-- acceptance criteria;
-- migration decision.
+Corrective migration added:
+- `supabase/migrations/20260915083000_phase4_astra_corrections.sql`
+- changes derived RPC semantics only;
+- no historical MealEntry snapshot mutation;
+- SECURITY INVOKER / existing RLS ownership boundary retained.
 
-Until Supervisor accepts that review:
-- do not begin iPhone/iPad acceptance;
-- do not mark PR #6 Ready;
-- do not merge to main;
-- do not touch Production;
-- do not start Phase 5.
+DRI source revision:
+- MHLW 2025 report published 2024-10-11;
+- currently published report reflects corrections through 2025-03-25;
+- dataset revision: `report-corrected-2025-03-25`.
+
+Preview migration ledger note:
+- repo source filename/version and Supabase remote migration ledger version are not expected to be identical because remote apply creates its own migration version;
+- the actual applied migration name/content and resulting function behavior must be verified, not inferred from filename equality.
 
 ## Remaining gate
 
-1. Astra design review and Supervisor acceptance of the design result.
-2. Latest Phase 4 Preview branch deployment READY and CI green after any required corrections.
-3. iPhone acceptance:
+1. Latest correction head CI, fresh replay, pgTAP and build PASS.
+2. Corrective migration applied to Preview and direct RPC smoke PASS.
+3. Latest Phase 4 Preview branch deployment READY.
+4. iPhone acceptance:
    - default 30-day view
    - 7 / 30 / 90 switching
    - complete/incomplete day behavior
@@ -155,10 +164,10 @@ Until Supervisor accepts that review:
    - food/supplement split
    - nutrient → day → meal → item drilldown
    - Today lightweight nutrition summary
-4. iPad regression.
-5. Supervisor implementation acceptance.
-6. PR #6 ready / main merge.
-7. Production Phase 4 migration / deploy / runtime verification.
+5. iPad regression.
+6. Supervisor implementation acceptance.
+7. PR #6 ready / main merge.
+8. Production Phase 4 migration / deploy / runtime verification.
 
 ## Excluded
 
