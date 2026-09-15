@@ -6,8 +6,8 @@
 - Phase 2 COMPLETE
 - Phase 3 COMPLETE
 - Phase 4 COMPLETE
-- **Phase 4.5 COMPLETE — 2026-09-15**
-- Phase 5 NEXT / NOT STARTED
+- **Phase 4.5 MERGED / PRODUCTION DEPLOY PENDING — 2026-09-15**
+- Phase 5 QUEUED / NOT STARTED
 - CR-001 remains the mandatory Phase 5 start gate.
 - PR #7 merged to main.
 - merge commit: `f357f148635ddcff7e0ae3bba858c35fb6744567`
@@ -57,7 +57,16 @@ The user confirmed that Today known-energy feedback changes immediately after me
 - iPad touched-flow PASS
 - Supervisor acceptance PASS
 
+## Production gate
+
+Production build PASS, but deployment creation was rejected by Vercel Free with:
+`api-deployments-free-per-day: more than 100 deployments`.
+
+No Production alias was changed by the failed attempt.
+The Production Deploy workflow has been restored to manual-only.
+
 ## Phase boundary
 
-Phase 4.5 is closed and must not be reopened for Sleep/provider implementation.
-Phase 5 starts only through CR-001.
+Phase 4.5 implementation and acceptance are complete and merged, but the phase remains open only for the final Production deploy/runtime verification gate.
+Do not reopen Phase 4.5 for Sleep/provider implementation.
+Phase 5 remains NOT STARTED and begins only after Production verification, through CR-001.
