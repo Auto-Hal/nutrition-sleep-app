@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DRI_2025_ADULT_REFERENCES } from "@/lib/nutrition/dri/2025";
+import { DRI_2025_ADULT_REFERENCES, DRI_2025_SOURCE } from "@/lib/nutrition/dri/2025";
 import { evaluateDriSet, describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 import { ageOnLocalDate, resolveDri2025 } from "@/lib/nutrition/dri/resolve";
 
@@ -143,5 +143,37 @@ describe("Phase 4 DRI 2025 adult reference model", () => {
 
     expect(male?.upper).toBe(7.5);
     expect(female?.upper).toBe(6.5);
+  });
+});
+
+
+describe("Phase 4 Astra DRI corrections", () => {
+  it("treats the salt-equivalent DG upper bound as exclusive", () => {
+    const references = resolveDri2025(
+      { birthDate: "2001-01-01", sex: "male", activityLevel: "moderate" },
+      "2026-09-14",
+      "salt_equivalent",
+    ).references;
+
+    expect(evaluateDriSet(references, 7.49).target).toBe("within_dg");
+    expect(evaluateDriSet(references, 7.5).target).toBe("above_dg");
+    expect(evaluateDriSet(references, 7.51).target).toBe("above_dg");
+  });
+
+  it("keeps vitamin B6 UL reference-only until chemical-form compatibility is proven", () => {
+    const references = resolveDri2025(
+      { birthDate: "2001-01-01", sex: "male", activityLevel: "moderate" },
+      "2026-09-14",
+      "vitamin_b6",
+    ).references;
+
+    const evaluation = evaluateDriSet(references, 100);
+    expect(evaluation.upperLimit).toBeNull();
+    expect(evaluation.nonComparableMetrics).toContain("UL");
+  });
+
+  it("pins DRI interpretation to the corrected 2025 report revision", () => {
+    expect(DRI_2025_SOURCE.revision).toBe("report-corrected-2025-03-25");
+    expect(DRI_2025_SOURCE.correctionsReflectedOn).toBe("2025-03-25");
   });
 });
