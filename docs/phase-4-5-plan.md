@@ -1,6 +1,6 @@
 # Phase 4.5 — Interaction Performance / UX Hardening
 
-Status: COMPLETE
+Status: MERGED / PRODUCTION DEPLOY PENDING
 Date: 2026-09-15
 
 ## Goal
@@ -82,7 +82,7 @@ Phase 4.5 COMPLETE is required before Phase 5 CR-001 implementation begins.
 
 ## Closure
 
-Completed 2026-09-15.
+Implementation, Preview/device acceptance, and main merge completed 2026-09-15.
 
-Acceptance evidence is recorded in `docs/phase-4-5-status.md`.
-Phase 5 remains NOT STARTED and CR-001 remains its mandatory start gate.
+Final Production deployment is pending Vercel Free daily deployment-quota recovery. Acceptance evidence and the quota gate are recorded in `docs/phase-4-5-status.md`.
+Phase 5 remains NOT STARTED and CR-001 remains its mandatory start gate after Production verification.
