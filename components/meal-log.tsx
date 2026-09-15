@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import { applyMealEntryWrite, applyMealStateWrite, type MealEntryWriteResult, type MealStateWriteResult } from "@/lib/nutrition/meal-optimistic";
@@ -18,10 +18,18 @@ function stateLabel(state: MealState | undefined) {
   return "未登録";
 }
 
-export function MealLog({ date }: { date: string }) {
+export function MealLog({
+  date,
+  initialItems,
+  initialMeals,
+}: {
+  date: string;
+  initialItems: CatalogItem[];
+  initialMeals: Meal[];
+}) {
   const router = useRouter();
-  const [items, setItems] = useState<CatalogItem[]>([]);
-  const [meals, setMeals] = useState<Meal[]>([]);
+  const [items, setItems] = useState<CatalogItem[]>(initialItems);
+  const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [composer, setComposer] = useState<MealType | null>(null);
   const [itemId, setItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -31,23 +39,13 @@ export function MealLog({ date }: { date: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
  
-  const loadInitial = useCallback(async () => {
-    const [catalogResponse, mealsResponse] = await Promise.all([
-      fetch("/api/catalog"),
-      fetch(`/api/meals?date=${date}`),
-    ]);
-    if (!catalogResponse.ok || !mealsResponse.ok) throw new Error("食事データを取得できませんでした。");
-    const catalog = (await catalogResponse.json()) as { items: CatalogItem[] };
-    const mealData = (await mealsResponse.json()) as { meals: Meal[] };
-    setItems(catalog.items);
-    setMeals(mealData.meals);
-  }, [date]);
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
 
   useEffect(() => {
-    loadInitial().catch((requestError) =>
-      setError(requestError instanceof Error ? requestError.message : "読み込みに失敗しました。")
-    );
-  }, [loadInitial]);
+    setMeals(initialMeals);
+  }, [initialMeals]);
 
   function refreshTodaySummary() {
     startRefresh(() => router.refresh());
