@@ -6,9 +6,7 @@ export type DailyNutritionAmountState = {
 };
 
 export function dailyDisplayAmount(day: DailyNutritionAmountState) {
-  if (day.entry_count === 0) {
-    return day.record_complete ? 0 : null;
-  }
+  if (day.entry_count === 0) return null;
 
   return day.entry_count === day.missing_entry_count
     ? null
