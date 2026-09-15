@@ -1,5 +1,6 @@
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { evaluateDriSet } from "@/lib/nutrition/dri/evaluate";
+import { DRI_2025_SOURCE } from "@/lib/nutrition/dri/2025";
 import { resolveDri2025 } from "@/lib/nutrition/dri/resolve";
 import type { DriProfile, DriReference } from "@/lib/nutrition/dri/types";
 import { createUserClient } from "@/lib/supabase/user";
@@ -18,7 +19,7 @@ type RawDailyRow = {
   supplement_amount: number | string;
   coverage_complete: boolean;
   eligible_for_reference: boolean;
-  quality: "user_verified" | "contains_unverified" | "unknown_or_incomplete";
+  quality: "user_verified" | "contains_unverified" | "unknown_or_incomplete" | "not_applicable";
 };
 
 type DailyRow = {
@@ -33,7 +34,7 @@ type DailyRow = {
   supplement_amount: number;
   coverage_complete: boolean;
   eligible_for_reference: boolean;
-  quality: "user_verified" | "contains_unverified" | "unknown_or_incomplete";
+  quality: "user_verified" | "contains_unverified" | "unknown_or_incomplete" | "not_applicable";
 };
 
 type AnalyticsProfile = DriProfile & {
@@ -61,57 +62,77 @@ export function localDateInTimeZone(timeZone: string, now = new Date()) {
   }).format(now);
 }
 
-function referenceSignature(references: DriReference[]) {
-  return JSON.stringify(references.map((reference) => ({
+function referenceSignature(reference: DriReference) {
+  return JSON.stringify({
     metric: reference.metric,
     unit: reference.unit,
     value: reference.value ?? null,
     lower: reference.lower ?? null,
     upper: reference.upper ?? null,
+    lowerInclusive: reference.lowerInclusive ?? true,
+    upperInclusive: reference.upperInclusive ?? true,
     comparable: reference.comparable,
-  })));
+    comparisonScope: reference.comparisonScope ?? null,
+  });
 }
 
 function stableReferences(
   profile: DriProfile,
   nutrientCode: NutrientCode,
   dates: string[],
+  unit: DriReference["unit"],
 ) {
   if (dates.length === 0) {
-    return { references: [] as DriReference[], unavailableReason: "比較に使える完全な記録日がありません。", stable: true };
+    return {
+      references: [] as DriReference[],
+      unavailableReason: null as string | null,
+      unstableMetrics: [] as DriReference["metric"][],
+    };
   }
 
   const resolutions = dates.map((date) => resolveDri2025(profile, date, nutrientCode));
-  const withReferences = resolutions.filter((resolution) => resolution.references.length > 0);
-  if (withReferences.length !== resolutions.length) {
+  const unavailable = resolutions.find((resolution) => resolution.references.length === 0);
+  if (unavailable) {
     return {
       references: [] as DriReference[],
-      unavailableReason: resolutions.find((resolution) => resolution.references.length === 0)?.unavailableReason
-        ?? "期間内の基準を確定できません。",
-      stable: false,
+      unavailableReason: unavailable.unavailableReason ?? "期間内の基準を確定できません。",
+      unstableMetrics: [] as DriReference["metric"][],
     };
   }
 
-  const signatures = new Set(withReferences.map((resolution) => referenceSignature(resolution.references)));
-  if (signatures.size !== 1) {
-    return {
-      references: [] as DriReference[],
-      unavailableReason: "期間内で適用される食事摂取基準が変わるため、日別に確認してください。",
-      stable: false,
-    };
+  const perDate = resolutions.map((resolution) =>
+    resolution.references.filter((reference) => reference.unit === unit)
+  );
+  const metrics = [...new Set(perDate.flat().map((reference) => reference.metric))];
+  const references: DriReference[] = [];
+  const unstableMetrics: DriReference["metric"][] = [];
+
+  for (const metric of metrics) {
+    const metricReferences = perDate.map((refs) => refs.find((reference) => reference.metric === metric));
+    if (metricReferences.some((reference) => !reference)) {
+      unstableMetrics.push(metric);
+      continue;
+    }
+    const resolved = metricReferences as DriReference[];
+    const signatures = new Set(resolved.map(referenceSignature));
+    if (signatures.size === 1) references.push(resolved[0]);
+    else unstableMetrics.push(metric);
   }
 
   return {
-    references: withReferences[0].references,
-    unavailableReason: withReferences[0].unavailableReason,
-    stable: true,
+    references,
+    unavailableReason: unstableMetrics.length > 0
+      ? `期間内で ${unstableMetrics.join(" / ")} の基準が変わるため、その指標の期間比較は表示しません。`
+      : null,
+    unstableMetrics,
   };
 }
 
 export function aggregateNutritionQuality(rows: Array<Pick<DailyRow, "quality">>) {
-  if (rows.length === 0) return "unknown_or_incomplete" as const;
+  if (rows.length === 0) return "not_applicable" as const;
   if (rows.some((row) => row.quality === "unknown_or_incomplete")) return "unknown_or_incomplete" as const;
   if (rows.some((row) => row.quality === "contains_unverified")) return "contains_unverified" as const;
+  if (rows.every((row) => row.quality === "not_applicable")) return "not_applicable" as const;
   return "user_verified" as const;
 }
 
@@ -141,28 +162,32 @@ export function calculatePercentEnergy(
     : nutrientCode === "protein" || nutrientCode === "carbohydrate" ? 4
       : null;
   if (factor === null) {
-    return { value: null, eligibleDays: 0 };
+    return { value: null, eligibleDays: 0, eligibleDates: [] as string[], quality: "not_applicable" as const };
   }
 
   let nutrientTotal = 0;
   let energyTotal = 0;
-  let eligibleDays = 0;
+  const eligibleDates: string[] = [];
+  const qualityRows: Array<Pick<DailyRow, "quality">> = [];
 
   for (const row of nutrientRows) {
     const energy = energyRows.get(row.meal_date);
     if (!row.eligible_for_reference || !energy?.eligible_for_reference || energy.known_amount <= 0) continue;
     nutrientTotal += row.known_amount * factor;
     energyTotal += energy.known_amount;
-    eligibleDays += 1;
+    eligibleDates.push(row.meal_date);
+    qualityRows.push(row, energy);
   }
 
-  if (eligibleDays === 0 || energyTotal <= 0) {
-    return { value: null, eligibleDays: 0 };
+  if (eligibleDates.length === 0 || energyTotal <= 0) {
+    return { value: null, eligibleDays: 0, eligibleDates: [] as string[], quality: "not_applicable" as const };
   }
 
   return {
     value: (nutrientTotal / energyTotal) * 100,
-    eligibleDays,
+    eligibleDays: eligibleDates.length,
+    eligibleDates,
+    quality: aggregateNutritionQuality(qualityRows),
   };
 }
 
@@ -194,11 +219,12 @@ export async function getNutritionAnalytics(
     const eligibleRows = nutrientRows.filter((row) => row.eligible_for_reference);
     const recordCompleteRows = nutrientRows.filter((row) => row.record_complete);
     const eligibleDates = eligibleRows.map((row) => row.meal_date);
-    const dri = stableReferences(profile, definition.code, eligibleDates);
     const percentEnergyResult = calculatePercentEnergy(definition.code, nutrientRows, energyRows);
-
-    const directReferences = dri.references.filter((reference) => reference.unit === definition.unit);
-    const percentReferences = dri.references.filter((reference) => reference.unit === "percent_energy");
+    const directDri = stableReferences(profile, definition.code, eligibleDates, definition.unit);
+    const percentDri = stableReferences(profile, definition.code, percentEnergyResult.eligibleDates, "percent_energy");
+    const directReferences = directDri.references;
+    const percentReferences = percentDri.references;
+    const references = [...directReferences, ...percentReferences];
 
     const avg = average(eligibleRows.map((row) => row.known_amount));
     const directEvaluation = avg === null ? null : evaluateDriSet(directReferences, avg);
@@ -214,13 +240,20 @@ export async function getNutritionAnalytics(
       average_known_amount: avg,
       average_food_amount: average(eligibleRows.map((row) => row.food_amount)),
       average_supplement_amount: average(eligibleRows.map((row) => row.supplement_amount)),
-      quality: aggregateNutritionQuality(recordCompleteRows),
+      average_unclassified_amount: average(eligibleRows.map((row) =>
+        Math.max(0, row.known_amount - row.food_amount - row.supplement_amount)
+      )),
+      quality: aggregateNutritionQuality(eligibleRows),
+      excluded_coverage_days: recordCompleteRows.filter((row) => row.entry_count > 0 && !row.eligible_for_reference).length,
+      empty_complete_days: recordCompleteRows.filter((row) => row.entry_count === 0).length,
       percent_energy: percentEnergyResult.value,
       percent_energy_eligible_days: percentEnergyResult.eligibleDays,
+      percent_energy_quality: percentEnergyResult.quality,
       dri: {
-        references: dri.references,
-        stable: dri.stable,
-        unavailable_reason: dri.unavailableReason,
+        references,
+        stable: directDri.unstableMetrics.length === 0 && percentDri.unstableMetrics.length === 0,
+        unavailable_reason: [directDri.unavailableReason, percentDri.unavailableReason].filter(Boolean).join(" ") || null,
+        unstable_metrics: [...new Set([...directDri.unstableMetrics, ...percentDri.unstableMetrics])],
         adequacy: directEvaluation?.adequacy ?? null,
         target: percentEvaluation?.target ?? directEvaluation?.target ?? null,
         upper_limit: directEvaluation?.upperLimit ?? null,
@@ -235,6 +268,7 @@ export async function getNutritionAnalytics(
     end_date: endDate,
     total_days: range,
     record_complete_days: recordCompleteDays,
+    dri_dataset: DRI_2025_SOURCE,
     nutrients,
   };
 }
@@ -342,8 +376,8 @@ export async function getTodayNutritionSummary(
   return {
     date,
     record_complete: energy?.record_complete ?? false,
-    energy_known_amount: knownEntryCount > 0 || entryCount === 0
-      ? energy?.known_amount ?? 0
+    energy_known_amount: knownEntryCount > 0
+      ? energy?.known_amount ?? null
       : null,
     energy_coverage_complete: energy?.coverage_complete ?? false,
     entry_count: entryCount,
