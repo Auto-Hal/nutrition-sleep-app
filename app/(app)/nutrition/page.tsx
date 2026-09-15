@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
@@ -66,7 +67,7 @@ function hrefFor(range: NutritionRange, nutrient?: NutrientCode | null, day?: st
   const params = new URLSearchParams({ range: String(range) });
   if (nutrient) params.set("nutrient", nutrient);
   if (day) params.set("day", day);
-  return `/nutrition?${params.toString()}`;
+  return `/nutrition?${params.toString()}` as Route;
 }
 
 export default async function NutritionPage({
