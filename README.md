@@ -1,14 +1,14 @@
 # Nutrition / Sleep App
 
-Current status: **Phase 1–3 COMPLETE / Phase 4 NEXT**.
+Current status: **Phase 1–4 COMPLETE / Phase 5 NEXT (CR-001 gate)**.
 
 Implemented:
 - Phase 1: Auth, Profile, server-side sessions, RLS, Preview/Production separation, 4-tab PWA foundation.
 - Phase 2: Catalog, Batch, Meal/MealEntry, immutable nutrient snapshots, Today meal entry.
 - Phase 3: Product ingestion, barcode scanning, Open Food Facts, Google Cloud Vision nutrition-label OCR, Product Library, provenance/source priority.
+- Phase 4: Nutrition analytics, Japanese Dietary Reference Intakes 2025, 7/30/90-day trends, completeness/quality semantics, food/supplement/source-unclassified split, and drilldown.
 
 Next:
-- Phase 4: Nutrition analytics using the Japanese Dietary Reference Intakes 2025.
 - Phase 5: Sleep domain and current supported health-provider integration under CR-001.
 - Phase 6: Offline/reliability/export/account lifecycle and final MVP acceptance.
 
@@ -27,7 +27,7 @@ The browser talks only to same-origin Next.js routes. Supabase access and refres
 
 ## Database
 
-The migrations under `supabase/migrations/` are additive and must be replayed in filename order against an empty dedicated database. Phase 1 creates the profile/session foundation; Phase 2 adds Catalog, Batch, Meal, and immutable nutrient snapshot tables; Phase 3 adds Product/source metadata and commercial ingestion RPCs. The pgTAP checks under `supabase/tests/` cover the RLS and permission contracts.
+The migrations under `supabase/migrations/` are additive and must be replayed in filename order against an empty dedicated database. Phase 1 creates the profile/session foundation; Phase 2 adds Catalog, Batch, Meal, and immutable nutrient snapshot tables; Phase 3 adds Product/source metadata and commercial ingestion RPCs; Phase 4 adds the derived nutrition analytics RPC without persisting mutable summary state. The pgTAP checks under `supabase/tests/` cover the RLS, permission, and nutrition-analytics contracts.
 
 `DATABASE_URL` is required by the server session repository and must point to the same environment as `SUPABASE_URL`. `APP_ALLOWED_USER_ID` identifies the one pre-provisioned Auth user, and `APP_LOGIN_RATE_LIMIT_KEY` is a server-only HMAC key for shared login throttling. The production database URL must never be configured in a Preview deployment.
 
@@ -40,7 +40,7 @@ pnpm test
 pnpm build
 ```
 
-CI runs the same checks and a fresh local Supabase replay. Preview deployment is a separate protected job and requires environment-scoped Vercel/Supabase secrets. Production promotion is intentionally not automatic.
+CI runs the same checks and a fresh local Supabase replay. Preview deployment is a separate protected job and requires environment-scoped Vercel/Supabase secrets. Production deployment is intentionally gated behind the manual `Production Deploy` workflow after database migration and Supervisor acceptance.
 
 ## Security boundaries
 
