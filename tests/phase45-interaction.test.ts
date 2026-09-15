@@ -85,3 +85,14 @@ describe("Phase 4.5 optimistic meal interaction", () => {
     expect(source).toContain("startRefresh(() => router.refresh())");
   });
 });
+
+
+describe("Phase 4.5 tab navigation", () => {
+  it("prefetches tabs and keeps pending feedback in the nav instead of a route-wide loader", () => {
+    const shell = readFileSync(resolve(process.cwd(), "components/app-shell.tsx"), "utf8");
+    expect(shell).toContain("router.prefetch(tab.href)");
+    expect(shell).toContain("startNavigation(() => router.push(href))");
+    expect(shell).toContain('data-pending={pending ? "true" : undefined}');
+    expect(() => readFileSync(resolve(process.cwd(), "app/(app)/loading.tsx"), "utf8")).toThrow();
+  });
+});
