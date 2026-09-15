@@ -6,8 +6,8 @@
 - Phase 2 COMPLETE
 - Phase 3 COMPLETE
 - Phase 4 COMPLETE
-- **Phase 4.5 MERGED / PRODUCTION DEPLOY PENDING — 2026-09-15**
-- Phase 5 QUEUED / NOT STARTED
+- **Phase 4.5 COMPLETE — 2026-09-16**
+- Phase 5 NEXT / NOT STARTED
 - CR-001 remains the mandatory Phase 5 start gate.
 - PR #7 merged to main.
 - merge commit: `f357f148635ddcff7e0ae3bba858c35fb6744567`
@@ -57,16 +57,23 @@ The user confirmed that Today known-energy feedback changes immediately after me
 - iPad touched-flow PASS
 - Supervisor acceptance PASS
 
-## Production gate
+## Production verification
 
-Production build PASS, but deployment creation was rejected by Vercel Free with:
-`api-deployments-free-per-day: more than 100 deployments`.
+Final Production deployment completed successfully on 2026-09-16 after Vercel quota recovery.
 
-No Production alias was changed by the failed attempt.
-The Production Deploy workflow has been restored to manual-only.
+- deployment: `dpl_48dk2CAzyH5EBEGbA6xtUqp6ajvm`
+- deployment URL: `nutrition-sleep-4nr4ogfmx-tsuno2.vercel.app`
+- production alias: `nutrition-sleep-app.vercel.app`
+- state: READY
+- Functions region: `hnd1` (Tokyo)
+- `/login`: HTTP 200
+- relevant Production runtime errors: 0
+- Production Deploy workflow: PASS
+- no Phase 4.5 database migration was required
+
+The Production Deploy workflow remains manual-only.
 
 ## Phase boundary
 
-Phase 4.5 implementation and acceptance are complete and merged, but the phase remains open only for the final Production deploy/runtime verification gate.
-Do not reopen Phase 4.5 for Sleep/provider implementation.
-Phase 5 remains NOT STARTED and begins only after Production verification, through CR-001.
+Phase 4.5 is formally closed and must not be reopened for Sleep/provider implementation.
+Phase 5 remains NOT STARTED and begins only through CR-001.
