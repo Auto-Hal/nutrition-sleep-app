@@ -25,6 +25,34 @@ export function TodayInteractive({
   const [summary, setSummary] = useState(initialSummary);
   const [refreshing, setRefreshing] = useState(false);
   const refreshVersion = useRef(0);
+  const optimisticBase = useRef<TodayNutritionSummary | null>(null);
+
+  const applyPendingNutrition = useCallback((delta: { energyAmount: number | null; energyKnown: boolean }) => {
+    setSummary((current) => {
+      optimisticBase.current = current;
+      const entryCount = (current?.entry_count ?? 0) + 1;
+      const knownEntryCount = (current?.known_entry_count ?? 0) + (delta.energyKnown ? 1 : 0);
+      const energyKnownAmount = delta.energyKnown
+        ? (current?.energy_known_amount ?? 0) + (delta.energyAmount ?? 0)
+        : current?.energy_known_amount ?? null;
+
+      return {
+        date,
+        record_complete: current?.record_complete ?? false,
+        energy_known_amount: knownEntryCount > 0 ? energyKnownAmount : null,
+        energy_coverage_complete: (current?.energy_coverage_complete ?? true) && delta.energyKnown,
+        entry_count: entryCount,
+        known_entry_count: knownEntryCount,
+      };
+    });
+    setRefreshing(true);
+  }, [date]);
+
+  const rollbackPendingNutrition = useCallback(() => {
+    setSummary(optimisticBase.current);
+    optimisticBase.current = null;
+    setRefreshing(false);
+  }, []);
 
   const refreshSummary = useCallback(() => {
     const version = ++refreshVersion.current;
@@ -41,7 +69,10 @@ export function TodayInteractive({
         if (!response.ok || !payload.summary) {
           throw new Error(payload.error ?? "今日の栄養を更新できませんでした。");
         }
-        if (refreshVersion.current === version) setSummary(payload.summary);
+        if (refreshVersion.current === version) {
+          setSummary(payload.summary);
+          optimisticBase.current = null;
+        }
       })
       .catch(() => {
         // Meal write is already confirmed. Keep the previous summary and allow a later refresh.
@@ -57,7 +88,9 @@ export function TodayInteractive({
         date={date}
         initialItems={initialItems}
         initialMeals={initialMeals}
+        onPendingNutrition={applyPendingNutrition}
         onCommitted={refreshSummary}
+        onFailed={rollbackPendingNutrition}
       />
 
       <section className="card" aria-labelledby="today-nutrition-title" aria-busy={refreshing || undefined}>
@@ -88,7 +121,7 @@ export function TodayInteractive({
           <div className="empty-state">食事を記録すると、既知の栄養量をここに表示します。</div>
         )}
 
-        {refreshing && <p className="muted sync-status" role="status">今日の栄養を更新中…</p>}
+        {refreshing && <p className="muted sync-status" role="status">暫定値を表示中 · 保存結果を確認しています…</p>}
         <p className="muted nutrition-caption">
           日中の途中経過から「不足」とは判定しません。未登録の栄養値も0として扱いません。
         </p>
