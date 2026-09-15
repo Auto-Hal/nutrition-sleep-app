@@ -81,7 +81,8 @@ describe("Phase 4.5 optimistic meal interaction", () => {
   it("keeps Catalog fetch out of the post-write critical path", () => {
     const source = readFileSync(resolve(process.cwd(), "components/meal-log.tsx"), "utf8");
     expect(source).not.toContain("await load()");
-    expect(source.match(/fetch\("\/api\/catalog"\)/g)).toHaveLength(1);
+    expect(source).not.toContain('fetch("/api/catalog")');
+    expect(source).not.toContain('fetch(\`/api/meals?date=\${date}\`)');
     expect(source).toContain("startRefresh(() => router.refresh())");
   });
 });
@@ -94,5 +95,17 @@ describe("Phase 4.5 tab navigation", () => {
     expect(shell).toContain("startNavigation(() => router.push(href))");
     expect(shell).toContain('data-pending={pending ? "true" : undefined}');
     expect(() => readFileSync(resolve(process.cwd(), "app/(app)/loading.tsx"), "utf8")).toThrow();
+  });
+});
+
+
+describe("Phase 4.5 Today bootstrap", () => {
+  it("loads profile/catalog in parallel and meals/summary in parallel on the server", () => {
+    const source = readFileSync(resolve(process.cwd(), "app/(app)/today/page.tsx"), "utf8");
+    expect(source).toContain("getMealLogCatalogItems(session.accessToken)");
+    expect(source).toContain("getMealsForDate(session.accessToken, date)");
+    expect(source.match(/Promise\.all\(/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(source).toContain("initialItems={initialItems}");
+    expect(source).toContain("initialMeals={initialMeals}");
   });
 });
