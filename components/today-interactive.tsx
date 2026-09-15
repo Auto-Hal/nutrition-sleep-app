@@ -28,6 +28,7 @@ export function TodayInteractive({
   const optimisticBase = useRef<TodayNutritionSummary | null>(null);
 
   const applyPendingNutrition = useCallback((delta: { energyAmount: number | null; energyKnown: boolean }) => {
+    refreshVersion.current += 1;
     setSummary((current) => {
       optimisticBase.current = current;
       const entryCount = (current?.entry_count ?? 0) + 1;
