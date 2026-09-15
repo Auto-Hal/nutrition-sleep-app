@@ -76,7 +76,7 @@ function referenceSignature(reference: DriReference) {
   });
 }
 
-function stableReferences(
+export function stableReferences(
   profile: DriProfile,
   nutrientCode: NutrientCode,
   dates: string[],
@@ -100,6 +100,9 @@ function stableReferences(
     };
   }
 
+  const contextualReasons = [...new Set(
+    resolutions.map((resolution) => resolution.unavailableReason).filter((reason): reason is string => Boolean(reason))
+  )];
   const perDate = resolutions.map((resolution) =>
     resolution.references.filter((reference) => reference.unit === unit)
   );
@@ -121,9 +124,12 @@ function stableReferences(
 
   return {
     references,
-    unavailableReason: unstableMetrics.length > 0
-      ? `期間内で ${unstableMetrics.join(" / ")} の基準が変わるため、その指標の期間比較は表示しません。`
-      : null,
+    unavailableReason: [
+      unstableMetrics.length > 0
+        ? `期間内で ${unstableMetrics.join(" / ")} の基準が変わるため、その指標の期間比較は表示しません。`
+        : null,
+      ...contextualReasons,
+    ].filter(Boolean).join(" ") || null,
     unstableMetrics,
   };
 }
