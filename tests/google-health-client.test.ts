@@ -72,10 +72,10 @@ describe("Google Health reconcile client", () => {
       startDate: "2026-09-13",
       endDateExclusive: "2026-09-17",
       fetchImpl: fetchMock,
-    })).rejects.toMatchObject<Partial<GoogleHealthApiError>>({
+    })).rejects.toMatchObject({
       status: 403,
       reason: "MISSING_OAUTH_SCOPE",
-    });
+    } satisfies Partial<GoogleHealthApiError>);
   });
 
   it("rejects invalid sync dates before issuing a request", async () => {
