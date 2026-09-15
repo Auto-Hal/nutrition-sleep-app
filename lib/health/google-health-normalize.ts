@@ -90,7 +90,7 @@ function normalizeInterval(
   };
 }
 
-function canonicalPayload(value: unknown) {
+function canonicalPayload(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalPayload);
   if (value && typeof value === "object") {
     return Object.fromEntries(
