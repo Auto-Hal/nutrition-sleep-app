@@ -21,7 +21,8 @@ set local role authenticated;
 create temp table phase4_smoke_context (
   user_id uuid not null,
   food_id uuid,
-  supplement_id uuid
+  supplement_id uuid,
+  batch_id uuid
 ) on commit drop;
 
 insert into phase4_smoke_context (user_id) values (auth.uid());
@@ -67,6 +68,19 @@ set supplement_id = (
   )->>'item_id'
 )::uuid;
 
+update phase4_smoke_context
+set batch_id = (public.create_batch(
+  'Phase 4 synthetic mixed batch',
+  'Phase 4 synthetic mixed batch',
+  1,
+  'serving',
+  jsonb_build_array(
+    jsonb_build_object('catalog_item_id', food_id, 'quantity', 1, 'quantity_unit', 'serving'),
+    jsonb_build_object('catalog_item_id', supplement_id, 'quantity', 1, 'quantity_unit', 'serving')
+  ),
+  'phase4-smoke-batch'
+)).id;
+
 -- Complete fixed day: breakfast recorded; lunch and dinner explicitly skipped.
 select public.create_meal_entry(
   date '2026-09-10',
@@ -93,6 +107,20 @@ from phase4_smoke_context;
 select public.create_skipped_meal(date '2026-09-10', 'lunch');
 select public.create_skipped_meal(date '2026-09-10', 'dinner');
 
+-- Mixed Batch day: source composition is known at recipe level but not snapshotted by source class.
+select public.create_meal_entry(
+  date '2026-09-13',
+  'breakfast',
+  timestamptz '2026-09-13 08:00:00+09',
+  batch_id,
+  1,
+  'serving',
+  'phase4-smoke-batch-entry'
+)
+from phase4_smoke_context;
+select public.create_skipped_meal(date '2026-09-13', 'lunch');
+select public.create_skipped_meal(date '2026-09-13', 'dinner');
+
 -- Fully skipped fixed-slot day: record-complete, but not evidence of whole-day zero intake.
 select public.create_skipped_meal(date '2026-09-12', 'breakfast');
 select public.create_skipped_meal(date '2026-09-12', 'lunch');
@@ -117,6 +145,7 @@ declare
   calcium_row record;
   skipped_row record;
   partial_row record;
+  batch_row record;
 begin
   select * into energy_row
   from public.get_nutrition_daily_summary(date '2026-09-10', date '2026-09-11')
@@ -170,6 +199,18 @@ begin
   end if;
   if calcium_row.quality <> 'unknown_or_incomplete' then
     raise exception 'phase4 smoke: all-unknown calcium quality incorrect';
+  end if;
+
+  select * into batch_row
+  from public.get_nutrition_daily_summary(date '2026-09-13', date '2026-09-13')
+  where meal_date = date '2026-09-13' and nutrient_code = 'energy';
+
+  if batch_row.record_complete is distinct from true
+     or batch_row.eligible_for_reference is distinct from true
+     or batch_row.known_amount <> 500
+     or batch_row.food_amount <> 0
+     or batch_row.supplement_amount <> 0 then
+    raise exception 'phase4 smoke: Batch contribution was incorrectly classified as food or supplement';
   end if;
 
   select * into skipped_row
