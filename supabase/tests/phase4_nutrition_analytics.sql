@@ -1,5 +1,5 @@
 begin;
-select plan(8);
+select plan(10);
 
 select has_function(
   'public',
@@ -49,6 +49,17 @@ select ok(
 select ok(
   position('cannot exceed 90 days' in pg_get_functiondef('public.get_nutrition_daily_summary(date,date)'::regprocedure)) > 0,
   'nutrition summary enforces maximum 90 day range'
+);
+
+select ok(
+  position('a.entry_count > 0' in pg_get_functiondef('public.get_nutrition_daily_summary(date,date)'::regprocedure)) > 0,
+  'empty-entry days are excluded from comparison eligibility'
+);
+
+select ok(
+  position('''ingredient'', ''product'', ''estimated_dish''' in pg_get_functiondef('public.get_nutrition_daily_summary(date,date)'::regprocedure)) > 0
+  and position('en.item_type <> ''supplement''' in pg_get_functiondef('public.get_nutrition_daily_summary(date,date)'::regprocedure)) = 0,
+  'batch contribution is not silently classified as food'
 );
 
 select * from finish();
