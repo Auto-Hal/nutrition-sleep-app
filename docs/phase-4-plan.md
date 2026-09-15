@@ -1,6 +1,6 @@
 # Phase 4 — Nutrition Analytics Plan
 
-Status: IMPLEMENTED / ASTRA DESIGN REVIEW PENDING / DEVICE ACCEPTANCE BLOCKED
+Status: ASTRA APPROVED WITH REQUIRED CORRECTIONS / IMPLEMENTATION VERIFICATION IN PROGRESS / DEVICE ACCEPTANCE BLOCKED
 Date: 2026-09-14
 
 ## 1. Goal
@@ -132,6 +132,8 @@ Custom meals:
 - do not make an incomplete fixed day complete;
 - do not make a complete day incomplete.
 
+A day with breakfast/lunch/dinner all explicitly skipped is record-complete for fixed-slot logging, but if it has no active MealEntry it is not evidence of whole-day zero intake. It remains comparison-ineligible and is displayed as “摂取項目なし”, not as 0 intake.
+
 ### 7.2 Nutrient coverage completeness
 
 Record-complete does not imply nutrient-complete.
@@ -148,10 +150,11 @@ This is required to preserve `unknown != 0`.
 
 For each nutrient/day and selected-period aggregate, calculate quality separately from amount.
 
-Suggested states:
+States:
 - `user_verified`
 - `contains_unverified`
 - `unknown_or_incomplete`
+- `not_applicable` for an empty comparison set
 
 Rules:
 - any nutrient-coverage gap → `unknown_or_incomplete`
@@ -165,11 +168,13 @@ Quality must not change the numeric value itself.
 For each nutrient:
 - food contribution
 - supplement contribution
+- source-unclassified contribution
 - total
 
-Supplement contribution is derived from MealEntry → CatalogItem type `supplement`.
+Supplement contribution is derived from a directly logged CatalogItem type `supplement`.
+A Batch is not retrospectively decomposed from its current recipe because source-class composition is not snapshotted at intake time. Batch amount therefore remains in total but is source-unclassified in Phase 4.
 
-Do not collapse this distinction in the API response.
+Do not collapse these distinctions in the API response.
 
 DRI/UL comparison must be suppressed when the tracked nutrient semantics are incompatible with the official threshold or when source-specific rules cannot be represented safely.
 
@@ -273,13 +278,16 @@ Do not add aggressive intra-day warnings such as “Vitamin D不足” at lunch 
 
 ## 13. Period aggregation
 
-Habitual-intake comparisons should use only days that are:
-- record-complete; and
+Period comparisons use only days that are:
+- record-complete;
+- contain at least one active MealEntry; and
 - coverage-complete for the nutrient being compared.
 
 Incomplete days remain visible in the daily timeline but do not silently lower the comparison average.
 
 The UI must always show how many eligible days contributed to the displayed average.
+The displayed average quality is calculated from those same eligible days; excluded coverage-gap days and empty record-complete days are shown separately.
+Protein/fat/carbohydrate %energy uses ratio-of-sums over days where both the nutrient and positive energy are eligible, with its own eligible-day count and quality.
 
 No arbitrary medical conclusion should be derived from a small sample count.
 
@@ -291,7 +299,10 @@ For daily analysis:
 - derive age for that local calendar day.
 
 For period analysis:
-- resolve DRI per eligible day before period aggregation, so a birthday/age-band transition cannot be silently assigned to the whole period.
+- resolve DRI per eligible day before period aggregation;
+- evaluate EAR/RDA/AI, DG and UL as separate axes;
+- if an age-band transition changes only one metric, suppress only that changed metric rather than all DRI comparisons;
+- do not average reference thresholds across age bands.
 
 ## 15. Security / permissions
 
@@ -332,6 +343,21 @@ UI:
 - DRI markers
 - nutrient drilldown
 - no “<100% = deficiency” language
+
+## 16.1 Astra design-review decisions (2026-09-15)
+
+The required Astra review returned **APPROVE WITH REQUIRED CORRECTIONS** and was accepted by the Supervisor.
+
+Binding corrections before device acceptance:
+- empty record-complete days are not inferred as zero intake and are comparison-ineligible;
+- salt-equivalent DG uses an exclusive upper bound;
+- Batch source composition is not silently classified as food;
+- DRI comparison applicability and non-comparable reasons are metric-specific;
+- age-band transitions suppress only changed metrics;
+- average quality uses the same eligible-day set as the average;
+- drilldown state/source labels and Today date/refresh semantics match stored state;
+- the DRI dataset is pinned to the MHLW 2025 report with corrections reflected 2025-03-25;
+- a corrective RPC migration is required; historical snapshots and ownership semantics are unchanged.
 
 ## 17. Acceptance gate
 
