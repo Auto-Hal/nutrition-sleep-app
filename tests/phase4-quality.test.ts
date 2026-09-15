@@ -23,8 +23,8 @@ describe("Phase 4 period nutrition quality", () => {
     ])).toBe("user_verified");
   });
 
-  it("stays incomplete when there are no complete days", () => {
-    expect(aggregateNutritionQuality([])).toBe("unknown_or_incomplete");
+  it("is not applicable when there are no contributing eligible days", () => {
+    expect(aggregateNutritionQuality([])).toBe("not_applicable");
   });
 });
 
@@ -62,6 +62,8 @@ describe("Phase 4 percent-energy eligibility", () => {
     const result = calculatePercentEnergy("protein", proteinRows, energyRows);
 
     expect(result.eligibleDays).toBe(1);
+    expect(result.eligibleDates).toEqual(["2026-09-13"]);
+    expect(result.quality).toBe("user_verified");
     expect(result.value).toBe(12);
   });
 
@@ -74,6 +76,8 @@ describe("Phase 4 percent-energy eligibility", () => {
     expect(calculatePercentEnergy("protein", proteinRows, energyRows)).toEqual({
       value: null,
       eligibleDays: 0,
+      eligibleDates: [],
+      quality: "not_applicable",
     });
   });
 });
