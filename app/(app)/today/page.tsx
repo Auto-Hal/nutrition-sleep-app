@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { MealLog } from "@/components/meal-log";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
-import { getTodayNutritionSummary } from "@/lib/nutrition/analytics";
+import { getTodayNutritionSummary, localDateInTimeZone } from "@/lib/nutrition/analytics";
+import { getMealLogCatalogItems, getMealsForDate } from "@/lib/nutrition/today-data";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
@@ -13,13 +14,21 @@ function formatEnergy(value: number | null) {
 
 export default async function TodayPage() {
   const session = await getAppSessionForRsc();
-  const profile = session ? await getProfile(session.accessToken) : null;
-  const summary = session
-    ? await getTodayNutritionSummary(
-      session.accessToken,
-      profile?.time_zone ?? "Asia/Tokyo",
-    )
-    : null;
+  const [profile, initialItems] = session
+    ? await Promise.all([
+      getProfile(session.accessToken),
+      getMealLogCatalogItems(session.accessToken),
+    ])
+    : [null, []];
+
+  const timeZone = profile?.time_zone ?? "Asia/Tokyo";
+  const date = localDateInTimeZone(timeZone);
+  const [summary, initialMeals] = session
+    ? await Promise.all([
+      getTodayNutritionSummary(session.accessToken, timeZone),
+      getMealsForDate(session.accessToken, date),
+    ])
+    : [null, []];
 
   return (
     <main className="app-main">
@@ -32,7 +41,7 @@ export default async function TodayPage() {
       </header>
 
       <div className="stack">
-        <MealLog date={summary?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: profile?.time_zone ?? "Asia/Tokyo" }).format(new Date())} />
+        <MealLog date={summary?.date ?? date} initialItems={initialItems} initialMeals={initialMeals} />
 
         <section className="card" aria-labelledby="today-nutrition-title">
           <div className="section-heading">
