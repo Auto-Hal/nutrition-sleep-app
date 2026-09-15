@@ -308,12 +308,14 @@ export async function getNutritionDayDrilldown(
     unit: string;
     quality: string;
     provenance: string;
+    source_uri: string | null;
+    source_observed_at: string | null;
   }> = [];
 
   if (entryIds.length > 0) {
     const { data: snapshotData, error: snapshotError } = await client
       .from("meal_entry_nutrient_snapshots")
-      .select("meal_entry_id,amount,unit,quality,provenance")
+      .select("meal_entry_id,amount,unit,quality,provenance,source_uri,source_observed_at")
       .in("meal_entry_id", entryIds)
       .eq("nutrient_code", nutrientCode);
     if (snapshotError) throw new Error(snapshotError.message);
@@ -337,6 +339,8 @@ export async function getNutritionDayDrilldown(
       unit: snapshot?.unit ?? NUTRIENT_DEFINITIONS.find((definition) => definition.code === nutrientCode)?.unit ?? "",
       quality: snapshot?.quality ?? "unknown",
       provenance: snapshot?.provenance ?? null,
+      source_uri: snapshot?.source_uri ?? null,
+      source_observed_at: snapshot?.source_observed_at ?? null,
     };
   });
 
