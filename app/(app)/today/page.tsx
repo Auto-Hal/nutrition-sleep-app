@@ -31,7 +31,7 @@ export default async function TodayPage() {
       </header>
 
       <div className="stack">
-        <MealLog />
+        <MealLog date={summary?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: profile?.time_zone ?? "Asia/Tokyo" }).format(new Date())} />
 
         <section className="card" aria-labelledby="today-nutrition-title">
           <div className="section-heading">
@@ -46,9 +46,11 @@ export default async function TodayPage() {
               <div>
                 <span className="muted">既知エネルギー</span>
                 <strong>{formatEnergy(summary.energy_known_amount)}{summary.energy_known_amount === null ? "" : " kcal"}</strong>
-                {summary.energy_known_amount === null
-                  ? <small>エネルギー値は未登録</small>
-                  : !summary.energy_coverage_complete && <small>既知分のみ</small>}
+                {summary.entry_count === 0
+                  ? <small>摂取項目なし（0 kcalとは判定しません）</small>
+                  : summary.energy_known_amount === null
+                    ? <small>エネルギー値は不明</small>
+                    : !summary.energy_coverage_complete && <small>既知分のみ</small>}
               </div>
               <span className={`pill ${summary.record_complete ? "" : "pending"}`}>
                 {summary.record_complete ? "食事記録 完了" : "食事記録 途中"}
