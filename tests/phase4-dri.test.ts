@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { stableReferences } from "@/lib/nutrition/analytics";
 import { DRI_2025_ADULT_REFERENCES, DRI_2025_SOURCE } from "@/lib/nutrition/dri/2025";
 import { evaluateDriSet, describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 import { ageOnLocalDate, resolveDri2025 } from "@/lib/nutrition/dri/resolve";
@@ -175,5 +176,59 @@ describe("Phase 4 Astra DRI corrections", () => {
   it("pins DRI interpretation to the corrected 2025 report revision", () => {
     expect(DRI_2025_SOURCE.revision).toBe("report-corrected-2025-03-25");
     expect(DRI_2025_SOURCE.correctionsReflectedOn).toBe("2025-03-25");
+  });
+});
+
+
+describe("Phase 4 DRI period boundary stability", () => {
+  const maleProfile = {
+    birthDate: "1976-09-15",
+    sex: "male" as const,
+    activityLevel: "moderate" as const,
+  };
+
+  it("keeps unchanged protein gram references across age 49 to 50", () => {
+    const result = stableReferences(
+      maleProfile,
+      "protein",
+      ["2026-09-14", "2026-09-15"],
+      "g",
+    );
+
+    expect(result.unstableMetrics).toEqual([]);
+    expect(result.references).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metric: "EAR", value: 50 }),
+      expect.objectContaining({ metric: "RDA", value: 65 }),
+    ]));
+  });
+
+  it("stops only the changing protein percent-energy DG across age 49 to 50", () => {
+    const result = stableReferences(
+      maleProfile,
+      "protein",
+      ["2026-09-14", "2026-09-15"],
+      "percent_energy",
+    );
+
+    expect(result.references).toEqual([]);
+    expect(result.unstableMetrics).toEqual(["DG"]);
+  });
+
+  it("keeps stable protein references across age 29 to 30 and 74 to 75", () => {
+    const at30 = stableReferences(
+      { ...maleProfile, birthDate: "1996-09-15" },
+      "protein",
+      ["2026-09-14", "2026-09-15"],
+      "g",
+    );
+    const at75 = stableReferences(
+      { ...maleProfile, birthDate: "1951-09-15" },
+      "protein",
+      ["2026-09-14", "2026-09-15"],
+      "g",
+    );
+
+    expect(at30.unstableMetrics).toEqual([]);
+    expect(at75.unstableMetrics).toEqual([]);
   });
 });
