@@ -60,3 +60,19 @@ Implemented on the Phase 5 branch:
 - sync-success/failure metadata on the provider connection;
 - explicit reauthorization state on 401;
 - no provider failure is converted into an empty/zero-sleep window.
+
+
+## Sleep analytics / UI foundation
+
+Implemented without requiring provider credentials:
+- active, non-superseded SleepSession reads under existing owner RLS;
+- 7 / 30 / 90-day windows;
+- missing civil days remain unknown rather than zero;
+- range averages include only days with complete source values for that metric;
+- multiple sessions per civil date are retained and aggregated;
+- a non-nap longest session is used only for timing presentation;
+- stage averages use only days with actual stage intervals;
+- CLASSIC / absent stage data is never treated as zero LIGHT/DEEP/REM;
+- out-of-bed segments are displayed as observed continuity data;
+- timing variability is descriptive only;
+- Sleep page no longer uses the Phase 5 placeholder.
