@@ -57,8 +57,12 @@ export function evaluateDriSet(references: DriReference[], amount: number): DriE
   }
 
   if (dg) {
-    if (dg.lower !== undefined && amount < dg.lower) result.target = "below_dg";
-    else if (dg.upper !== undefined && amount > dg.upper) result.target = "above_dg";
+    const belowLower = dg.lower !== undefined
+      && (dg.lowerInclusive === false ? amount <= dg.lower : amount < dg.lower);
+    const aboveUpper = dg.upper !== undefined
+      && (dg.upperInclusive === false ? amount >= dg.upper : amount > dg.upper);
+    if (belowLower) result.target = "below_dg";
+    else if (aboveUpper) result.target = "above_dg";
     else result.target = "within_dg";
   }
 
