@@ -83,7 +83,10 @@ describe("Phase 4.5 optimistic meal interaction", () => {
     expect(source).not.toContain("await load()");
     expect(source).not.toContain('fetch("/api/catalog")');
     expect(source).not.toContain('fetch(\`/api/meals?date=\${date}\`)');
-    expect(source).toContain("startRefresh(() => router.refresh())");
+    expect(source).not.toContain("router.refresh()");
+    expect(source).toContain('setMessage("保存中…")');
+    expect(source).toContain("setComposer(null)");
+    expect(source).toContain("onCommitted?.()");
   });
 });
 
@@ -107,5 +110,22 @@ describe("Phase 4.5 Today bootstrap", () => {
     expect(source.match(/Promise\.all\(/g)?.length).toBeGreaterThanOrEqual(2);
     expect(source).toContain("initialItems={initialItems}");
     expect(source).toContain("initialMeals={initialMeals}");
+  });
+});
+
+
+describe("Phase 4.5 Today nutrition refresh", () => {
+  it("refreshes only the nutrition card after a confirmed write", () => {
+    const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");
+    expect(source).toContain('/api/nutrition/today?date=');
+    expect(source).toContain("setSummary(payload.summary)");
+    expect(source).toContain("onCommitted={refreshSummary}");
+    expect(source).not.toContain("router.refresh()");
+  });
+
+  it("keeps the lightweight summary endpoint date-scoped", () => {
+    const source = readFileSync(resolve(process.cwd(), "app/api/nutrition/today/route.ts"), "utf8");
+    expect(source).toContain("getNutritionSummaryForDate(session.accessToken, date)");
+    expect(source).toContain('"Cache-Control": "no-store"');
   });
 });
