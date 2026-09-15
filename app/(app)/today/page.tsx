@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { MealLog } from "@/components/meal-log";
-import { getAppSession } from "@/lib/auth/session";
+import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getTodayNutritionSummary } from "@/lib/nutrition/analytics";
 import { getProfile } from "@/lib/profile";
 
@@ -11,7 +12,7 @@ function formatEnergy(value: number | null) {
 }
 
 export default async function TodayPage() {
-  const session = await getAppSession();
+  const session = await getAppSessionForRsc();
   const profile = session ? await getProfile(session.accessToken) : null;
   const summary = session
     ? await getTodayNutritionSummary(
@@ -39,7 +40,7 @@ export default async function TodayPage() {
               <p className="eyebrow">Nutrition</p>
               <h2 id="today-nutrition-title">今日の栄養</h2>
             </div>
-            <a className="button ghost" href="/nutrition?range=7">傾向を見る</a>
+            <Link className="button ghost" href="/nutrition?range=7">傾向を見る</Link>
           </div>
           {summary && (summary.entry_count > 0 || summary.record_complete) ? (
             <div className="today-nutrition-summary">

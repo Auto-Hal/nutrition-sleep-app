@@ -121,3 +121,11 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
 .today-nutrition-summary strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .today-nutrition-summary small { color: var(--muted); }
 @media (max-width: 520px) { .today-nutrition-summary { align-items: flex-start; flex-direction: column; } }
+
+
+/* Phase 4.5 interaction feedback — visual redesign remains Phase 6. */
+.sync-status { margin-bottom: 0; font-size: 0.78rem; }
+.route-loading { display: flex; min-height: 45svh; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
+.route-loading-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--accent); animation: route-loading-pulse 900ms ease-in-out infinite alternate; }
+@keyframes route-loading-pulse { from { opacity: 0.35; transform: scale(0.85); } to { opacity: 1; transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .route-loading-dot { animation: none; } }

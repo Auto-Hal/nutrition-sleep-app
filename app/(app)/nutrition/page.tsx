@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAppSession } from "@/lib/auth/session";
+import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
 import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
@@ -73,7 +74,7 @@ export default async function NutritionPage({
 }: {
   searchParams: Promise<{ range?: string; nutrient?: string; day?: string }>;
 }) {
-  const session = await getAppSession();
+  const session = await getAppSessionForRsc();
   if (!session) redirect("/login");
 
   const params = await searchParams;
@@ -119,13 +120,13 @@ export default async function NutritionPage({
 
       <nav className="subnav" aria-label="集計期間">
         {[7, 30, 90].map((days) => (
-          <a
+          <Link
             key={days}
             href={hrefFor(days as NutritionRange, selectedCode)}
             aria-current={range === days ? "page" : undefined}
           >
             {days}日
-          </a>
+          </Link>
         ))}
       </nav>
 
@@ -155,7 +156,7 @@ export default async function NutritionPage({
               const labels = driLabels(nutrient);
               const incomplete = nutrient.eligible_days < analytics.record_complete_days;
               return (
-                <a
+                <Link
                   key={nutrient.code}
                   className="nutrition-row"
                   href={hrefFor(range, nutrient.code)}
@@ -215,7 +216,7 @@ export default async function NutritionPage({
                     ))}
                   </div>
                   <span className="nutrition-chevron" aria-hidden="true">›</span>
-                </a>
+                </Link>
               );
             })}
           </div>
@@ -228,7 +229,7 @@ export default async function NutritionPage({
                 <p className="eyebrow">Nutrient detail</p>
                 <h2>{selected.label}</h2>
               </div>
-              <a className="button ghost" href={hrefFor(range)}>閉じる</a>
+              <Link className="button ghost" href={hrefFor(range)}>閉じる</Link>
             </div>
 
             <p className="muted">
@@ -237,7 +238,7 @@ export default async function NutritionPage({
 
             <div className="nutrition-days">
               {[...selected.daily].reverse().map((day) => (
-                <a
+                <Link
                   key={day.meal_date}
                   className="nutrition-day"
                   href={hrefFor(range, selected.code, day.meal_date)}
@@ -259,7 +260,7 @@ export default async function NutritionPage({
                       ? <small>{day.entry_count === 0 ? "0摂取とは判定しません" : "栄養値不明"}</small>
                       : !day.coverage_complete && <small>既知分のみ</small>}
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
           </section>
@@ -272,7 +273,7 @@ export default async function NutritionPage({
                 <p className="eyebrow">Day detail</p>
                 <h2>{selectedDay}</h2>
               </div>
-              <a className="button ghost" href={hrefFor(range, selected.code)}>日別へ戻る</a>
+              <Link className="button ghost" href={hrefFor(range, selected.code)}>日別へ戻る</Link>
             </div>
 
             <div className="stack">
