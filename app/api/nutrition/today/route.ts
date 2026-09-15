@@ -8,7 +8,9 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const startedAt = performance.now();
   const session = await getAppSession();
+  const authCompletedAt = performance.now();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const date = new URL(request.url).searchParams.get("date");
@@ -18,6 +20,12 @@ export async function GET(request: Request) {
 
   try {
     const summary = await getNutritionSummaryForDate(session.accessToken, date);
+    const summaryCompletedAt = performance.now();
+    console.info("[perf] today-summary", {
+      auth_ms: Math.round(authCompletedAt - startedAt),
+      summary_ms: Math.round(summaryCompletedAt - authCompletedAt),
+      total_ms: Math.round(summaryCompletedAt - startedAt),
+    });
     return NextResponse.json(
       { summary },
       { headers: { "Cache-Control": "no-store" } },
