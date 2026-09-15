@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type MouseEvent, type ReactNode, useEffect, useState, useTransition } from "react";
@@ -9,7 +10,7 @@ const tabs = [
   { href: "/nutrition", label: "Nutrition", icon: "◌" },
   { href: "/sleep", label: "Sleep", icon: "☾" },
   { href: "/settings", label: "Settings", icon: "⚙" },
-] as const;
+] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: string }>;
 
 export function AppShell({ children, email }: { children: ReactNode; email?: string }) {
   const pathname = usePathname();
@@ -25,7 +26,7 @@ export function AppShell({ children, email }: { children: ReactNode; email?: str
     setPendingHref(null);
   }, [pathname]);
 
-  function navigateTab(event: MouseEvent<HTMLAnchorElement>, href: string) {
+  function navigateTab(event: MouseEvent<HTMLAnchorElement>, href: Route) {
     if (
       event.defaultPrevented
       || event.button !== 0
