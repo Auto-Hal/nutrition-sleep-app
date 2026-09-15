@@ -86,7 +86,9 @@ describe("Phase 4.5 optimistic meal interaction", () => {
     expect(source).not.toContain("router.refresh()");
     expect(source).toContain('setMessage("保存中…")');
     expect(source).toContain("setComposer(null)");
+    expect(source).toContain("onPendingNutrition?.({ energyAmount, energyKnown })");
     expect(source).toContain("onCommitted?.()");
+    expect(source).toContain("onFailed?.()");
   });
 });
 
@@ -119,7 +121,9 @@ describe("Phase 4.5 Today nutrition refresh", () => {
     const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");
     expect(source).toContain('/api/nutrition/today?date=');
     expect(source).toContain("setSummary(payload.summary)");
+    expect(source).toContain("onPendingNutrition={applyPendingNutrition}");
     expect(source).toContain("onCommitted={refreshSummary}");
+    expect(source).toContain("onFailed={rollbackPendingNutrition}");
     expect(source).not.toContain("router.refresh()");
   });
 
@@ -127,5 +131,21 @@ describe("Phase 4.5 Today nutrition refresh", () => {
     const source = readFileSync(resolve(process.cwd(), "app/api/nutrition/today/route.ts"), "utf8");
     expect(source).toContain("getNutritionSummaryForDate(session.accessToken, date)");
     expect(source).toContain('"Cache-Control": "no-store"');
+  });
+});
+
+
+describe("Phase 4.5 optimistic Today energy", () => {
+  it("preloads only energy nutrients for immediate feedback", () => {
+    const source = readFileSync(resolve(process.cwd(), "lib/nutrition/today-data.ts"), "utf8");
+    expect(source).toContain('.eq("nutrient_code", "energy")');
+    expect(source).toContain("Promise.all([");
+  });
+
+  it("marks the optimistic card as provisional until reconciliation", () => {
+    const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");
+    expect(source).toContain("optimisticBase.current = current");
+    expect(source).toContain("暫定値を表示中");
+    expect(source).toContain("rollbackPendingNutrition");
   });
 });
