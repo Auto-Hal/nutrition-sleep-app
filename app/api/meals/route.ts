@@ -35,8 +35,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = performance.now();
   if (!isAllowedOrigin(request)) return NextResponse.json({ error: "許可されていないリクエストです。" }, { status: 403 });
   const session = await getAppSession();
+  const authCompletedAt = performance.now();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "入力内容を確認してください。" }, { status: 400 });
@@ -45,6 +47,12 @@ export async function POST(request: Request) {
     p_meal_date: parsed.data.meal_date, p_meal_type: parsed.data.meal_type, p_eaten_at: parsed.data.eaten_at ?? new Date().toISOString(),
     p_catalog_item_id: parsed.data.catalog_item_id, p_quantity: parsed.data.quantity, p_quantity_unit: parsed.data.quantity_unit,
     p_idempotency_key: parsed.data.idempotency_key ?? null,
+  });
+  const rpcCompletedAt = performance.now();
+  console.info("[perf] meal-write", {
+    auth_ms: Math.round(authCompletedAt - startedAt),
+    rpc_ms: Math.round(rpcCompletedAt - authCompletedAt),
+    total_ms: Math.round(rpcCompletedAt - startedAt),
   });
   if (result.error) return NextResponse.json({ error: "食事記録を保存できませんでした。" }, { status: result.error.code === "23505" ? 409 : 400 });
   return NextResponse.json({ result: result.data }, { status: 201 });
