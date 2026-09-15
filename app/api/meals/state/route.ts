@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
-import { getNutritionSummaryForDate } from "@/lib/nutrition/analytics";
 import { isAllowedOrigin } from "@/lib/security/request";
 
 const schema = z.object({ meal_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), meal_type: z.enum(["breakfast", "lunch", "dinner"]), state: z.enum(["not_recorded", "skipped"]) });
@@ -18,8 +17,7 @@ export async function POST(request: Request) {
   if (parsed.data.state === "skipped") {
     const result = await client.rpc("create_skipped_meal", { p_meal_date: parsed.data.meal_date, p_meal_type: parsed.data.meal_type });
     if (result.error) return NextResponse.json({ error: "食事状態を保存できませんでした。" }, { status: 400 });
-    const summary = await getNutritionSummaryForDate(session.accessToken, parsed.data.meal_date);
-  return NextResponse.json({ meal: result.data, summary });
+    return NextResponse.json({ meal: result.data });
   }
   const existing = await client.from("meals").select("id,revision").eq("meal_date", parsed.data.meal_date).eq("meal_type", parsed.data.meal_type).maybeSingle();
   if (existing.error) return NextResponse.json({ error: "食事状態を取得できませんでした。" }, { status: 500 });
