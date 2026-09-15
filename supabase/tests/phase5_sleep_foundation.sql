@@ -1,5 +1,5 @@
 begin;
-select plan(41);
+select plan(43);
 
 select has_table('public', 'health_provider_connections', 'provider connection metadata exists');
 select has_table('private', 'health_provider_credentials', 'provider credentials are server-only');
@@ -23,8 +23,10 @@ select has_index('public', 'health_provider_connections', 'health_provider_conne
 select has_index('public', 'sleep_sessions', 'sleep_sessions_provider_resource_unique', 'provider resource idempotency index exists');
 select has_index('public', 'sleep_sessions', 'sleep_sessions_user_date_idx', 'sleep date index exists');
 select has_index('public', 'sleep_sessions', 'sleep_sessions_active_user_date_idx', 'active sleep date index exists');
-select has_index('public', 'sleep_stage_intervals', 'sleep_stage_intervals_user_session_idx', 'stage session index exists');
-select has_index('public', 'sleep_short_awakenings', 'sleep_short_awakenings_user_session_idx', 'awakening session index exists');
+select has_index('public', 'sleep_stage_intervals', 'sleep_stage_intervals_user_session_idx', 'stage read index exists');
+select has_index('public', 'sleep_short_awakenings', 'sleep_short_awakenings_user_session_idx', 'awakening read index exists');
+select has_index('public', 'sleep_stage_intervals', 'sleep_stage_intervals_session_owner_idx', 'stage composite foreign key is covered');
+select has_index('public', 'sleep_short_awakenings', 'sleep_short_awakenings_session_owner_idx', 'awakening composite foreign key is covered');
 
 select ok((select relrowsecurity from pg_class where oid = 'public.health_provider_connections'::regclass), 'provider connection RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.sleep_sessions'::regclass), 'sleep session RLS enabled');
