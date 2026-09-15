@@ -48,3 +48,15 @@ The canonical v4 REST resource was re-checked immediately before adapter impleme
 - Sleep summary exposes minutes in sleep period, asleep, awake, latency and after-wakeup values.
 
 The foundation receives an additive corrective migration before Production. No Production Sleep schema exists yet.
+
+
+## Sleep synchronization foundation
+
+Implemented on the Phase 5 branch:
+- server-only transactional persistence for normalized Google Health sleep;
+- payload-hash-aware updates so unchanged sessions do not rewrite child intervals;
+- transactional replacement of stages/out-of-bed segments when provider data changes;
+- authoritative refresh-window supersession instead of hard deletion;
+- sync-success/failure metadata on the provider connection;
+- explicit reauthorization state on 401;
+- no provider failure is converted into an empty/zero-sleep window.
