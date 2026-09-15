@@ -23,7 +23,7 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | NEXT / CR-001 GATE | Sleep domain and current official health-provider integration |
+| Phase 5 | CR-001 REVIEW / NOT STARTED | Sleep domain and current official health-provider integration |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
@@ -106,7 +106,7 @@ Visual redesign (colors, card layout, typography and full design-system polish) 
 
 Goal: import Fitbit-origin sleep through the current supported official API path and visualize duration, regularity, continuity, and stages.
 
-CR-001 remains the phase-start gate. The old Fitbit Web API Sleep v1.2 requirement is superseded and must not be implemented.
+CR-001 remains the phase-start gate. The researched provider contract is documented in `docs/cr-001-google-health-provider.md` and is awaiting user approval. The old Fitbit Web API Sleep v1.2 requirement is superseded and must not be implemented.
 
 Before implementation:
 - verify current official Google/Fitbit health API availability;
