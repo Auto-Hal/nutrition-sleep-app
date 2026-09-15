@@ -1,6 +1,6 @@
 # Nutrition / Sleep App
 
-Current status: **Phase 1–4 COMPLETE / Phase 4.5 MERGED, Production deploy pending / Phase 5 NOT STARTED**.
+Current status: **Phase 1–4.5 COMPLETE / Phase 5 NEXT (CR-001 gate)**.
 
 Implemented:
 - Phase 1: Auth, Profile, server-side sessions, RLS, Preview/Production separation, 4-tab PWA foundation.
