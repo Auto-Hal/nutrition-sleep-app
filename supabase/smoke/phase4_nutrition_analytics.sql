@@ -93,7 +93,7 @@ from phase4_smoke_context;
 select public.create_skipped_meal(date '2026-09-10', 'lunch');
 select public.create_skipped_meal(date '2026-09-10', 'dinner');
 
--- Fully skipped day: explicit zero intake is valid, not "not recorded".
+-- Fully skipped fixed-slot day: record-complete, but not evidence of whole-day zero intake.
 select public.create_skipped_meal(date '2026-09-12', 'breakfast');
 select public.create_skipped_meal(date '2026-09-12', 'lunch');
 select public.create_skipped_meal(date '2026-09-12', 'dinner');
@@ -178,10 +178,11 @@ begin
 
   if skipped_row.record_complete is distinct from true
      or skipped_row.coverage_complete is distinct from true
-     or skipped_row.eligible_for_reference is distinct from true
+     or skipped_row.eligible_for_reference is distinct from false
      or skipped_row.entry_count <> 0
-     or skipped_row.known_amount <> 0 then
-    raise exception 'phase4 smoke: fully skipped day was not preserved as an explicit complete zero day';
+     or skipped_row.known_amount <> 0
+     or skipped_row.quality <> 'not_applicable' then
+    raise exception 'phase4 smoke: empty fully skipped day was incorrectly treated as comparison-eligible zero intake';
   end if;
 
   select * into partial_row
