@@ -3,15 +3,22 @@ import { createUserClient } from "@/lib/supabase/user";
 
 export async function getMealLogCatalogItems(accessToken: string): Promise<CatalogItem[]> {
   const client = createUserClient(accessToken);
-  const { data, error } = await client
-    .from("catalog_items")
-    .select("id,user_id,item_type,name,brand,serving_size,serving_unit,active,revision")
-    .eq("active", true)
-    .order("updated_at", { ascending: false });
+  const [itemsResult, energyResult] = await Promise.all([
+    client
+      .from("catalog_items")
+      .select("id,user_id,item_type,name,brand,serving_size,serving_unit,active,revision")
+      .eq("active", true)
+      .order("updated_at", { ascending: false }),
+    client
+      .from("item_nutrients")
+      .select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at")
+      .eq("nutrient_code", "energy"),
+  ]);
 
-  if (error) throw new Error(error.message);
+  if (itemsResult.error) throw new Error(itemsResult.error.message);
+  if (energyResult.error) throw new Error(energyResult.error.message);
 
-  return (data ?? []).map((item) => ({
+  return (itemsResult.data ?? []).map((item) => ({
     id: item.id,
     user_id: item.user_id,
     item_type: item.item_type,
@@ -21,7 +28,17 @@ export async function getMealLogCatalogItems(accessToken: string): Promise<Catal
     serving_unit: item.serving_unit,
     active: item.active,
     revision: item.revision,
-    nutrients: [],
+    nutrients: (energyResult.data ?? [])
+      .filter((nutrient) => nutrient.catalog_item_id === item.id)
+      .map((nutrient) => ({
+        code: "energy" as const,
+        amount: nutrient.amount === null ? null : Number(nutrient.amount),
+        unit: nutrient.unit,
+        provenance: nutrient.provenance,
+        quality: nutrient.quality,
+        source_uri: nutrient.source_uri,
+        source_observed_at: nutrient.source_observed_at,
+      })),
   })) as CatalogItem[];
 }
 
