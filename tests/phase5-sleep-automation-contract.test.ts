@@ -9,10 +9,11 @@ function source(path: string) {
 describe("Phase 5 sleep automation contract", () => {
   it("protects the morning endpoint with CRON_SECRET before provider access", () => {
     const route = source("app/api/health/google/morning/route.ts");
-    const authCheck = route.indexOf("authorized(request)");
-    const accessToken = route.indexOf("getGoogleHealthAccessToken");
+    const handler = route.slice(route.indexOf("export async function GET"));
+    const authCheck = handler.indexOf("if (!authorized(request))");
+    const providerCall = handler.indexOf("withGoogleHealthAccessTokenRetry(");
     expect(authCheck).toBeGreaterThan(-1);
-    expect(accessToken).toBeGreaterThan(authCheck);
+    expect(providerCall).toBeGreaterThan(authCheck);
     expect(route).toContain('request.headers.get("authorization")');
     expect(route).toContain("CRON_SECRET");
   });
