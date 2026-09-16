@@ -16,6 +16,7 @@ const publicKeyNames = [
   "NEXT_PUBLIC_GOOGLE_CLOUD_VISION_API_KEY",
   "NEXT_PUBLIC_PROVIDER_TOKEN_ENCRYPTION_KEY",
   "NEXT_PUBLIC_GOOGLE_HEALTH_CLIENT_SECRET",
+  "NEXT_PUBLIC_CRON_SECRET",
 ];
 if (publicKeyNames.some((key) => process.env[key])) {
   console.error("Server credentials must not be exposed as public environment variables.");
@@ -58,6 +59,10 @@ if (process.env.GOOGLE_HEALTH_REDIRECT_URI) {
     console.error("GOOGLE_HEALTH_REDIRECT_URI must be an exact OAuth callback URL.");
     process.exit(1);
   }
+}
+if (process.env.CRON_SECRET && Buffer.byteLength(process.env.CRON_SECRET) < 32) {
+  console.error("CRON_SECRET must contain at least 32 bytes when configured.");
+  process.exit(1);
 }
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(process.env.APP_ALLOWED_USER_ID)) {
   console.error("APP_ALLOWED_USER_ID must be a valid UUID.");
