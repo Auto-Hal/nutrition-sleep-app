@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAppSession } from "@/lib/auth/session";
 import { getProfile } from "@/lib/profile";
-import { getGoogleHealthAccessToken } from "@/lib/health/google-health-token";
+import { withGoogleHealthAccessTokenRetry } from "@/lib/health/google-health-token";
 import {
   getGoogleHealthBackfillState,
 } from "@/lib/health/sleep-backfill-progress";
@@ -29,39 +29,43 @@ export async function POST(request: Request) {
   }
 
   try {
-    const [accessToken, profile] = await Promise.all([
-      getGoogleHealthAccessToken(session.userId),
-      getProfile(session.accessToken),
-    ]);
+    const profile = await getProfile(session.accessToken);
     const fallbackTimeZone = profile?.time_zone ?? "Asia/Tokyo";
 
-    const recent = await syncRecentGoogleHealthSleep({
-      userId: session.userId,
-      accessToken,
-      fallbackTimeZone,
-    });
+    const result = await withGoogleHealthAccessTokenRetry(
+      session.userId,
+      async (accessToken) => {
+        const recent = await syncRecentGoogleHealthSleep({
+          userId: session.userId,
+          accessToken,
+          fallbackTimeZone,
+        });
 
-    let backfill = null;
-    const state = await getGoogleHealthBackfillState(session.userId);
-    if (
-      state?.backfill_started_at
-      && !state.backfill_completed_at
-      && state.backfill_target_start_date
-      && state.backfill_cursor_end_date
-    ) {
-      backfill = await runGoogleHealthSleepBackfillStep({
-        userId: session.userId,
-        accessToken,
-        fallbackTimeZone,
-      });
-    }
+        let backfill = null;
+        const state = await getGoogleHealthBackfillState(session.userId);
+        if (
+          state?.backfill_started_at
+          && !state.backfill_completed_at
+          && state.backfill_target_start_date
+          && state.backfill_cursor_end_date
+        ) {
+          backfill = await runGoogleHealthSleepBackfillStep({
+            userId: session.userId,
+            accessToken,
+            fallbackTimeZone,
+          });
+        }
+
+        return { recent, backfill };
+      },
+    );
 
     if (wantsJson(request)) {
       return NextResponse.json({
         ok: true,
-        recent,
-        backfill: backfill
-          ? { completed: backfill.completed, window: backfill.window }
+        recent: result.recent,
+        backfill: result.backfill
+          ? { completed: result.backfill.completed, window: result.backfill.window }
           : null,
       });
     }

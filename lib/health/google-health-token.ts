@@ -1,3 +1,4 @@
+import { GoogleHealthApiError } from "@/lib/health/google-health-client";
 import { createGoogleHealthOAuthClient } from "@/lib/health/google-health-oauth";
 import {
   loadGoogleHealthCredentials,
@@ -13,7 +14,10 @@ export class GoogleHealthReauthorizationRequiredError extends Error {
   }
 }
 
-export async function getGoogleHealthAccessToken(userId: string) {
+export async function getGoogleHealthAccessToken(
+  userId: string,
+  options: { forceRefresh?: boolean } = {},
+) {
   const stored = await loadGoogleHealthCredentials(userId);
   if (!stored) throw new GoogleHealthReauthorizationRequiredError();
 
@@ -21,7 +25,8 @@ export async function getGoogleHealthAccessToken(userId: string) {
     ? Date.parse(stored.accessTokenExpiresAt)
     : Number.NaN;
   if (
-    stored.accessToken
+    !options.forceRefresh
+    && stored.accessToken
     && Number.isFinite(expiresAt)
     && expiresAt - Date.now() > REFRESH_WINDOW_MS
   ) {
@@ -29,11 +34,15 @@ export async function getGoogleHealthAccessToken(userId: string) {
   }
 
   const client = createGoogleHealthOAuthClient();
-  client.setCredentials({
-    refresh_token: stored.refreshToken,
-    access_token: stored.accessToken ?? undefined,
-    expiry_date: Number.isFinite(expiresAt) ? expiresAt : undefined,
-  });
+  client.setCredentials(
+    options.forceRefresh
+      ? { refresh_token: stored.refreshToken }
+      : {
+          refresh_token: stored.refreshToken,
+          access_token: stored.accessToken ?? undefined,
+          expiry_date: Number.isFinite(expiresAt) ? expiresAt : undefined,
+        },
+  );
 
   try {
     const result = await client.getAccessToken();
@@ -52,6 +61,35 @@ export async function getGoogleHealthAccessToken(userId: string) {
   } catch {
     await markGoogleHealthReauthorizationRequired(userId).catch(() => undefined);
     throw new GoogleHealthReauthorizationRequiredError();
+  }
+}
+
+export async function withGoogleHealthAccessTokenRetry<T>(
+  userId: string,
+  operation: (accessToken: string) => Promise<T>,
+) {
+  const accessToken = await getGoogleHealthAccessToken(userId);
+
+  try {
+    return await operation(accessToken);
+  } catch (error) {
+    if (!(error instanceof GoogleHealthApiError) || error.status !== 401) {
+      throw error;
+    }
+  }
+
+  const refreshedAccessToken = await getGoogleHealthAccessToken(userId, {
+    forceRefresh: true,
+  });
+
+  try {
+    return await operation(refreshedAccessToken);
+  } catch (error) {
+    if (error instanceof GoogleHealthApiError && error.status === 401) {
+      await markGoogleHealthReauthorizationRequired(userId).catch(() => undefined);
+      throw new GoogleHealthReauthorizationRequiredError();
+    }
+    throw error;
   }
 }
 

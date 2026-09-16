@@ -8,7 +8,7 @@ import type { GoogleHealthDataSourceFamily } from "@/lib/health/google-health-ty
 
 function syncErrorCode(error: unknown) {
   if (error instanceof GoogleHealthApiError) {
-    if (error.status === 401) return "REAUTH_REQUIRED";
+    if (error.status === 401) return "TOKEN_REJECTED";
     if (error.reason === "MISSING_OAUTH_SCOPE") return "MISSING_OAUTH_SCOPE";
     return error.reason ?? `HTTP_${error.status}`;
   }

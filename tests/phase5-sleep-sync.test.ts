@@ -64,7 +64,7 @@ describe("Google Health sleep sync", () => {
     }));
   });
 
-  it("records reauthorization instead of replacing the window after an auth failure", async () => {
+  it("records a retryable token rejection instead of requiring reauth immediately", async () => {
     mocks.fetchReconciledSleep.mockRejectedValue(new GoogleHealthApiError(401, null));
     mocks.recordGoogleHealthSyncFailure.mockResolvedValue(undefined);
 
@@ -76,7 +76,7 @@ describe("Google Health sleep sync", () => {
       fallbackTimeZone: "Asia/Tokyo",
     })).rejects.toBeInstanceOf(GoogleHealthApiError);
 
-    expect(mocks.recordGoogleHealthSyncFailure).toHaveBeenCalledWith(USER_ID, "REAUTH_REQUIRED");
+    expect(mocks.recordGoogleHealthSyncFailure).toHaveBeenCalledWith(USER_ID, "TOKEN_REJECTED");
     expect(mocks.replaceGoogleHealthSleepWindow).not.toHaveBeenCalled();
   });
 });

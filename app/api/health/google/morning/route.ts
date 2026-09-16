@@ -5,7 +5,7 @@ import { query } from "@/lib/db";
 import {
   googleHealthOAuthConfigured,
 } from "@/lib/health/google-health-oauth";
-import { getGoogleHealthAccessToken } from "@/lib/health/google-health-token";
+import { withGoogleHealthAccessTokenRetry } from "@/lib/health/google-health-token";
 import {
   getGoogleHealthBackfillState,
 } from "@/lib/health/sleep-backfill-progress";
@@ -45,47 +45,55 @@ export async function GET(request: Request) {
   const started = Date.now();
 
   try {
-    const [accessToken, fallbackTimeZone] = await Promise.all([
-      getGoogleHealthAccessToken(env.allowedUserId),
-      syncTimeZone(env.allowedUserId),
-    ]);
+    const fallbackTimeZone = await syncTimeZone(env.allowedUserId);
 
-    const recentStarted = Date.now();
-    const recent = await syncRecentGoogleHealthSleep({
-      userId: env.allowedUserId,
-      accessToken,
-      fallbackTimeZone,
-    });
-    const recentMs = Date.now() - recentStarted;
+    const result = await withGoogleHealthAccessTokenRetry(
+      env.allowedUserId,
+      async (accessToken) => {
+        const recentStarted = Date.now();
+        const recent = await syncRecentGoogleHealthSleep({
+          userId: env.allowedUserId,
+          accessToken,
+          fallbackTimeZone,
+        });
+        const recentMs = Date.now() - recentStarted;
 
-    let backfill = null;
-    const state = await getGoogleHealthBackfillState(env.allowedUserId);
-    if (
-      state?.backfill_started_at
-      && !state.backfill_completed_at
-      && state.backfill_target_start_date
-      && state.backfill_cursor_end_date
-    ) {
-      const backfillStarted = Date.now();
-      const result = await runGoogleHealthSleepBackfillStep({
-        userId: env.allowedUserId,
-        accessToken,
-        fallbackTimeZone,
-      });
-      backfill = {
-        completed: result.completed,
-        window: result.window,
-        duration_ms: Date.now() - backfillStarted,
-      };
-    }
+        let backfill = null;
+        const state = await getGoogleHealthBackfillState(env.allowedUserId);
+        if (
+          state?.backfill_started_at
+          && !state.backfill_completed_at
+          && state.backfill_target_start_date
+          && state.backfill_cursor_end_date
+        ) {
+          const backfillStarted = Date.now();
+          const backfillResult = await runGoogleHealthSleepBackfillStep({
+            userId: env.allowedUserId,
+            accessToken,
+            fallbackTimeZone,
+          });
+          backfill = {
+            completed: backfillResult.completed,
+            window: backfillResult.window,
+            duration_ms: Date.now() - backfillStarted,
+          };
+        }
+
+        return { recent, recentMs, backfill };
+      },
+    );
 
     console.info("[sleep-sync] morning", {
-      recent_ms: recentMs,
+      recent_ms: result.recentMs,
       total_ms: Date.now() - started,
-      backfill_ran: Boolean(backfill),
+      backfill_ran: Boolean(result.backfill),
     });
 
-    return NextResponse.json({ ok: true, recent, backfill });
+    return NextResponse.json({
+      ok: true,
+      recent: result.recent,
+      backfill: result.backfill,
+    });
   } catch {
     console.error("[sleep-sync] morning failed", {
       total_ms: Date.now() - started,
