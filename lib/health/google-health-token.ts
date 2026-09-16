@@ -5,6 +5,7 @@ import {
   markGoogleHealthReauthorizationRequired,
   saveGoogleHealthCredentials,
 } from "@/lib/health/provider-credentials";
+import { recordGoogleHealthSyncFailure } from "@/lib/health/sleep-repository";
 
 const REFRESH_WINDOW_MS = 60_000;
 
@@ -12,6 +13,20 @@ export class GoogleHealthReauthorizationRequiredError extends Error {
   constructor() {
     super("Google Health reauthorization is required");
   }
+}
+
+function oauthRefreshErrorCode(error: unknown) {
+  if (!error || typeof error !== "object") return null;
+  const response = (error as { response?: unknown }).response;
+  if (response && typeof response === "object") {
+    const data = (response as { data?: unknown }).data;
+    if (data && typeof data === "object") {
+      const code = (data as { error?: unknown }).error;
+      if (typeof code === "string") return code;
+    }
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
 }
 
 export async function getGoogleHealthAccessToken(
@@ -58,9 +73,18 @@ export async function getGoogleHealthAccessToken(
         : null,
     });
     return accessToken;
-  } catch {
-    await markGoogleHealthReauthorizationRequired(userId).catch(() => undefined);
-    throw new GoogleHealthReauthorizationRequiredError();
+  } catch (error) {
+    const code = oauthRefreshErrorCode(error);
+    if (code === "invalid_grant") {
+      await markGoogleHealthReauthorizationRequired(userId).catch(() => undefined);
+      throw new GoogleHealthReauthorizationRequiredError();
+    }
+
+    await recordGoogleHealthSyncFailure(
+      userId,
+      code ? `TOKEN_REFRESH_${code.toUpperCase().slice(0, 96)}` : "TOKEN_REFRESH_FAILED",
+    ).catch(() => undefined);
+    throw error;
   }
 }
 
