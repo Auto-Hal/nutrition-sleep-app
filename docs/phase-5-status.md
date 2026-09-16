@@ -91,3 +91,23 @@ Implemented on the Phase 5 branch:
 - cursor advancement uses an expected-current-cursor condition to detect concurrent workers.
 
 No scheduler or real provider token is required for these planning/progress tests.
+
+
+## Google OAuth server flow
+
+Implemented on the Phase 5 branch:
+- official `google-auth-library` dependency;
+- Authorization Code flow with `access_type=offline`;
+- explicit `prompt=consent` for connect/re-auth so a refresh token can be issued;
+- only `googlehealth.sleep.readonly` is requested and verified before credential persistence;
+- OAuth state is random, HttpOnly-cookie backed, HMAC-protected and bound to the current app session hash;
+- callback state is single-use and expires after 10 minutes;
+- provider access/refresh tokens never enter browser JavaScript or response payloads;
+- Google Health `users/me/identity` is captured before the connection becomes active;
+- connection metadata + encrypted credentials are persisted transactionally;
+- refresh-token based access-token renewal is server-only;
+- local disconnect deletes credentials even if remote token revocation is unavailable;
+- manual recent-3-day sync endpoint is available;
+- Sleep UI exposes connect / re-auth / manual sync / disconnect only when OAuth environment is fully configured.
+
+Preview Google Cloud Client ID / Secret / redirect URI / provider token encryption key remain external configuration prerequisites. Production is unchanged.
