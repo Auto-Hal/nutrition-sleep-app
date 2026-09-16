@@ -23,7 +23,7 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | IN PROGRESS | Sleep domain and Google Health integration (CR-001 approved) |
+| Phase 5 | IN PROGRESS / PREVIEW OAUTH CONFIG GATE | Sleep domain and Google Health integration (CR-001 approved) |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
@@ -177,3 +177,19 @@ If the product later becomes native/hybrid iOS:
 ### Body measurement history
 
 Profile currently stores reference weight, not a measurement history. BodyMeasurement/trend support is outside the current MVP roadmap unless explicitly promoted.
+
+
+## Phase 5 current external gate — Preview OAuth
+
+Code-side provider, sync, analytics, retry/recovery, and Preview-schema work is implemented and verified through the Vercel gated build plus Preview pgTAP.
+
+The next acceptance step requires external Preview configuration:
+- dedicated Google Cloud Preview project with Google Health API enabled;
+- Google OAuth Web client using the stable Phase 5 Preview callback;
+- Preview Vercel values for Google client ID/secret, exact redirect URI, and provider token encryption key.
+
+Exact setup is documented in `docs/phase-5-preview-oauth-setup.md`.
+
+The current ChatGPT connectors can inspect/deploy Vercel and manage GitHub/Supabase, but do not expose Google Cloud OAuth-client creation or Vercel environment-variable write actions. Therefore this is an external configuration gate rather than an application-code blocker.
+
+Production remains untouched.
