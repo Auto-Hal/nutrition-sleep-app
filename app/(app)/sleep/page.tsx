@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
+import { SleepStaleSync } from "@/components/sleep-stale-sync";
 import {
   getGoogleHealthConnectionSummary,
   getSleepAnalytics,
@@ -69,6 +70,10 @@ export default async function SleepPage({
 
   return (
     <main className="app-main">
+      <SleepStaleSync
+        enabled={oauthConfigured && connection?.status === "connected"}
+        lastSuccessfulSyncAt={connection?.last_successful_sync_at ?? null}
+      />
       <header className="topbar">
         <div>
           <p className="eyebrow">Sleep</p>
