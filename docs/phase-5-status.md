@@ -152,3 +152,26 @@ CR-001 re-review corrections now implemented:
 - only permanent refresh-token `invalid_grant` transitions to `reauth_required`;
 - transient refresh failures stay retryable and are recorded as sync errors;
 - `MISSING_OAUTH_SCOPE` is classified as reauthorization-required without broadening scopes.
+
+
+## Initial-history recovery
+
+The first-connect path is now recoverable if the initial 14-day provider request is interrupted after OAuth credentials have already been stored:
+- manual and morning catch-up inspect persisted initial-sync/backfill state;
+- if initial recent sync or the 90-day backfill cursor is not initialized, the 14-day fast path is retried first;
+- after successful initialization, one bounded 14-day historical backfill chunk is advanced;
+- an already initialized connection uses the normal recent 3-day correction window and advances at most one backfill chunk;
+- a completed 90-day backfill performs only the normal 3-day correction sync;
+- the total window remains exactly 90 civil days: recent 14 days plus the preceding 76 days;
+- recovery behavior is covered by orchestration unit-contract tests.
+
+Latest verified functional Preview build:
+- head `1bdb6e0678b66b55ee4de4c9c1d67348537eebf0`;
+- Vercel deployment `dpl_BCU5oMxgfNTD6vtmFFn5vvYUP227`;
+- URL `https://nutrition-sleep-masx60sb5-tsuno2.vercel.app`;
+- READY;
+- Next production compilation and type validation passed;
+- `/login` returned HTTP 200;
+- recent error/fatal runtime scan returned no entries.
+
+GitHub Actions remains externally blocked before runner startup. A rerun was attempted and again returned jobs with no steps/logs, so latest-head unit/fresh-DB/pgTAP execution remains a formal pending gate rather than an observed test failure.
