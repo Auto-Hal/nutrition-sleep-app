@@ -127,3 +127,28 @@ Implemented on the Phase 5 branch:
 - logs contain timing/status only, not OAuth token material or raw sleep payloads.
 
 The cron will not be considered operational until `CRON_SECRET` and Google Health Preview credentials are configured. Production remains unchanged.
+
+
+## Preview fixture acceptance
+
+Completed on Preview Supabase only:
+- inserted one synthetic STAGES night and one synthetic CLASSIC night with unique fixture resource names;
+- verified 2 sleep sessions, 4 STAGES intervals and 1 separate out-of-bed segment;
+- verified the CLASSIC fixture had 0 stage intervals and remained distinct from zero-minute stage data;
+- verified civil sleep dates and duration fields persisted as expected;
+- deleted the fixture sessions immediately after verification;
+- verified cascade cleanup left 0 fixture sessions, stages and out-of-bed segments.
+
+No synthetic Sleep data remains in Preview. Production was untouched.
+
+## OAuth / retry contract hardening
+
+CR-001 re-review corrections now implemented:
+- normal first authorization uses offline access without forcing `prompt=consent`;
+- explicit consent is requested only for reauthorization, reconnect after disconnect, missing-scope recovery, or refresh-token reissuance;
+- callback recovery states for missing code/token/refresh token are surfaced in Sleep UI;
+- HTTP 429/504 use bounded exponential backoff with jitter;
+- an API 401 triggers one forced refresh-token exchange and one API retry;
+- only permanent refresh-token `invalid_grant` transitions to `reauth_required`;
+- transient refresh failures stay retryable and are recorded as sync errors;
+- `MISSING_OAUTH_SCOPE` is classified as reauthorization-required without broadening scopes.
