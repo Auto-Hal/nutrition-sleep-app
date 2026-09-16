@@ -62,20 +62,69 @@ describe("Google Health reconcile client", () => {
     expect((fetchMock.mock.calls[1][0] as URL).searchParams.get("pageToken")).toBe("next-token");
   });
 
-  it("does not silently broaden provider errors into empty sleep", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
-      error: { details: [{ reason: "MISSING_OAUTH_SCOPE" }] },
-    }, 403));
+  it.each([429, 504])("retries HTTP %s with exponential backoff and jitter", async (status) => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ error: {} }, status))
+      .mockResolvedValueOnce(jsonResponse({ error: {} }, status))
+      .mockResolvedValueOnce(jsonResponse({
+        dataPoints: [{ dataPointName: "recovered" }],
+        nextPageToken: "",
+      }));
+    const sleepMock = vi.fn().mockResolvedValue(undefined);
+
+    const rows = await fetchReconciledSleep({
+      accessToken: "token",
+      startDate: "2026-09-13",
+      endDateExclusive: "2026-09-17",
+      fetchImpl: fetchMock,
+      sleepImpl: sleepMock,
+      randomImpl: () => 0.5,
+    });
+
+    expect(rows.map((row) => row.dataPointName)).toEqual(["recovered"]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sleepMock.mock.calls.map(([delay]) => delay)).toEqual([500, 1000]);
+  });
+
+  it("stops retrying a retryable provider error at the configured bound", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: {} }, 429));
+    const sleepMock = vi.fn().mockResolvedValue(undefined);
 
     await expect(fetchReconciledSleep({
       accessToken: "token",
       startDate: "2026-09-13",
       endDateExclusive: "2026-09-17",
       fetchImpl: fetchMock,
+      maxRetries: 2,
+      sleepImpl: sleepMock,
+      randomImpl: () => 0.5,
+    })).rejects.toMatchObject({
+      status: 429,
+    } satisfies Partial<GoogleHealthApiError>);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sleepMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry authorization or missing-scope errors", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      error: { details: [{ reason: "MISSING_OAUTH_SCOPE" }] },
+    }, 403));
+    const sleepMock = vi.fn().mockResolvedValue(undefined);
+
+    await expect(fetchReconciledSleep({
+      accessToken: "token",
+      startDate: "2026-09-13",
+      endDateExclusive: "2026-09-17",
+      fetchImpl: fetchMock,
+      sleepImpl: sleepMock,
     })).rejects.toMatchObject({
       status: 403,
       reason: "MISSING_OAUTH_SCOPE",
     } satisfies Partial<GoogleHealthApiError>);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleepMock).not.toHaveBeenCalled();
   });
 
   it("rejects invalid sync dates before issuing a request", async () => {
