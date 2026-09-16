@@ -140,6 +140,18 @@ export default async function SleepPage({
           {params.google === "oauth_error" && (
             <p className="notice warning">Google Health接続を完了できませんでした。再試行してください。</p>
           )}
+          {params.google === "config_required" && (
+            <p className="notice warning">Google Health OAuth設定が揃っていません。</p>
+          )}
+          {params.google === "code_error" && (
+            <p className="notice warning">Googleから認証コードを受け取れませんでした。接続をやり直してください。</p>
+          )}
+          {params.google === "token_error" && (
+            <p className="notice warning">Googleのアクセストークンを取得できませんでした。接続をやり直してください。</p>
+          )}
+          {params.google === "refresh_token_error" && (
+            <p className="notice warning">継続同期に必要な更新トークンが発行されませんでした。再同意して接続してください。</p>
+          )}
           {params.google === "disconnected" && (
             <p className="notice">Google Healthとの接続を解除しました。</p>
           )}
@@ -164,11 +176,21 @@ export default async function SleepPage({
               </form>
             </div>
           ) : (
-            <form method="post" action="/api/health/google/connect">
+            <form
+              method="post"
+              action={
+                params.google === "refresh_token_error" || params.google === "scope_error"
+                  ? "/api/health/google/connect?force=consent"
+                  : "/api/health/google/connect"
+              }
+            >
               <button className="button" type="submit">
-                {connection?.status === "reauth_required" || connection?.status === "error"
-                  ? "Google Healthを再認証"
-                  : "Google Healthを接続"}
+                {connection?.status === "reauth_required"
+                  || connection?.status === "error"
+                  || params.google === "refresh_token_error"
+                  || params.google === "scope_error"
+                    ? "Google Healthを再認証"
+                    : "Google Healthを接続"}
               </button>
             </form>
           )}
