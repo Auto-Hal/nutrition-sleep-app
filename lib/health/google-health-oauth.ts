@@ -76,12 +76,15 @@ export function createGoogleHealthOAuthClient() {
   });
 }
 
-export function buildGoogleHealthAuthorizeUrl(state: string) {
+export function buildGoogleHealthAuthorizeUrl(
+  state: string,
+  options: { promptConsent?: boolean } = {},
+) {
   return createGoogleHealthOAuthClient().generateAuthUrl({
     access_type: "offline",
-    prompt: "consent",
     scope: [GOOGLE_HEALTH_SLEEP_SCOPE],
     state,
+    ...(options.promptConsent ? { prompt: "consent" } : {}),
   });
 }
 
