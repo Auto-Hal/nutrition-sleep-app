@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
+import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
 import {
   getGoogleHealthConnectionSummary,
   getSleepAnalytics,
@@ -51,13 +52,14 @@ function connectionLabel(status: string | undefined) {
 export default async function SleepPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; google?: string; sync?: string }>;
 }) {
   const session = await getAppSessionForRsc();
   if (!session) redirect("/login");
 
   const params = await searchParams;
   const range = parseRange(params.range);
+  const oauthConfigured = googleHealthOAuthConfigured();
   const profile = await getProfile(session.accessToken);
   const timeZone = profile?.time_zone ?? "Asia/Tokyo";
   const [analytics, connection] = await Promise.all([
@@ -91,6 +93,82 @@ export default async function SleepPage({
       </nav>
 
       <div className="stack">
+        <section className="card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Provider</p>
+              <h2>Google Health</h2>
+            </div>
+            <span className={`pill ${connection?.status === "connected" ? "" : "pending"}`}>
+              {connectionLabel(connection?.status)}
+            </span>
+          </div>
+
+          {connection?.last_successful_sync_at && (
+            <p className="muted nutrition-caption">
+              最終同期 {new Intl.DateTimeFormat("ja-JP", {
+                timeZone,
+                dateStyle: "medium",
+                timeStyle: "short",
+              }).format(new Date(connection.last_successful_sync_at))}
+            </p>
+          )}
+          {connection?.last_sync_error_code && (
+            <p className="error-text">同期状態: {connection.last_sync_error_code}</p>
+          )}
+
+          {params.google === "connected" && (
+            <p className="notice">Google Healthを接続し、初回の睡眠同期を完了しました。</p>
+          )}
+          {params.google === "connected_sync_error" && (
+            <p className="notice warning">接続は完了しましたが、初回同期は完了していません。手動同期を再試行できます。</p>
+          )}
+          {params.google === "denied" && (
+            <p className="notice warning">Google Healthへのアクセス許可は完了しませんでした。</p>
+          )}
+          {params.google === "scope_error" && (
+            <p className="notice warning">睡眠の読み取り権限が確認できませんでした。再認証してください。</p>
+          )}
+          {params.google === "state_error" && (
+            <p className="notice warning">OAuth確認情報が一致しませんでした。接続を最初からやり直してください。</p>
+          )}
+          {params.google === "oauth_error" && (
+            <p className="notice warning">Google Health接続を完了できませんでした。再試行してください。</p>
+          )}
+          {params.google === "disconnected" && (
+            <p className="notice">Google Healthとの接続を解除しました。</p>
+          )}
+          {params.sync === "ok" && (
+            <p className="notice">直近3日を再同期しました。</p>
+          )}
+          {params.sync === "error" && (
+            <p className="notice warning">睡眠データを同期できませんでした。再認証が必要な場合があります。</p>
+          )}
+
+          {!oauthConfigured ? (
+            <div className="empty-state">
+              Preview用のGoogle Health OAuth設定待ちです。Client ID / Secret / Redirect URI / provider暗号鍵が揃うまで接続は開始しません。
+            </div>
+          ) : connection?.status === "connected" ? (
+            <div className="form-actions">
+              <form method="post" action="/api/health/google/sync">
+                <button className="button secondary" type="submit">直近3日を同期</button>
+              </form>
+              <form method="post" action="/api/health/google/disconnect">
+                <button className="button ghost" type="submit">接続を解除</button>
+              </form>
+            </div>
+          ) : (
+            <form method="post" action="/api/health/google/connect">
+              <button className="button" type="submit">
+                {connection?.status === "reauth_required" || connection?.status === "error"
+                  ? "Google Healthを再認証"
+                  : "Google Healthを接続"}
+              </button>
+            </form>
+          )}
+        </section>
+
         <section className="card">
           <div className="section-heading">
             <div>
