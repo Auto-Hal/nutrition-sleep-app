@@ -6,13 +6,7 @@ import {
   googleHealthOAuthConfigured,
 } from "@/lib/health/google-health-oauth";
 import { withGoogleHealthAccessTokenRetry } from "@/lib/health/google-health-token";
-import {
-  getGoogleHealthBackfillState,
-} from "@/lib/health/sleep-backfill-progress";
-import {
-  runGoogleHealthSleepBackfillStep,
-  syncRecentGoogleHealthSleep,
-} from "@/lib/health/sleep-sync-orchestrator";
+import { syncGoogleHealthSleepCatchUp } from "@/lib/health/sleep-sync-orchestrator";
 import { requiredServerEnv } from "@/lib/env";
 
 function authorized(request: Request) {
@@ -47,52 +41,31 @@ export async function GET(request: Request) {
   try {
     const fallbackTimeZone = await syncTimeZone(env.allowedUserId);
 
+    const syncStarted = Date.now();
     const result = await withGoogleHealthAccessTokenRetry(
       env.allowedUserId,
-      async (accessToken) => {
-        const recentStarted = Date.now();
-        const recent = await syncRecentGoogleHealthSleep({
-          userId: env.allowedUserId,
-          accessToken,
-          fallbackTimeZone,
-        });
-        const recentMs = Date.now() - recentStarted;
-
-        let backfill = null;
-        const state = await getGoogleHealthBackfillState(env.allowedUserId);
-        if (
-          state?.backfill_started_at
-          && !state.backfill_completed_at
-          && state.backfill_target_start_date
-          && state.backfill_cursor_end_date
-        ) {
-          const backfillStarted = Date.now();
-          const backfillResult = await runGoogleHealthSleepBackfillStep({
-            userId: env.allowedUserId,
-            accessToken,
-            fallbackTimeZone,
-          });
-          backfill = {
-            completed: backfillResult.completed,
-            window: backfillResult.window,
-            duration_ms: Date.now() - backfillStarted,
-          };
-        }
-
-        return { recent, recentMs, backfill };
-      },
+      (accessToken) => syncGoogleHealthSleepCatchUp({
+        userId: env.allowedUserId,
+        accessToken,
+        fallbackTimeZone,
+      }),
     );
+    const syncMs = Date.now() - syncStarted;
 
     console.info("[sleep-sync] morning", {
-      recent_ms: result.recentMs,
+      sync_ms: syncMs,
       total_ms: Date.now() - started,
+      initialized: result.initialized,
       backfill_ran: Boolean(result.backfill),
     });
 
     return NextResponse.json({
       ok: true,
+      initialized: result.initialized,
       recent: result.recent,
-      backfill: result.backfill,
+      backfill: result.backfill
+        ? { completed: result.backfill.completed, window: result.backfill.window }
+        : null,
     });
   } catch {
     console.error("[sleep-sync] morning failed", {
