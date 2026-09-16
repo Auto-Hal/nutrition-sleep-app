@@ -3,13 +3,7 @@ import { NextResponse } from "next/server";
 import { getAppSession } from "@/lib/auth/session";
 import { getProfile } from "@/lib/profile";
 import { withGoogleHealthAccessTokenRetry } from "@/lib/health/google-health-token";
-import {
-  getGoogleHealthBackfillState,
-} from "@/lib/health/sleep-backfill-progress";
-import {
-  runGoogleHealthSleepBackfillStep,
-  syncRecentGoogleHealthSleep,
-} from "@/lib/health/sleep-sync-orchestrator";
+import { syncGoogleHealthSleepCatchUp } from "@/lib/health/sleep-sync-orchestrator";
 import { isAllowedOrigin } from "@/lib/security/request";
 
 function wantsJson(request: Request) {
@@ -34,35 +28,17 @@ export async function POST(request: Request) {
 
     const result = await withGoogleHealthAccessTokenRetry(
       session.userId,
-      async (accessToken) => {
-        const recent = await syncRecentGoogleHealthSleep({
-          userId: session.userId,
-          accessToken,
-          fallbackTimeZone,
-        });
-
-        let backfill = null;
-        const state = await getGoogleHealthBackfillState(session.userId);
-        if (
-          state?.backfill_started_at
-          && !state.backfill_completed_at
-          && state.backfill_target_start_date
-          && state.backfill_cursor_end_date
-        ) {
-          backfill = await runGoogleHealthSleepBackfillStep({
-            userId: session.userId,
-            accessToken,
-            fallbackTimeZone,
-          });
-        }
-
-        return { recent, backfill };
-      },
+      (accessToken) => syncGoogleHealthSleepCatchUp({
+        userId: session.userId,
+        accessToken,
+        fallbackTimeZone,
+      }),
     );
 
     if (wantsJson(request)) {
       return NextResponse.json({
         ok: true,
+        initialized: result.initialized,
         recent: result.recent,
         backfill: result.backfill
           ? { completed: result.backfill.completed, window: result.backfill.window }
