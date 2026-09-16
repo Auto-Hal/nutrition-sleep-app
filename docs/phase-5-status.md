@@ -111,3 +111,19 @@ Implemented on the Phase 5 branch:
 - Sleep UI exposes connect / re-auth / manual sync / disconnect only when OAuth environment is fully configured.
 
 Preview Google Cloud Client ID / Secret / redirect URI / provider token encryption key remain external configuration prerequisites. Production is unchanged.
+
+
+## Automatic synchronization entry points
+
+Implemented on the Phase 5 branch:
+- manual sync refreshes the recent 3-day reconciliation window;
+- when a 90-day backfill is active, one bounded 14-day backfill step is also advanced after a successful recent sync;
+- Sleep stale-on-open refresh runs only for a connected provider when the last successful sync is older than 6 hours;
+- browser stale refresh calls only the same-origin app endpoint and never receives provider tokens;
+- stale attempts are session-throttled for 30 minutes to avoid repeated provider traffic on failure;
+- Vercel morning cron calls a server-only endpoint once per day at 22:30 UTC / 07:30 JST;
+- the cron endpoint requires `Authorization: Bearer $CRON_SECRET`;
+- `CRON_SECRET` and provider secrets are rejected if exposed via `NEXT_PUBLIC_*`;
+- logs contain timing/status only, not OAuth token material or raw sleep payloads.
+
+The cron will not be considered operational until `CRON_SECRET` and Google Health Preview credentials are configured. Production remains unchanged.
