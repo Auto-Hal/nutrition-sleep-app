@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { requiredServerEnv } from "@/lib/env";
 
 type BackfillRow = {
+  initial_recent_sync_completed_at: string | null;
   backfill_target_start_date: string | null;
   backfill_cursor_end_date: string | null;
   backfill_started_at: string | null;
@@ -40,14 +41,16 @@ export async function initializeGoogleHealthBackfill(
         and provider = 'google_health'
         and backfill_target_start_date is null
         and backfill_cursor_end_date is null
-      returning backfill_target_start_date, backfill_cursor_end_date,
+      returning initial_recent_sync_completed_at,
+                backfill_target_start_date, backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, targetStartDate, cursorEndDate],
   );
   if (initialized.rows[0]) return initialized.rows[0];
 
   const existing = await query<BackfillRow>(
-    `select backfill_target_start_date, backfill_cursor_end_date,
+    `select initial_recent_sync_completed_at,
+            backfill_target_start_date, backfill_cursor_end_date,
             backfill_started_at, backfill_completed_at
        from public.health_provider_connections
       where user_id = $1 and provider = 'google_health'`,
@@ -68,7 +71,8 @@ export async function initializeGoogleHealthBackfill(
 export async function getGoogleHealthBackfillState(userId: string) {
   assertAllowedUser(userId);
   const result = await query<BackfillRow>(
-    `select backfill_target_start_date, backfill_cursor_end_date,
+    `select initial_recent_sync_completed_at,
+            backfill_target_start_date, backfill_cursor_end_date,
             backfill_started_at, backfill_completed_at
        from public.health_provider_connections
       where user_id = $1 and provider = 'google_health'`,
@@ -96,7 +100,8 @@ export async function advanceGoogleHealthBackfill(
         and backfill_target_start_date = $4::date
         and backfill_cursor_end_date = $2::date
         and backfill_completed_at is null
-      returning backfill_target_start_date, backfill_cursor_end_date,
+      returning initial_recent_sync_completed_at,
+                backfill_target_start_date, backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, expectedCursorEndDate, newCursorEndDate, targetStartDate],
   );
