@@ -175,3 +175,30 @@ Latest verified functional Preview build:
 - recent error/fatal runtime scan returned no entries.
 
 GitHub Actions remains externally blocked before runner startup. A rerun was attempted and again returned jobs with no steps/logs, so latest-head unit/fresh-DB/pgTAP execution remains a formal pending gate rather than an observed test failure.
+
+
+## Compensating Preview verification while GitHub Actions runners are unavailable
+
+GitHub Actions continues to fail before a runner starts, so no workflow steps or job logs are produced. To keep the code-quality gate active without weakening acceptance:
+
+- Vercel now uses the official `vercel-build` script;
+- every Vercel deployment runs `pnpm lint && pnpm test && pnpm build`;
+- the first gated deployment correctly found one stale automation-contract assertion;
+- after correcting that test, latest head `0a2aa82313ef36866b1a18d1e57ee3b26bed979c` passed:
+  - ESLint: 0 errors (1 pre-existing image optimization warning);
+  - Vitest: 30 files PASS / 157 tests PASS;
+  - Next production compilation PASS;
+  - Next type validation PASS;
+  - Vercel Preview READY;
+  - deployment `dpl_HyKvgCiTL4vbTbvdkvxmZpqVpbKg`;
+  - URL `https://nutrition-sleep-hers7z0yd-tsuno2.vercel.app`;
+  - runtime region `hnd1` (Tokyo);
+  - `/login` HTTP 200;
+  - recent error/fatal runtime scan: 0.
+
+Preview pgTAP was also executed manually:
+- pgtap 1.3.3 was enabled temporarily in the Preview database;
+- all 56 Phase 5 pgTAP assertions completed with no failure diagnostics;
+- the temporary pgtap extension was removed afterward.
+
+This compensates for application/unit and current Preview-schema regression checks, but does **not** replace the formal fresh-from-zero migration replay gate. Fresh replay remains mandatory once GitHub Actions runners execute normally.
