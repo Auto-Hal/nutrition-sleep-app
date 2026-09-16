@@ -71,7 +71,7 @@ export default async function SleepPage({
   return (
     <main className="app-main">
       <SleepStaleSync
-        enabled={oauthConfigured && connection?.status === "connected"}
+        enabled={oauthConfigured && (connection?.status === "connected" || connection?.status === "error")}
         lastSuccessfulSyncAt={connection?.last_successful_sync_at ?? null}
       />
       <header className="topbar">
@@ -166,7 +166,7 @@ export default async function SleepPage({
             <div className="empty-state">
               Preview用のGoogle Health OAuth設定待ちです。Client ID / Secret / Redirect URI / provider暗号鍵が揃うまで接続は開始しません。
             </div>
-          ) : connection?.status === "connected" ? (
+          ) : connection?.status === "connected" || connection?.status === "error" ? (
             <div className="form-actions">
               <form method="post" action="/api/health/google/sync">
                 <button className="button secondary" type="submit">直近3日を同期</button>
@@ -186,7 +186,6 @@ export default async function SleepPage({
             >
               <button className="button" type="submit">
                 {connection?.status === "reauth_required"
-                  || connection?.status === "error"
                   || params.google === "refresh_token_error"
                   || params.google === "scope_error"
                     ? "Google Healthを再認証"
