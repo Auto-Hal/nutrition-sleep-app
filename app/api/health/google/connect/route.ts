@@ -28,7 +28,6 @@ export async function POST(request: Request) {
   const promptConsent =
     requestedForceConsent
     || connection?.status === "reauth_required"
-    || connection?.status === "error"
     || connection?.status === "disconnected";
 
   const state = createGoogleHealthOAuthState(session.sessionHash);
