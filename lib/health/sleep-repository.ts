@@ -213,7 +213,10 @@ export async function recordGoogleHealthSyncFailure(userId: string, errorCode: s
     `update public.health_provider_connections
         set last_sync_attempt_at = now(),
             last_sync_error_code = left($2, 128),
-            status = case when $2 = 'REAUTH_REQUIRED' then 'reauth_required' else 'error' end
+            status = case
+              when $2 in ('REAUTH_REQUIRED', 'MISSING_OAUTH_SCOPE') then 'reauth_required'
+              else 'error'
+            end
       where user_id = $1 and provider = 'google_health'`,
     [userId, errorCode],
   );
