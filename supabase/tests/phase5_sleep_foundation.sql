@@ -13,7 +13,19 @@ select has_column('public', 'health_provider_connections', 'backfill_target_star
 select has_column('public', 'health_provider_connections', 'backfill_cursor_end_date', 'backfill cursor exists');
 select has_column('public', 'health_provider_connections', 'backfill_started_at', 'backfill start timestamp exists');
 select has_column('public', 'health_provider_connections', 'backfill_completed_at', 'backfill completion timestamp exists');
-select has_check('public', 'health_provider_connections', 'health_provider_connections_backfill_cursor_check', 'backfill cursor ordering is constrained');
+select ok(
+  exists (
+    select 1
+      from pg_constraint c
+      join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+     where n.nspname = 'public'
+       and t.relname = 'health_provider_connections'
+       and c.conname = 'health_provider_connections_backfill_cursor_check'
+       and c.contype = 'c'
+  ),
+  'backfill cursor ordering is constrained'
+);
 select has_column('private', 'health_provider_credentials', 'refresh_token_ciphertext', 'refresh token ciphertext exists');
 select has_column('private', 'health_provider_credentials', 'key_version', 'credential key version exists');
 select has_column('public', 'sleep_sessions', 'provider_payload_hash', 'provider payload hash exists');
