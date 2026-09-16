@@ -9,6 +9,7 @@ import {
   googleHealthStateCookieOptions,
 } from "@/lib/health/google-health-oauth";
 import { isAllowedOrigin } from "@/lib/security/request";
+import { getGoogleHealthConnectionSummary } from "@/lib/sleep/analytics";
 
 export async function POST(request: Request) {
   if (!isAllowedOrigin(request)) {
@@ -21,8 +22,20 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL("/sleep?google=config_required", request.url), 303);
   }
 
+  const connection = await getGoogleHealthConnectionSummary(session.accessToken);
+  const requestedForceConsent =
+    new URL(request.url).searchParams.get("force") === "consent";
+  const promptConsent =
+    requestedForceConsent
+    || connection?.status === "reauth_required"
+    || connection?.status === "error"
+    || connection?.status === "disconnected";
+
   const state = createGoogleHealthOAuthState(session.sessionHash);
-  const response = NextResponse.redirect(buildGoogleHealthAuthorizeUrl(state.state), 303);
+  const response = NextResponse.redirect(
+    buildGoogleHealthAuthorizeUrl(state.state, { promptConsent }),
+    303,
+  );
   response.cookies.set(
     GOOGLE_HEALTH_STATE_COOKIE,
     state.cookieValue,
