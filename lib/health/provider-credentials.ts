@@ -111,7 +111,12 @@ export async function connectGoogleHealthAccount(
              granted_scopes = excluded.granted_scopes,
              connected_at = now(),
              disconnected_at = null,
-             last_sync_error_code = null`,
+             last_sync_error_code = null,
+             initial_recent_sync_completed_at = null,
+             backfill_target_start_date = null,
+             backfill_cursor_end_date = null,
+             backfill_started_at = null,
+             backfill_completed_at = null`,
       [
         userId,
         GOOGLE_HEALTH_PROVIDER,
