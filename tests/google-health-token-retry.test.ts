@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     loadGoogleHealthCredentials: vi.fn(),
     markGoogleHealthReauthorizationRequired: vi.fn(),
     saveGoogleHealthCredentials: vi.fn(),
+    recordGoogleHealthSyncFailure: vi.fn(),
   };
 });
 
@@ -30,8 +31,13 @@ vi.mock("@/lib/health/provider-credentials", () => ({
   saveGoogleHealthCredentials: mocks.saveGoogleHealthCredentials,
 }));
 
+vi.mock("@/lib/health/sleep-repository", () => ({
+  recordGoogleHealthSyncFailure: mocks.recordGoogleHealthSyncFailure,
+}));
+
 import { GoogleHealthApiError } from "@/lib/health/google-health-client";
 import {
+  getGoogleHealthAccessToken,
   GoogleHealthReauthorizationRequiredError,
   withGoogleHealthAccessTokenRetry,
 } from "@/lib/health/google-health-token";
@@ -53,6 +59,7 @@ describe("Google Health token retry", () => {
     });
     mocks.markGoogleHealthReauthorizationRequired.mockResolvedValue(undefined);
     mocks.saveGoogleHealthCredentials.mockResolvedValue(undefined);
+    mocks.recordGoogleHealthSyncFailure.mockResolvedValue(undefined);
   });
 
   it("uses the cached access token without refreshing when the provider accepts it", async () => {
@@ -122,6 +129,44 @@ describe("Google Health token retry", () => {
     expect(operation).toHaveBeenCalledTimes(2);
     expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledTimes(1);
     expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it("marks reauthorization only when the refresh token is permanently invalid", async () => {
+    mocks.loadGoogleHealthCredentials.mockResolvedValue({
+      refreshToken: "revoked-refresh-token",
+      accessToken: "expired-access-token",
+      accessTokenExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      revision: 1,
+    });
+    mocks.oauthClient.getAccessToken.mockRejectedValue({
+      response: { data: { error: "invalid_grant" } },
+    });
+
+    await expect(
+      getGoogleHealthAccessToken(USER_ID),
+    ).rejects.toBeInstanceOf(GoogleHealthReauthorizationRequiredError);
+
+    expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledWith(USER_ID);
+    expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
+  });
+
+  it("keeps transient refresh failures retryable instead of forcing reauthorization", async () => {
+    mocks.loadGoogleHealthCredentials.mockResolvedValue({
+      refreshToken: "refresh-token",
+      accessToken: "expired-access-token",
+      accessTokenExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      revision: 1,
+    });
+    const transient = new Error("temporary network failure");
+    mocks.oauthClient.getAccessToken.mockRejectedValue(transient);
+
+    await expect(getGoogleHealthAccessToken(USER_ID)).rejects.toBe(transient);
+
+    expect(mocks.markGoogleHealthReauthorizationRequired).not.toHaveBeenCalled();
+    expect(mocks.recordGoogleHealthSyncFailure).toHaveBeenCalledWith(
+      USER_ID,
+      "TOKEN_REFRESH_FAILED",
+    );
   });
 
   it("does not refresh for non-401 provider failures", async () => {
