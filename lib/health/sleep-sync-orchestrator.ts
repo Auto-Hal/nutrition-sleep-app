@@ -106,3 +106,41 @@ export async function runGoogleHealthSleepBackfillStep(options: SyncContext) {
     state: nextState,
   };
 }
+
+
+export async function syncGoogleHealthSleepCatchUp(options: SyncContext) {
+  const current = await getGoogleHealthBackfillState(options.userId);
+  const needsInitialization =
+    !current?.initial_recent_sync_completed_at
+    || !current.backfill_target_start_date
+    || !current.backfill_cursor_end_date
+    || !current.backfill_started_at;
+
+  let recentResult;
+  let initialized = false;
+
+  if (needsInitialization) {
+    const initial = await initializeGoogleHealthSleepHistory(options);
+    recentResult = initial.syncResult;
+    initialized = true;
+  } else {
+    recentResult = await syncRecentGoogleHealthSleep(options);
+  }
+
+  const state = await getGoogleHealthBackfillState(options.userId);
+  let backfill = null;
+  if (
+    state?.backfill_started_at
+    && !state.backfill_completed_at
+    && state.backfill_target_start_date
+    && state.backfill_cursor_end_date
+  ) {
+    backfill = await runGoogleHealthSleepBackfillStep(options);
+  }
+
+  return {
+    initialized,
+    recent: recentResult,
+    backfill,
+  };
+}
