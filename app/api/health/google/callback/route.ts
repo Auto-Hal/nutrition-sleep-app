@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 
 import { getAppSession } from "@/lib/auth/session";
 import { getProfile } from "@/lib/profile";
-import { fetchGoogleHealthIdentity } from "@/lib/health/google-health-identity";
+import {
+  fetchGoogleHealthIdentity,
+  GoogleHealthIdentityError,
+} from "@/lib/health/google-health-identity";
 import {
   accessTokenExpiryIso,
   exchangeGoogleHealthAuthorizationCode,
@@ -48,21 +51,28 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   if (!code) return redirect(request, "code_error");
 
+  let stage = "exchange_code";
+
   try {
     const { client, tokens } = await exchangeGoogleHealthAuthorizationCode(code);
     const accessToken = tokens.access_token;
     if (!accessToken) return redirect(request, "token_error");
 
+    stage = "token_info";
     const tokenInfo = await client.getTokenInfo(accessToken);
     if (!hasRequiredGoogleHealthScope(tokenInfo.scopes)) {
       return redirect(request, "scope_error");
     }
 
+    stage = "load_credentials";
     const existing = await loadGoogleHealthCredentials(session.userId);
     const refreshToken = tokens.refresh_token ?? existing?.refreshToken ?? null;
     if (!refreshToken) return redirect(request, "refresh_token_error");
 
+    stage = "identity";
     const identity = await fetchGoogleHealthIdentity(accessToken);
+
+    stage = "persist_connection";
     await connectGoogleHealthAccount(
       session.userId,
       {
@@ -77,6 +87,7 @@ export async function GET(request: Request) {
       },
     );
 
+    stage = "profile";
     const profile = await getProfile(session.accessToken);
     const timeZone = profile?.time_zone ?? "Asia/Tokyo";
 
@@ -90,7 +101,12 @@ export async function GET(request: Request) {
     } catch {
       return redirect(request, "connected_sync_error");
     }
-  } catch {
+  } catch (error) {
+    console.error("Google Health OAuth callback failed", {
+      stage,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      identityStatus: error instanceof GoogleHealthIdentityError ? error.status : null,
+    });
     return redirect(request, "oauth_error");
   }
 }
