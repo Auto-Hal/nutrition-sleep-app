@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAppSession } from "@/lib/auth/session";
 import { getProfile } from "@/lib/profile";
+import { GoogleHealthApiError } from "@/lib/health/google-health-client";
 import { withGoogleHealthAccessTokenRetry } from "@/lib/health/google-health-token";
 import { syncGoogleHealthSleepCatchUp } from "@/lib/health/sleep-sync-orchestrator";
 import { isAllowedOrigin } from "@/lib/security/request";
@@ -46,7 +47,12 @@ export async function POST(request: Request) {
       });
     }
     return NextResponse.redirect(new URL("/sleep?sync=ok", request.url), 303);
-  } catch {
+  } catch (error) {
+    console.error("Google Health manual sync failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      apiStatus: error instanceof GoogleHealthApiError ? error.status : null,
+      apiReason: error instanceof GoogleHealthApiError ? error.reason : null,
+    });
     return wantsJson(request)
       ? NextResponse.json({ error: "sync_failed" }, { status: 503 })
       : NextResponse.redirect(new URL("/sleep?sync=error", request.url), 303);
