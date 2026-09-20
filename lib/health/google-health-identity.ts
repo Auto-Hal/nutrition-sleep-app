@@ -3,6 +3,13 @@ export type GoogleHealthIdentity = {
   legacyUserId: string | null;
 };
 
+export class GoogleHealthIdentityError extends Error {
+  constructor(public readonly status: number) {
+    super("Google Health identity request failed");
+    this.name = "GoogleHealthIdentityError";
+  }
+}
+
 export async function fetchGoogleHealthIdentity(
   accessToken: string,
   fetchImpl: typeof fetch = fetch,
@@ -22,7 +29,7 @@ export async function fetchGoogleHealthIdentity(
   } | null;
 
   if (!response.ok) {
-    throw new Error(`Google Health identity request failed with status ${response.status}`);
+    throw new GoogleHealthIdentityError(response.status);
   }
   if (
     !payload
