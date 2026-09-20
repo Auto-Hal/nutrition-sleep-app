@@ -42,7 +42,8 @@ export async function initializeGoogleHealthBackfill(
         and backfill_target_start_date is null
         and backfill_cursor_end_date is null
       returning initial_recent_sync_completed_at,
-                backfill_target_start_date, backfill_cursor_end_date,
+                backfill_target_start_date::text as backfill_target_start_date,
+                backfill_cursor_end_date::text as backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, targetStartDate, cursorEndDate],
   );
@@ -50,7 +51,8 @@ export async function initializeGoogleHealthBackfill(
 
   const existing = await query<BackfillRow>(
     `select initial_recent_sync_completed_at,
-            backfill_target_start_date, backfill_cursor_end_date,
+            backfill_target_start_date::text as backfill_target_start_date,
+                backfill_cursor_end_date::text as backfill_cursor_end_date,
             backfill_started_at, backfill_completed_at
        from public.health_provider_connections
       where user_id = $1 and provider = 'google_health'`,
@@ -72,7 +74,8 @@ export async function getGoogleHealthBackfillState(userId: string) {
   assertAllowedUser(userId);
   const result = await query<BackfillRow>(
     `select initial_recent_sync_completed_at,
-            backfill_target_start_date, backfill_cursor_end_date,
+            backfill_target_start_date::text as backfill_target_start_date,
+                backfill_cursor_end_date::text as backfill_cursor_end_date,
             backfill_started_at, backfill_completed_at
        from public.health_provider_connections
       where user_id = $1 and provider = 'google_health'`,
@@ -101,7 +104,8 @@ export async function advanceGoogleHealthBackfill(
         and backfill_cursor_end_date = $2::date
         and backfill_completed_at is null
       returning initial_recent_sync_completed_at,
-                backfill_target_start_date, backfill_cursor_end_date,
+                backfill_target_start_date::text as backfill_target_start_date,
+                backfill_cursor_end_date::text as backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, expectedCursorEndDate, newCursorEndDate, targetStartDate],
   );
