@@ -23,10 +23,12 @@ export async function POST(request: Request) {
       : NextResponse.redirect(new URL("/login", request.url), 303);
   }
 
+  let stage: "profile" | "provider_sync" = "profile";
   try {
     const profile = await getProfile(session.accessToken);
     const fallbackTimeZone = profile?.time_zone ?? "Asia/Tokyo";
 
+    stage = "provider_sync";
     const result = await withGoogleHealthAccessTokenRetry(
       session.userId,
       (accessToken) => syncGoogleHealthSleepCatchUp({
@@ -49,6 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL("/sleep?sync=ok", request.url), 303);
   } catch (error) {
     console.error("Google Health manual sync failed", {
+      stage,
       errorName: error instanceof Error ? error.name : "UnknownError",
       apiStatus: error instanceof GoogleHealthApiError ? error.status : null,
       apiReason: error instanceof GoogleHealthApiError ? error.reason : null,
