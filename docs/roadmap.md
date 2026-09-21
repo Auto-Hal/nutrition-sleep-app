@@ -24,7 +24,7 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
 | Phase 5 | IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE | Sleep domain and Google Health integration (CR-001 approved) |
-| Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
+| Phase 6 | PLANNED | Reliability, Japanese product coverage, nutrition improvement priorities, export/account lifecycle, and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
 
@@ -149,16 +149,42 @@ Production Sleep remains untouched until these gates are satisfied.
 
 ## Phase 6 — MVP Completion / Reliability
 
-Goal: make the complete Nutrition + Sleep app dependable for daily use.
+Goal: make the complete Nutrition + Sleep app dependable for daily use and make the core Nutrition workflow actionable enough to support daily decisions.
 
 Planned capabilities:
 
+### Reliability / lifecycle
 - offline-aware writes and explicit pending/failed/synced states;
 - idempotent retry and conflict handling;
 - PWA recovery after network loss / stale client / version change;
 - export of user-owned nutrition and sleep data;
 - account/data deletion design and execution;
-- token/provider cleanup on deletion;
+- token/provider cleanup on deletion.
+
+### Japanese product database coverage
+- expand barcode product resolution beyond Open Food Facts so barcode entry is practically useful for Japanese commercial products;
+- preserve the provider-adapter boundary and local-first resolution;
+- candidate providers include GS1 Japan services and other sources only after API terms, pricing, nutrition-field coverage, and commercial-use conditions are verified;
+- external provider data remains unverified until user confirmation;
+- user-verified label data must outrank lower-priority external sources;
+- unknown nutrient values remain unknown and are never filled with zero;
+- acceptance must measure real barcode hit rate / fallback behavior on representative Japanese products, not only scanner decoding.
+
+### Nutrition Improvement Priority
+- add nutrient-level adequacy / goal-attainment values that make improvement opportunities visible at a glance;
+- provide a ranked improvement-priority view, defaulting to the 30-day period while remaining compatible with 7 / 30 / 90-day analytics;
+- preserve EAR / RDA / AI / DG / UL semantics rather than reducing every reference to simple intake ÷ target;
+- EAR/RDA nutrients may expose continuous adequacy toward RDA while retaining the EAR threshold as a distinct risk-relevant boundary;
+- AI-only nutrients must not translate AI-under-target into a numeric deficiency claim;
+- DG nutrients must support distance from the target range in both low and high directions;
+- UL exceedance must be presented separately as an excess/safety warning, not blended into an adequacy score;
+- energy remains contextual/reference-only and is not folded into a simplistic deficiency score;
+- show data confidence / evaluable-day coverage separately from adequacy so missing records never depress a nutrition score as if they were zero intake;
+- allow each priority item to drill into the existing nutrient → day → meal → item evidence path;
+- an optional overall nutrition-balance summary may be shown, but the primary UX must answer “what should I improve first?” rather than center a single score;
+- no score may be described as a medical diagnosis, deficiency probability, or disease-risk estimate.
+
+### Final acceptance
 - full Production E2E;
 - final security/advisor review;
 - final iPhone/iPad acceptance;
@@ -166,23 +192,14 @@ Planned capabilities:
 
 Phase 6 is the earliest phase that may declare the overall MVP COMPLETE.
 
+Before Phase 6 implementation, Astra design review is required for:
+- offline / retry / conflict / account-deletion semantics;
+- product-provider contract and source-priority changes when a concrete Japanese database provider is selected;
+- Nutrition Improvement Priority scoring semantics, especially EAR/RDA/AI/DG/UL mapping, confidence handling, and any overall-score aggregation.
+
 ## Post-MVP / independent backlog
 
 These items are valuable but do not block the next phase unless promoted by a separate decision.
-
-### External product database coverage
-
-Current standard path:
-local Library → Open Food Facts → Cloud Vision OCR → user confirmation.
-
-Open Food Facts coverage for Japanese products is limited. Candidate future providers include GS1 Japan services and any other provider whose API terms, pricing, nutrition coverage, and commercial-use conditions are acceptable.
-
-Provider expansion must preserve:
-- local-first resolution;
-- provider adapters;
-- external values remain unverified;
-- user-verified label data outranks lower-priority external data;
-- unknown remains unknown.
 
 ### Native iOS path
 
