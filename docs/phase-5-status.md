@@ -191,24 +191,26 @@ The first-connect path is now recoverable if the initial 14-day provider request
 - the total window remains exactly 90 civil days: recent 14 days plus the preceding 76 days;
 - recovery behavior is covered by orchestration unit-contract tests.
 
-Latest verified functional Preview build is tracked from the current Phase 5 branch head after each acceptance/fix commit. Vercel remains the compensating application gate while GitHub-hosted runners fail before startup.
+## Restored GitHub Actions verification
 
+The repository was changed from private to public after repeated GitHub-hosted runner allocation failures caused by private-repository Actions usage limits. Before the visibility change, affected jobs ended within seconds with `runner_id=0`, no runner name, no steps, and no job-log blob.
 
-GitHub Actions remains externally blocked before runner startup. A rerun was attempted and again returned jobs with no steps/logs, so latest-head unit/fresh-DB/pgTAP execution remains a formal pending gate rather than an observed test failure.
+After the visibility change, the same latest-head workflow was rerun successfully:
+- CI checks job PASS;
+- `pnpm lint` PASS;
+- `pnpm typecheck` PASS;
+- `pnpm test` PASS;
+- `pnpm verify:env` PASS;
+- `pnpm build` PASS;
+- database job PASS;
+- fresh local Supabase start PASS;
+- `supabase db reset` PASS;
+- `supabase test db` / pgTAP PASS;
+- Preview workflow/deployment PASS.
 
+This satisfies the formal latest-head fresh-from-zero migration replay / pgTAP gate that had been pending during the runner outage.
 
-## Compensating Preview verification while GitHub Actions runners are unavailable
-
-GitHub Actions continues to fail before a runner starts, so no workflow steps or job logs are produced. To keep the code-quality gate active without weakening acceptance:
-
-- every Vercel deployment runs `pnpm lint && pnpm test && pnpm build`;
-- the gated Preview build has repeatedly caught real contract/test regressions before deployment;
-- latest Phase 5 acceptance/fix heads are required to reach Vercel READY before user acceptance continues;
-- runtime Functions remain in `hnd1` (Tokyo).
-
-Preview pgTAP was also executed manually:
-- pgtap 1.3.3 was enabled temporarily in the Preview database;
-- all 56 Phase 5 pgTAP assertions completed with no failure diagnostics;
+The earlier manual Preview pgTAP result remains useful historical evidence:
+- pgtap 1.3.3 was enabled temporarily in Preview;
+- all 56 Phase 5 assertions completed with no failure diagnostics;
 - the temporary pgtap extension was removed afterward.
-
-This compensates for application/unit and current Preview-schema regression checks, but does **not** replace the formal fresh-from-zero migration replay gate. Fresh replay remains mandatory once GitHub Actions runners execute normally.
