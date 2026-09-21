@@ -154,7 +154,8 @@ Completed in the dedicated Preview environment:
 - disconnect deletes the private credential row; reconnect creates a fresh credential and reinitializes backfill without deleting stored observations;
 - stale-on-open triggered an automatic sync after more than six hours without a successful sync;
 - Google-side grant removal transitioned the app to `reauth_required` / `REAUTH_REQUIRED`;
-- forced reauthorization restored `connected`, cleared the sync error, stored a fresh credential revision, and reinitialized initial sync/backfill.
+- forced reauthorization restored `connected`, cleared the sync error, stored a fresh credential revision, and reinitialized initial sync/backfill;
+- the forced-reauth recovery backfill then completed again to the 90-day target with no sync errors.
 
 Real-runtime defects found and corrected during acceptance:
 - PostgreSQL `date` values used by backfill progress are explicitly returned as `YYYY-MM-DD` text;
