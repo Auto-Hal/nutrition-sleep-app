@@ -135,10 +135,10 @@ Real Preview acceptance completed:
 - disconnect → reconnect;
 - stale-on-open automatic sync;
 - Google grant revocation → `REAUTH_REQUIRED` → forced consent → connected recovery;
+- forced-reauth recovery backfill completed again to the 90-day target without sync errors;
 - regression coverage for real-runtime PostgreSQL civil-date handling, Google OAuth revoked-grant error shapes, and provider-status enum persistence.
 
 Remaining Phase 5 gates:
-- finish the currently reinitialized Preview backfill after the forced-reauth acceptance cycle;
 - real wearable Sleep/STAGES observations and iPhone/iPad acceptance;
 - latest-head fresh-from-zero migration replay / pgTAP once GitHub-hosted runners execute normally;
 - PR Ready → merge;
