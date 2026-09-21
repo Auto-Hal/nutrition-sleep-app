@@ -26,4 +26,10 @@ describe("Google Health sleep persistence contract", () => {
     expect(source).toContain('provider = \'google_health\'');
     expect(source).toContain("assertAllowedUser");
   });
+
+  it("casts provider failure status into the PostgreSQL enum before assignment", () => {
+    expect(source).toContain(")::public.health_connection_status");
+    expect(source).toContain("when $2 in ('REAUTH_REQUIRED', 'MISSING_OAUTH_SCOPE') then 'reauth_required'");
+    expect(source).toContain("else 'error'");
+  });
 });
