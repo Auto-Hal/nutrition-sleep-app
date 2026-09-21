@@ -141,6 +141,127 @@ Before selecting a provider, build a representative barcode set of real Japanese
 
 Do not score a provider as successful when it only returns product identity but leaves all nutrition fields missing.
 
+## Provisional provider selection — 2026-09-21
+
+### Selected MVP architecture
+
+Use a layered provider strategy rather than purchasing a single commercial Japanese nutrition database:
+
+1. local user-verified Library;
+2. Open Food Facts when it has a usable nutrition-bearing product candidate;
+3. Yahoo! Shopping Item Search v3 as a Japanese JAN identity fallback;
+4. Cloud Vision nutrition-label OCR for authoritative first-entry nutrient capture;
+5. user confirmation;
+6. subsequent scans resolve from the local verified Library.
+
+Yahoo! Shopping is selected only for **product identity enrichment** (JAN → product name / brand / listing identity). It is not a nutrition authority and its listing text must not be parsed as structured nutrient data.
+
+### Why this architecture is selected
+
+- Open Food Facts remains useful when it already contains structured nutrients, but Japanese coverage is insufficient as the only external source.
+- Yahoo! Shopping v3 supports exact JAN-code search and is available through a standard application Client ID. Its published rate limits are ample for a single-user personal app.
+- The app already has a working, user-confirmed Cloud Vision nutrition-label OCR path. Therefore an identity-only provider still materially improves the barcode workflow by removing product-name/manual identity entry even when nutrition must be captured from the label once.
+- After the first confirmed OCR capture, the existing local-first resolver makes later scans of the same barcode immediate and independent of the external provider.
+
+### Candidates rejected for the Phase 6 MVP
+
+#### GS1 Japan Cross-Industry Registry
+
+Do not use for this MVP.
+
+Current public terms/materials indicate:
+- users must be businesses with valid GS1 Company Prefix credentials;
+- the current target users are retailers;
+- obtained product information is restricted to the user's own business use and cannot be provided to third parties;
+- the public v1.0 interface centers on 56 common product-master fields plus industry-specific fields;
+- food-specific nutrition coverage is not publicly established in a way that supports this app.
+
+This may be revisited if GS1 later publishes a consumer/developer-compatible access model.
+
+#### JICFS/IFDB
+
+Do not use for this MVP.
+
+Current access is oriented to:
+- JDPs that provide/sell JICFS data to end users; or
+- retailer/wholesaler/manufacturer end users for their own business use.
+
+This is not a clean fit for a personal single-user nutrition app and publicly documented nutrition-field coverage is not sufficient to justify contract work.
+
+#### IMD Food Nutrition Database
+
+Do not use for this MVP because of cost despite strong technical fit.
+
+Strengths:
+- explicit JAN-code map search option;
+- approximately 400k food records;
+- rich nutrient data and Japanese commercial-food coverage.
+
+Blocker:
+- current published API licensing starts around JPY 2,000,000/year and is dedicated/unlimited-use rather than low-volume usage-based pricing.
+
+This is disproportionate for the current personal-app scope.
+
+### Yahoo! Shopping constraints
+
+Binding design assumptions before implementation:
+- use the v3 Item Search endpoint with exact `jan_code`;
+- call from the server, not directly from browser JavaScript;
+- treat returned identity data as unverified until user confirmation;
+- do not infer nutrient values from free-text listing descriptions;
+- do not persist seller/price/review data because those fields are irrelevant to nutrition identity;
+- avoid copying/caching images unless the applicable terms are explicitly confirmed;
+- satisfy Yahoo! Developer Network credit-display requirements in the UI where Yahoo-derived identity is shown;
+- respect published request throttling;
+- keep OCR as the immediate fallback when Yahoo has no exact usable identity match;
+- do not allow Yahoo data to overwrite a user-verified local product.
+
+### Proposed resolution flow
+
+`local verified product`
+→ `Open Food Facts structured nutrition candidate`
+→ `Yahoo! exact JAN identity candidate`
+→ `Cloud Vision nutrition-label OCR`
+→ `user confirmation`
+→ `save locally as verified product`
+
+If Yahoo identifies the product but no structured nutrition exists:
+- prefill product name / brand where available;
+- immediately ask for nutrition-label capture;
+- combine Yahoo identity with user-confirmed label nutrients only after confirmation;
+- final local source quality remains based on the confirmed label, not the Yahoo listing.
+
+### Required design change
+
+The current `ExternalProductCandidate` assumes that an external provider returns:
+- product identity;
+- serving basis;
+- at least one nutrient.
+
+Yahoo identity-only results do not satisfy that type.
+
+Phase 6 therefore needs a provider-neutral split between:
+- `ProductIdentityCandidate`; and
+- `NutritionCandidate`.
+
+This prevents an identity provider from being forced to fabricate serving basis or nutrients.
+
+Astra must approve this provider-contract/type split and the provenance transition before implementation.
+
+### Acceptance gate
+
+Before calling the Yahoo integration complete:
+- test 20–50 representative Japanese packaged-food JAN codes;
+- measure exact identity hit rate;
+- measure false/mismatched identity rate;
+- measure how often Open Food Facts already provides usable nutrition;
+- measure how often Yahoo removes manual product-name entry even though OCR is still required;
+- verify repeated scans hit the local Library after first confirmation;
+- verify provider outage/miss always falls back cleanly to OCR.
+
+Target metric should be practical workflow reduction, not merely API response success.
+
+
 ## Architecture constraints
 
 Regardless of provider:
@@ -152,9 +273,6 @@ Regardless of provider:
 - existing MealEntry nutrient snapshots remain immutable;
 - fallback to Cloud Vision OCR remains available.
 
-## Current recommendation for next research
+## Current next step
 
-1. Request/inspect current IMD contract/pricing/JAN coverage information.
-2. Contact or inspect GS1 Japan Cross-Industry Registry eligibility and food-specific field availability only if it can legally serve this personal application.
-3. Define a 20–50 product Japanese barcode acceptance set before provider implementation.
-4. Run provider hit-rate comparison before making a schema or paid-contract decision.
+Submit the selected layered provider architecture to Astra for contract/provenance review before implementation. After approval, implement the Yahoo identity adapter and run a real Japanese JAN acceptance set before adding any further provider.
