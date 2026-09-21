@@ -140,7 +140,7 @@ Real Preview acceptance completed:
 
 Remaining Phase 5 gates:
 - real wearable Sleep/STAGES observations and iPhone/iPad acceptance;
-- latest-head fresh-from-zero migration replay / pgTAP once GitHub-hosted runners execute normally;
+- latest-head fresh-from-zero migration replay / pgTAP PASS after GitHub Actions runner recovery;
 - PR Ready → merge;
 - Production Phase 5 migrations, dedicated Production Google OAuth configuration, provider secrets and `CRON_SECRET`;
 - Production deploy/runtime/morning-sync verification.
@@ -219,6 +219,6 @@ Dedicated Preview Google Cloud OAuth and Preview provider secrets are configured
 
 The remaining external dependency is real Google Health Sleep data from supported hardware so STAGES and observed-sleep presentation can be accepted on iPhone/iPad.
 
-GitHub Actions is also still blocked before runner startup; Vercel continues to enforce `lint + test + build`, and the formal fresh-from-zero migration replay / pgTAP remains pending until hosted runners execute normally.
+GitHub Actions runner execution is restored after the repository visibility change. Latest-head application checks and the formal fresh-from-zero Supabase replay / pgTAP have passed. The remaining external dependency is real wearable Sleep/STAGES data and device acceptance.
 
 Production remains untouched.
