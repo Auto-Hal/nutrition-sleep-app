@@ -1,6 +1,6 @@
 # Nutrition / Sleep App Roadmap
 
-Updated: 2026-09-16
+Updated: 2026-09-21
 
 This document is the implementation roadmap after Phase 3 completion. It does not replace the MVP requirements; it records the delivery order, phase boundaries, and acceptance gates.
 
@@ -23,7 +23,7 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | IN PROGRESS / PREVIEW OAUTH CONFIG GATE | Sleep domain and Google Health integration (CR-001 approved) |
+| Phase 5 | IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE | Sleep domain and Google Health integration (CR-001 approved) |
 | Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
@@ -98,37 +98,54 @@ Final Production verification completed after quota recovery:
 - `/login` HTTP 200;
 - relevant runtime errors: 0.
 
-Phase 5 is now the next phase, with CR-001 still mandatory before implementation.
+Phase 5 implementation is active under the approved CR-001 contract.
 
 Visual redesign (colors, card layout, typography and full design-system polish) remains Phase 6.
 
 ## Phase 5 — Sleep / Health Provider
 
-Goal: import Fitbit-origin sleep through the current supported official API path and visualize duration, regularity, continuity, and stages.
+**Status: IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE**
+
+Goal: import sleep through Google Health API v4 and visualize duration, regularity, continuity, and stages without converting missing data into zero.
 
 CR-001 was approved on 2026-09-16. The binding provider contract is documented in `docs/cr-001-google-health-provider.md`. The old Fitbit Web API Sleep v1.2 requirement is superseded and must not be implemented.
 
-Before implementation:
-- verify current official Google/Fitbit health API availability;
-- scopes, app registration, user-account requirements and review requirements;
-- sleep session/stage schema and corrections;
-- OAuth return flow on iPhone Safari/PWA;
-- quota/pagination and recent-history access.
-
-Planned capabilities:
-
+Implemented:
 - provider-neutral connection model and adapter boundary;
-- OAuth consent/callback/revoke/expiry/re-consent;
+- Google Authorization Code OAuth with sleep-readonly scope only;
 - server-side encrypted provider credentials/tokens;
-- idempotent SleepSession upsert;
-- sleep start/end, total sleep, time in bed;
-- awake/light/deep/REM intervals when officially available;
-- daily hypnogram;
-- morning refresh of recent 3 days;
+- Google Health identity capture;
+- connect / disconnect / forced reauthorization lifecycle;
+- authoritative `reconcile` ingestion with pagination and bounded retry;
+- normalized sleep sessions, stages, and out-of-bed segments;
+- correction-aware updates and authoritative-window supersession;
+- recent 3-day correction sync;
+- initial 14-day sync plus resumable 90-day backfill;
+- stale-on-open refresh after 6 hours;
+- server-only morning-sync endpoint protected by `CRON_SECRET`;
 - 7 / 30 / 90 day analytics;
-- duration / regularity / continuity as top-level views;
-- missing sync is unknown, never zero sleep;
-- no custom 100-point sleep score.
+- missing sync remains unknown, never zero sleep;
+- no custom sleep score or diagnostic language.
+
+Real Preview acceptance completed:
+- real OAuth connection and exact sleep-readonly scope;
+- encrypted credential persistence;
+- initial sync and resumable 90-day backfill;
+- completed-backfill no-restart behavior;
+- disconnect → reconnect;
+- stale-on-open automatic sync;
+- Google grant revocation → `REAUTH_REQUIRED` → forced consent → connected recovery;
+- regression coverage for real-runtime PostgreSQL civil-date handling, Google OAuth revoked-grant error shapes, and provider-status enum persistence.
+
+Remaining Phase 5 gates:
+- finish the currently reinitialized Preview backfill after the forced-reauth acceptance cycle;
+- real wearable Sleep/STAGES observations and iPhone/iPad acceptance;
+- latest-head fresh-from-zero migration replay / pgTAP once GitHub-hosted runners execute normally;
+- PR Ready → merge;
+- Production Phase 5 migrations, dedicated Production Google OAuth configuration, provider secrets and `CRON_SECRET`;
+- Production deploy/runtime/morning-sync verification.
+
+Production Sleep remains untouched until these gates are satisfied.
 
 ## Phase 6 — MVP Completion / Reliability
 
@@ -179,17 +196,12 @@ If the product later becomes native/hybrid iOS:
 Profile currently stores reference weight, not a measurement history. BodyMeasurement/trend support is outside the current MVP roadmap unless explicitly promoted.
 
 
-## Phase 5 current external gate — Preview OAuth
+## Phase 5 current gate — Real data / device acceptance
 
-Code-side provider, sync, analytics, retry/recovery, and Preview-schema work is implemented and verified through the Vercel gated build plus Preview pgTAP.
+Dedicated Preview Google Cloud OAuth and Preview provider secrets are configured and have passed real OAuth, sync, disconnect/reconnect, stale-on-open, and forced-reauth acceptance.
 
-The next acceptance step requires external Preview configuration:
-- dedicated Google Cloud Preview project with Google Health API enabled;
-- Google OAuth Web client using the stable Phase 5 Preview callback;
-- Preview Vercel values for Google client ID/secret, exact redirect URI, and provider token encryption key.
+The remaining external dependency is real Google Health Sleep data from supported hardware so STAGES and observed-sleep presentation can be accepted on iPhone/iPad.
 
-Exact setup is documented in `docs/phase-5-preview-oauth-setup.md`.
-
-The current ChatGPT connectors can inspect/deploy Vercel and manage GitHub/Supabase, but do not expose Google Cloud OAuth-client creation or Vercel environment-variable write actions. Therefore this is an external configuration gate rather than an application-code blocker.
+GitHub Actions is also still blocked before runner startup; Vercel continues to enforce `lint + test + build`, and the formal fresh-from-zero migration replay / pgTAP remains pending until hosted runners execute normally.
 
 Production remains untouched.
