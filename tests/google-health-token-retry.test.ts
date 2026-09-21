@@ -150,6 +150,47 @@ describe("Google Health token retry", () => {
     expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
   });
 
+  it("marks reauthorization when google-auth-library reports invalid_grant in the error message", async () => {
+    mocks.loadGoogleHealthCredentials.mockResolvedValue({
+      refreshToken: "revoked-refresh-token",
+      accessToken: "expired-access-token",
+      accessTokenExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      revision: 1,
+    });
+    const revoked = new Error("invalid_grant");
+    revoked.name = "GaxiosError";
+    mocks.oauthClient.getAccessToken.mockRejectedValue(revoked);
+
+    await expect(
+      getGoogleHealthAccessToken(USER_ID),
+    ).rejects.toBeInstanceOf(GoogleHealthReauthorizationRequiredError);
+
+    expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledWith(USER_ID);
+    expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
+  });
+
+  it("marks reauthorization when google-auth-library serializes the OAuth error into the message", async () => {
+    mocks.loadGoogleHealthCredentials.mockResolvedValue({
+      refreshToken: "revoked-refresh-token",
+      accessToken: "expired-access-token",
+      accessTokenExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      revision: 1,
+    });
+    mocks.oauthClient.getAccessToken.mockRejectedValue(
+      new Error(JSON.stringify({
+        error: "invalid_grant",
+        error_description: "reauth required",
+      })),
+    );
+
+    await expect(
+      getGoogleHealthAccessToken(USER_ID),
+    ).rejects.toBeInstanceOf(GoogleHealthReauthorizationRequiredError);
+
+    expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledWith(USER_ID);
+    expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
+  });
+
   it("keeps transient refresh failures retryable instead of forcing reauthorization", async () => {
     mocks.loadGoogleHealthCredentials.mockResolvedValue({
       refreshToken: "refresh-token",
