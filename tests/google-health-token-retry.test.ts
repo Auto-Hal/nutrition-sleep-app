@@ -190,6 +190,62 @@ describe("Google Health token retry", () => {
     expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
   });
 
+  it("detects invalid_grant from a nested Gaxios cause shape", async () => {
+    mocks.loadGoogleHealthCredentials.mockResolvedValue({
+      refreshToken: "revoked-refresh-token",
+      accessToken: "expired-access-token",
+      accessTokenExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      revision: 1,
+    });
+    const revoked = Object.assign(new Error("Request failed with status code 400"), {
+      name: "error",
+      code: 400,
+      status: 400,
+      cause: {
+        message: "invalid_grant",
+        code: 400,
+        status: "Bad Request",
+      },
+    });
+    mocks.oauthClient.getAccessToken.mockRejectedValue(revoked);
+
+    await expect(
+      getGoogleHealthAccessToken(USER_ID),
+    ).rejects.toBeInstanceOf(GoogleHealthReauthorizationRequiredError);
+
+    expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledWith(USER_ID);
+    expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
+  });
+
+  it("detects invalid_grant from a string response body", async () => {
+    mocks.loadGoogleHealthCredentials.mockResolvedValue({
+      refreshToken: "revoked-refresh-token",
+      accessToken: "expired-access-token",
+      accessTokenExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      revision: 1,
+    });
+    const revoked = Object.assign(new Error("Request failed with status code 400"), {
+      name: "error",
+      code: 400,
+      status: 400,
+      response: {
+        status: 400,
+        data: JSON.stringify({
+          error: "invalid_grant",
+          error_description: "Token has been expired or revoked.",
+        }),
+      },
+    });
+    mocks.oauthClient.getAccessToken.mockRejectedValue(revoked);
+
+    await expect(
+      getGoogleHealthAccessToken(USER_ID),
+    ).rejects.toBeInstanceOf(GoogleHealthReauthorizationRequiredError);
+
+    expect(mocks.markGoogleHealthReauthorizationRequired).toHaveBeenCalledWith(USER_ID);
+    expect(mocks.recordGoogleHealthSyncFailure).not.toHaveBeenCalled();
+  });
+
   it("marks reauthorization when google-auth-library serializes the OAuth error into the message", async () => {
     mocks.loadGoogleHealthCredentials.mockResolvedValue({
       refreshToken: "revoked-refresh-token",
