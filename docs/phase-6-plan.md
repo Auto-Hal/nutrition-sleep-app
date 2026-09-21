@@ -69,7 +69,7 @@ A candidate provider must be evaluated for:
 
 GS1 Japan services are a candidate, not an assumed implementation choice.
 
-Preliminary provider research is tracked in `docs/phase-6-product-provider-research.md`.
+Provider research and the current selected MVP strategy are tracked in `docs/phase-6-product-provider-research.md`. The selected direction is local Library → Open Food Facts nutrition candidate → Yahoo! Shopping exact-JAN identity fallback → Cloud Vision label OCR → user confirmation, pending Astra review.
 
 ### Source / provenance rules
 
