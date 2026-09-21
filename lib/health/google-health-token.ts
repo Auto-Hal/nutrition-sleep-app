@@ -67,43 +67,6 @@ function oauthRefreshErrorCode(error: unknown) {
   return typeof code === "string" ? code : null;
 }
 
-function safeRefreshErrorShape(error: unknown) {
-  if (!error || typeof error !== "object") {
-    return { errorType: typeof error };
-  }
-
-  const record = error as {
-    name?: unknown;
-    code?: unknown;
-    status?: unknown;
-    message?: unknown;
-    response?: unknown;
-    cause?: unknown;
-  };
-  const response = record.response && typeof record.response === "object"
-    ? record.response as { status?: unknown; data?: unknown }
-    : null;
-  const responseData = response?.data;
-  const responseError = responseData && typeof responseData === "object"
-    ? (responseData as { error?: unknown }).error
-    : null;
-
-  return {
-    errorName: typeof record.name === "string" ? record.name : null,
-    topCodeType: typeof record.code,
-    topStatus: typeof record.status === "number" ? record.status : null,
-    messageIsInvalidGrant: record.message === "invalid_grant",
-    messageIsJson: typeof record.message === "string" && record.message.trim().startsWith("{"),
-    hasResponse: Boolean(response),
-    responseStatus: typeof response?.status === "number" ? response.status : null,
-    responseDataType: Array.isArray(responseData) ? "array" : typeof responseData,
-    responseErrorType: Array.isArray(responseError) ? "array" : typeof responseError,
-    hasCause: Boolean(record.cause),
-    causeType: Array.isArray(record.cause) ? "array" : typeof record.cause,
-    classifiedOAuthCode: oauthRefreshErrorCode(error),
-  };
-}
-
 export async function getGoogleHealthAccessToken(
   userId: string,
   options: { forceRefresh?: boolean } = {},
@@ -150,7 +113,6 @@ export async function getGoogleHealthAccessToken(
     return accessToken;
   } catch (error) {
     const code = oauthRefreshErrorCode(error);
-    console.error("Google Health token refresh failed", safeRefreshErrorShape(error));
     if (code === "invalid_grant") {
       await markGoogleHealthReauthorizationRequired(userId).catch(() => undefined);
       throw new GoogleHealthReauthorizationRequiredError();
