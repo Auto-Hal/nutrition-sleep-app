@@ -4,7 +4,7 @@
 
 - Phase 1–4.5 COMPLETE
 - CR-001 APPROVED — 2026-09-16
-- **Phase 5 IN PROGRESS**
+- **Phase 5 IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE**
 - implementation branch: `phase/5-sleep-foundation`
 
 ## Binding provider contract
@@ -110,7 +110,7 @@ Implemented on the Phase 5 branch:
 - manual recent-3-day sync endpoint is available;
 - Sleep UI exposes connect / re-auth / manual sync / disconnect only when OAuth environment is fully configured.
 
-Preview Google Cloud Client ID / Secret / redirect URI / provider token encryption key remain external configuration prerequisites. Production is unchanged.
+Dedicated Preview Google Cloud OAuth and provider-secret configuration are complete and have passed real OAuth acceptance. Production is unchanged.
 
 
 ## Automatic synchronization entry points
@@ -126,7 +126,7 @@ Implemented on the Phase 5 branch:
 - `CRON_SECRET` and provider secrets are rejected if exposed via `NEXT_PUBLIC_*`;
 - logs contain timing/status only, not OAuth token material or raw sleep payloads.
 
-The cron will not be considered operational until `CRON_SECRET` and Google Health Preview credentials are configured. Production remains unchanged.
+The Preview/manual provider flow is operational. `CRON_SECRET` remains deferred to the Production morning-sync acceptance gate; Production remains unchanged.
 
 
 ## Preview fixture acceptance
@@ -140,6 +140,31 @@ Completed on Preview Supabase only:
 - verified cascade cleanup left 0 fixture sessions, stages and out-of-bed segments.
 
 No synthetic Sleep data remains in Preview. Production was untouched.
+
+## Real Preview acceptance
+
+Completed in the dedicated Preview environment:
+- real Google OAuth connection with exactly `googlehealth.sleep.readonly`;
+- Google Health identity capture;
+- encrypted refresh/access credential persistence in `private.health_provider_credentials`;
+- initial 14-day sync and resumable 90-day history backfill;
+- manual catch-up advances at most one bounded historical chunk per request;
+- completed 90-day history does not restart on later normal sync;
+- current Google Health account has no Sleep observations, so 0 observed days is treated as unknown data rather than zero sleep;
+- disconnect deletes the private credential row; reconnect creates a fresh credential and reinitializes backfill without deleting stored observations;
+- stale-on-open triggered an automatic sync after more than six hours without a successful sync;
+- Google-side grant removal transitioned the app to `reauth_required` / `REAUTH_REQUIRED`;
+- forced reauthorization restored `connected`, cleared the sync error, stored a fresh credential revision, and reinitialized initial sync/backfill.
+
+Real-runtime defects found and corrected during acceptance:
+- PostgreSQL `date` values used by backfill progress are explicitly returned as `YYYY-MM-DD` text;
+- revoked Google refresh grants are normalized across the error shapes produced by `google-auth-library@11` / `gaxios@7`;
+- provider failure status persistence explicitly casts the CASE result to `public.health_connection_status` so PostgreSQL does not reject text assignment to the enum column;
+- regression coverage protects all three real-runtime fixes.
+
+Current transient observation:
+- one protected-page request emitted `JWT issued at future` and then recovered without intervention;
+- no auth semantics were changed; investigate only if it recurs.
 
 ## OAuth / retry contract hardening
 
@@ -165,14 +190,8 @@ The first-connect path is now recoverable if the initial 14-day provider request
 - the total window remains exactly 90 civil days: recent 14 days plus the preceding 76 days;
 - recovery behavior is covered by orchestration unit-contract tests.
 
-Latest verified functional Preview build:
-- head `1bdb6e0678b66b55ee4de4c9c1d67348537eebf0`;
-- Vercel deployment `dpl_BCU5oMxgfNTD6vtmFFn5vvYUP227`;
-- URL `https://nutrition-sleep-masx60sb5-tsuno2.vercel.app`;
-- READY;
-- Next production compilation and type validation passed;
-- `/login` returned HTTP 200;
-- recent error/fatal runtime scan returned no entries.
+Latest verified functional Preview build is tracked from the current Phase 5 branch head after each acceptance/fix commit. Vercel remains the compensating application gate while GitHub-hosted runners fail before startup.
+
 
 GitHub Actions remains externally blocked before runner startup. A rerun was attempted and again returned jobs with no steps/logs, so latest-head unit/fresh-DB/pgTAP execution remains a formal pending gate rather than an observed test failure.
 
@@ -181,20 +200,10 @@ GitHub Actions remains externally blocked before runner startup. A rerun was att
 
 GitHub Actions continues to fail before a runner starts, so no workflow steps or job logs are produced. To keep the code-quality gate active without weakening acceptance:
 
-- Vercel now uses the official `vercel-build` script;
 - every Vercel deployment runs `pnpm lint && pnpm test && pnpm build`;
-- the first gated deployment correctly found one stale automation-contract assertion;
-- after correcting that test, latest head `0a2aa82313ef36866b1a18d1e57ee3b26bed979c` passed:
-  - ESLint: 0 errors (1 pre-existing image optimization warning);
-  - Vitest: 30 files PASS / 157 tests PASS;
-  - Next production compilation PASS;
-  - Next type validation PASS;
-  - Vercel Preview READY;
-  - deployment `dpl_HyKvgCiTL4vbTbvdkvxmZpqVpbKg`;
-  - URL `https://nutrition-sleep-hers7z0yd-tsuno2.vercel.app`;
-  - runtime region `hnd1` (Tokyo);
-  - `/login` HTTP 200;
-  - recent error/fatal runtime scan: 0.
+- the gated Preview build has repeatedly caught real contract/test regressions before deployment;
+- latest Phase 5 acceptance/fix heads are required to reach Vercel READY before user acceptance continues;
+- runtime Functions remain in `hnd1` (Tokyo).
 
 Preview pgTAP was also executed manually:
 - pgtap 1.3.3 was enabled temporarily in the Preview database;
