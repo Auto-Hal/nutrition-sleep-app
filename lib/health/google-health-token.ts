@@ -17,6 +17,7 @@ export class GoogleHealthReauthorizationRequiredError extends Error {
 
 function oauthRefreshErrorCode(error: unknown) {
   if (!error || typeof error !== "object") return null;
+
   const response = (error as { response?: unknown }).response;
   if (response && typeof response === "object") {
     const data = (response as { data?: unknown }).data;
@@ -25,8 +26,20 @@ function oauthRefreshErrorCode(error: unknown) {
       if (typeof code === "string") return code;
     }
   }
+
   const code = (error as { code?: unknown }).code;
-  return typeof code === "string" ? code : null;
+  if (typeof code === "string") return code;
+
+  const message = (error as { message?: unknown }).message;
+  if (typeof message !== "string") return null;
+  if (message === "invalid_grant") return "invalid_grant";
+
+  try {
+    const parsed = JSON.parse(message) as { error?: unknown };
+    return typeof parsed.error === "string" ? parsed.error : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getGoogleHealthAccessToken(
