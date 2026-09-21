@@ -12,9 +12,9 @@ Implemented:
 
 Next:
 - Finish Phase 5 real wearable/STAGES and device acceptance, formal latest-head fresh-DB/pgTAP once GitHub-hosted runners recover, then Production Phase 5 verification.
-- Phase 6: Offline/reliability/export/account lifecycle and final MVP acceptance.
+- Phase 6: Reliability/offline, Japanese barcode product-database expansion, Nutrition Improvement Priority, export/account lifecycle, and final MVP acceptance.
 
-See `docs/roadmap.md` and the phase-specific plans/status documents.
+See `docs/roadmap.md`, `docs/phase-6-plan.md`, and the phase-specific plans/status documents.
 
 ENV-001 uses a new app-dedicated Supabase account with two Free projects: `nutrition-sleep-preview` and `nutrition-sleep-production`. The existing `Auto-Hal's Org` projects `study-graph` and `money-canvas` are out of scope and must not be changed, paused, or reused.
 
