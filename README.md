@@ -1,6 +1,6 @@
 # Nutrition / Sleep App
 
-Current status: **Phase 1–4.5 COMPLETE / Phase 5 NEXT (CR-001 gate)**.
+Current status: **Phase 1–4.5 COMPLETE / Phase 5 IN PROGRESS — REAL-DATA & DEVICE ACCEPTANCE GATE**.
 
 Implemented:
 - Phase 1: Auth, Profile, server-side sessions, RLS, Preview/Production separation, 4-tab PWA foundation.
@@ -8,9 +8,10 @@ Implemented:
 - Phase 3: Product ingestion, barcode scanning, Open Food Facts, Google Cloud Vision nutrition-label OCR, Product Library, provenance/source priority.
 - Phase 4: Nutrition analytics, Japanese Dietary Reference Intakes 2025, 7/30/90-day trends, completeness/quality semantics, food/supplement/source-unclassified split, and drilldown.
 - Phase 4.5: interaction-performance hardening, optimistic Today feedback, client navigation/prefetch, server-hydrated Today bootstrap, and Tokyo-region Vercel Functions.
+- Phase 5: Google Health sleep-readonly OAuth, encrypted provider credentials, normalized Sleep/stage/out-of-bed persistence, recent sync + resumable 90-day backfill, 7/30/90 analytics, stale-on-open, disconnect/reconnect, and forced reauthorization recovery. Real Preview OAuth/sync lifecycle acceptance is complete; real wearable/STAGES acceptance remains.
 
 Next:
-- Phase 5: Sleep domain and current supported health-provider integration under CR-001.
+- Finish Phase 5 real wearable/STAGES and device acceptance, formal latest-head fresh-DB/pgTAP once GitHub-hosted runners recover, then Production Phase 5 verification.
 - Phase 6: Offline/reliability/export/account lifecycle and final MVP acceptance.
 
 See `docs/roadmap.md` and the phase-specific plans/status documents.
@@ -28,7 +29,7 @@ The browser talks only to same-origin Next.js routes. Supabase access and refres
 
 ## Database
 
-The migrations under `supabase/migrations/` are additive and must be replayed in filename order against an empty dedicated database. Phase 1 creates the profile/session foundation; Phase 2 adds Catalog, Batch, Meal, and immutable nutrient snapshot tables; Phase 3 adds Product/source metadata and commercial ingestion RPCs; Phase 4 adds the derived nutrition analytics RPC without persisting mutable summary state. The pgTAP checks under `supabase/tests/` cover the RLS, permission, and nutrition-analytics contracts.
+The migrations under `supabase/migrations/` are additive and must be replayed in filename order against an empty dedicated database. Phase 1 creates the profile/session foundation; Phase 2 adds Catalog, Batch, Meal, and immutable nutrient snapshot tables; Phase 3 adds Product/source metadata and commercial ingestion RPCs; Phase 4 adds the derived nutrition analytics RPC without persisting mutable summary state; Phase 5 adds provider connection metadata, private encrypted provider credentials, normalized Sleep sessions/stages/out-of-bed segments, and resumable backfill progress. The pgTAP checks under `supabase/tests/` cover RLS, permissions, nutrition analytics, and the Phase 5 Sleep schema/security contract.
 
 `DATABASE_URL` is required by the server session repository and must point to the same environment as `SUPABASE_URL`. `APP_ALLOWED_USER_ID` identifies the one pre-provisioned Auth user, and `APP_LOGIN_RATE_LIMIT_KEY` is a server-only HMAC key for shared login throttling. The production database URL must never be configured in a Preview deployment.
 
@@ -51,4 +52,4 @@ CI runs the same checks and a fresh local Supabase replay. Preview deployment is
 - `auth.uid()` owns every profile row; direct profile delete is disabled in Phase 1.
 - `revision` protects profile updates from lost writes.
 - Missing values remain `NULL`; the foundation never converts an unknown health value into zero or a normal value.
-- CR-001 supersedes the old Fitbit Sleep v1.2 implementation requirement. No deprecated Fitbit provider schema has been added. Phase 5 begins only after the current supported health-provider contract is re-verified.
+- CR-001 supersedes the old Fitbit Sleep v1.2 implementation requirement. No deprecated Fitbit provider schema has been added. Phase 5 uses Google Health API v4 with sleep-readonly scope only.
