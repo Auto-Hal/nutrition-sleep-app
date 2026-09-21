@@ -175,6 +175,8 @@ Preferred hierarchy:
 
 The user should not need to inspect every nutrient row to find the most important improvement opportunities.
 
+Preliminary scoring research is tracked in `docs/phase-6-nutrition-priority-research.md`.
+
 ## Workstream D — Final MVP acceptance
 
 Required before MVP COMPLETE:
