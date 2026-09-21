@@ -27,19 +27,20 @@ function oauthRefreshErrorCode(error: unknown) {
     }
   }
 
-  const code = (error as { code?: unknown }).code;
-  if (typeof code === "string") return code;
-
   const message = (error as { message?: unknown }).message;
-  if (typeof message !== "string") return null;
-  if (message === "invalid_grant") return "invalid_grant";
+  if (typeof message === "string") {
+    if (message === "invalid_grant") return "invalid_grant";
 
-  try {
-    const parsed = JSON.parse(message) as { error?: unknown };
-    return typeof parsed.error === "string" ? parsed.error : null;
-  } catch {
-    return null;
+    try {
+      const parsed = JSON.parse(message) as { error?: unknown };
+      if (typeof parsed.error === "string") return parsed.error;
+    } catch {
+      // Fall through to non-message error codes.
+    }
   }
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
 }
 
 export async function getGoogleHealthAccessToken(
