@@ -69,6 +69,8 @@ A candidate provider must be evaluated for:
 
 GS1 Japan services are a candidate, not an assumed implementation choice.
 
+Preliminary provider research is tracked in `docs/phase-6-product-provider-research.md`.
+
 ### Source / provenance rules
 
 - existing local user-verified data outranks external data;
