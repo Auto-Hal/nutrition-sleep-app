@@ -1,8 +1,16 @@
 # Phase 6 Astra Review Request
 
-Status: READY FOR ASTRA REVIEW  
-Updated: 2026-09-22  
+Status: REVIEW COMPLETED — SEE `docs/phase-6-astra-review-result.md`  
+Updated: 2026-09-23  
 Branch: `phase/6-design`
+
+## Review result
+
+Astra returned `PHASE 6 DESIGN APPROVED WITH REQUIRED CORRECTIONS`.
+
+All blocking corrections are recorded in `docs/phase-6-astra-review-result.md` and reflected in the canonical Phase 6 design documents.
+
+This file remains as the original review contract.
 
 ## Review objective
 
