@@ -1,36 +1,46 @@
 # Phase 6 Reliability Design
 
-Status: DRAFT FOR ASTRA REVIEW  
-Updated: 2026-09-22
+Status: ASTRA REVIEW CORRECTIONS APPLIED  
+Updated: 2026-09-23
 
 ## Problem
 
-The current application is server-authoritative and has strong database invariants, but a user write can still become ambiguous if connectivity disappears after the server commits and before the browser receives the response.
+The current application is server-authoritative and already has strong database invariants, but delayed/offline execution creates two new ambiguity classes:
 
-Current strengths:
-- create MealEntry/Catalog/Batch/Product paths already have create-time idempotency keys;
-- mutable Catalog/Profile/Batch/Product paths use revision-based optimistic concurrency;
-- MealEntry snapshots are immutable;
-- writes already go through same-origin app APIs and authenticated RPCs;
-- no provider token is exposed to browser JavaScript.
+1. the server may commit and the HTTP response may be lost;
+2. the referenced server state may change while a user intent is waiting offline.
 
-Current gaps:
-- no browser mutation outbox;
-- no service worker/offline shell beyond the manifest;
-- update/void/state transitions are not all replay-idempotent after a lost HTTP response;
-- there is no durable cross-request operation receipt;
-- stale client/version recovery is not defined.
+Phase 6 must preserve the meaning of the user's original action without silently changing referenced values, duplicating mutations, or turning a retry into last-write-wins.
+
+## Existing invariants
+
+Phase 6 reliability must preserve:
+
+- unknown != 0;
+- not_recorded != skipped;
+- MealEntry nutrient snapshots are immutable after creation;
+- Product/Catalog updates do not mutate historical MealEntry snapshots;
+- owner-scoped RLS and private-schema boundaries;
+- app/provider auth tokens never enter browser storage;
+- Preview and Production remain isolated.
 
 ## MVP reliability goal
 
-A user should be able to tap Save once, lose connectivity, and later get exactly one authoritative mutation or an explicit conflict/error.
+A user should be able to perform a supported write once, lose connectivity, and later reach exactly one of:
 
-The system must never:
-- duplicate an intake because the HTTP response was lost;
-- silently overwrite a newer revision;
-- discard queued intent during a deploy/update;
-- treat a permanent validation error as a retryable network failure;
-- persist auth/provider tokens in the browser queue.
+- server-confirmed success;
+- explicit retryable failure;
+- explicit authentication pause;
+- explicit semantic conflict;
+- explicit expired/blocked state.
+
+The app must never:
+
+- duplicate an intake because a response was lost;
+- re-snapshot a different Catalog/Batch value without user confirmation;
+- silently attach the latest revision to an old queued intent;
+- silently drop pending intent during logout/update;
+- present local IndexedDB persistence as equivalent to durable server persistence.
 
 ## Browser outbox
 
@@ -39,27 +49,55 @@ Use IndexedDB, not localStorage.
 ### Record shape
 
 ```ts
+type PendingMutationStatus =
+  | "pending"
+  | "in_flight"
+  | "failed"
+  | "paused_auth"
+  | "conflict"
+  | "expired"
+  | "blocked";
+
 type PendingMutation = {
-  operation_id: string; // UUID generated once at user action
-  contract_version: 1;
+  operation_id: string;            // stable UUID generated once
+  contract_version: number;
+  environment_id: string;          // Preview/Production binding
+  owner_user_id: string;           // current app owner binding
   kind: MutationKind;
-  created_at: string;
+  created_at: string;              // immutable client intent time
   updated_at: string;
   payload: unknown;
-  base_revision?: number;
-  status: "pending" | "in_flight" | "failed" | "conflict" | "expired";
+  expected_revision?: number;
+  expected_absence?: boolean;
+  reference_fingerprint?: string;
+  status: PendingMutationStatus;
   attempt_count: number;
   next_retry_at: string | null;
   last_error_code: string | null;
 };
 ```
 
-Successful operations are removed from the active outbox. A small local receipt may be retained for UI acknowledgement for a bounded period; this receipt must not contain secrets.
+### Binding and replay rules
+
+A queued operation may replay only when:
+
+- current app environment matches `environment_id`;
+- authenticated user matches `owner_user_id`;
+- contract version is supported or explicitly migrated;
+- the operation is younger than the 30-day automatic replay horizon;
+- dependencies are synchronized;
+- the state is not blocked/conflict/expired.
+
+Never replay a Preview outbox against Production or another user.
 
 ### Browser-storage rules
 
+The outbox may contain only the minimum user intent required to replay a supported mutation.
+
 May contain:
-- pending meal/catalog/profile/product/batch user input required to replay the write;
+- food/meal/catalog/profile/product/batch user input;
+- expected revision/absence;
+- reference fingerprint;
 - operation metadata.
 
 Must never contain:
@@ -68,36 +106,68 @@ Must never contain:
 - Google Health access/refresh token;
 - password;
 - Cloud Vision API key;
-- Yahoo Client ID if configured server-only;
-- raw sleep provider payload.
+- Yahoo credential;
+- raw provider sleep payload;
+- account-deletion password;
+- export payload.
 
-Retention:
-- pending/conflict records remain automatically replayable for at most 30 days from creation;
-- after 30 days, an unresolved record becomes `expired` / blocked and is never automatically replayed;
-- the user may inspect/discard it or explicitly re-create the intended action as a **new** operation against current server state;
-- completed UI receipts expire automatically;
-- logout/account deletion clears local outbox/receipts after server-side destructive action completes or local logout succeeds.
+IndexedDB is local health-related application data, not a secret vault. No custom application-layer encryption is added because a same-origin persisted decryption key would not create a meaningful XSS boundary.
 
-The 30-day replay horizon is intentionally shorter than the server mutation-receipt retention window, so a client never automatically retries an operation after the server may have forgotten its idempotency receipt.
+Required mitigations:
+- strict payload minimization;
+- CSP and dependency hygiene;
+- owner/environment binding;
+- serializer allowlist;
+- explicit handling of quota/storage failure.
 
-IndexedDB data is same-origin local application data. Phase 6 does not add custom browser-side encryption because a persisted decryption key in the same origin would not create a meaningful security boundary. Minimize retained payload and never store provider credentials instead.
+### Local persistence semantics
 
-## Server mutation receipt
+Only after the IndexedDB transaction succeeds may the UI say:
 
-### Why existing create idempotency is insufficient
+`端末に保存・未同期`
 
-Existing create-time idempotency protects many POST creates, but a revisioned update can still behave incorrectly when:
+If IDB persistence fails:
+- do not claim the intent is saved;
+- keep the form state if possible;
+- surface a local-storage failure.
 
-1. server update succeeds;
-2. network response is lost;
-3. client retries the same request with the old expected revision;
-4. server sees a revision conflict even though the original operation already succeeded.
+30 days is an automatic retry horizon, **not** a guarantee that the device/browser will retain IndexedDB for 30 days.
 
-Void/state operations have similar ambiguity.
+### Logout/session expiry
+
+Session expiry:
+- stop replay;
+- move applicable items to `paused_auth`;
+- retain pending intent;
+- resume only after the same owner successfully authenticates in the same environment.
+
+Explicit logout:
+- show the number of unsynchronized items before final logout;
+- require explicit acknowledgement if logout will discard local pending intent;
+- if user chooses to preserve local intent, keep it bound to the same owner/environment and do not replay until reauthentication;
+- account deletion always clears local pending state after authoritative server deletion is confirmed.
+
+## Server mutation receipts
+
+### Security boundary
+
+`private.mutation_receipts` is server-only and is never granted directly to browser roles.
+
+Browser-authenticated clients continue to call **typed mutation RPCs**.
+
+Any mutation RPC that needs receipt access must use a narrowly scoped `SECURITY DEFINER` boundary with:
+
+- `auth.uid()` required;
+- owner derived from `auth.uid()`, never arbitrary input user ID;
+- target ownership validation;
+- fixed `search_path`;
+- fully-qualified object names;
+- minimal `EXECUTE` grants;
+- no arbitrary SQL/function dispatch.
+
+Do not create a generic "execute mutation" RPC.
 
 ### Proposed table
-
-Server-only:
 
 ```sql
 private.mutation_receipts (
@@ -105,263 +175,436 @@ private.mutation_receipts (
   operation_id uuid not null,
   operation_kind text not null,
   request_fingerprint text not null,
-  response_json jsonb not null,
-  created_at timestamptz not null,
+  result_code text not null,
+  result_entity_id uuid,
+  result_revision integer,
+  result_json jsonb,
+  first_applied_at timestamptz not null,
   primary key (user_id, operation_id)
 )
 ```
 
-No anon/authenticated table privileges.
+Receipt payload must be minimal. Store only data required to identify/reconstruct the original mutation result.
 
-### RPC behavior
+Never store:
+- token;
+- password;
+- provider credential/ciphertext;
+- raw health payload;
+- large exported health data.
 
-For each supported mutation:
+A previously returned receipt is proof of that mutation's success; it is **not** the current screen state. After resolving a retry from a receipt, the client performs normal authoritative refetch/reconciliation before updating current UI state.
 
-1. acquire an operation-scoped advisory lock;
-2. check `private.mutation_receipts` by user + operation ID;
-3. if found:
-   - if request fingerprint matches, return stored response;
-   - if fingerprint differs, fail closed with operation-ID reuse error;
-4. apply business mutation;
-5. store the authoritative response in the receipt table in the same database transaction;
-6. return the response.
+## RPC transaction behavior
 
-The receipt lookup occurs **before** revision validation. This makes a retry after a lost successful response return the original success instead of a false conflict.
+Each supported typed mutation RPC performs in one database transaction:
 
-### Fingerprint
+1. derive current owner from `auth.uid()`;
+2. acquire operation-scoped lock;
+3. normalize mutation arguments;
+4. compute canonical DB-side fingerprint;
+5. check receipt by owner + operation ID;
+6. if receipt exists:
+   - matching fingerprint → return stored mutation result;
+   - different fingerprint → raise `operation_content_mismatch`;
+7. validate first-apply replay deadline / semantic preconditions;
+8. lock/read referenced current state as needed;
+9. validate expected revision / expected absence / reference fingerprint;
+10. apply mutation;
+11. insert minimal receipt with immutable `first_applied_at`;
+12. return authoritative mutation result.
 
-The same-origin server route computes a canonical request fingerprint over the mutation kind and validated business payload and passes it into the RPC.
+Receipt lookup occurs before:
+- replay-deadline validation;
+- revision validation;
+- reference-fingerprint validation.
 
-No secret is included in the fingerprint input.
+This allows a successful operation with a lost response to resolve to its original success.
 
-Astra must approve the exact canonicalization boundary.
+## Fingerprint
 
-### Receipt retention
+### Source of truth
 
-Candidate MVP retention: 90 days.
+The fingerprint is computed **inside the typed DB/RPC boundary from normalized arguments**.
 
-Client automatic replay horizon: 30 days.
+The API route:
+- authenticates via the existing app session;
+- parses/validates the request schema;
+- calls the typed RPC.
 
-Reason:
-- server receipts remain valid for at least 60 days beyond the longest automatic client retry horizon;
-- avoids unbounded permanent growth;
-- single-user volume is low.
+The route does not define an independent fingerprint algorithm.
 
-A client operation older than 30 days must not be automatically replayed. It becomes `expired` and requires explicit user review/new operation. This makes server pruning independent from knowing the contents of every client outbox.
+### Fingerprint fields
+
+As applicable, include normalized:
+
+- contract version;
+- mutation kind;
+- target/entity IDs;
+- expected revision or expected absence;
+- meal date / fixed target date;
+- immutable `eaten_at`;
+- quantities/units;
+- serving basis;
+- nutrient amounts/units;
+- provenance/quality/source fields;
+- actual mutation content;
+- required reference fingerprint.
+
+Preserve semantic differences:
+- NULL != omitted where the contract distinguishes them;
+- NULL != 0;
+- expected absence != expected revision;
+- explicit clearing != no change.
+
+Exclude:
+- JSON key order;
+- current server time;
+- HTTP headers;
+- session identifiers;
+- retry attempt count.
+
+## Reference-value guard
+
+### MealEntry snapshot meaning
+
+A queued MealEntry using a synchronized Catalog/Batch item must preserve the values the user selected.
+
+At selection time, the server/client contract captures a **server-generated reference fingerprint** over the effective values required to create the MealEntry snapshot, including as applicable:
+
+- serving basis;
+- effective nutrient values;
+- nutrient units;
+- nutrient provenance/quality/source metadata;
+- component-derived effective values for Batch.
+
+On execution/replay:
+
+1. server locks/reads the referenced current values once;
+2. computes the same reference fingerprint;
+3. uses that same locked value set for both:
+   - fingerprint comparison;
+   - snapshot generation.
+
+If the current reference fingerprint differs:
+- return HTTP 409 / `reference_changed`;
+- do not silently snapshot the newer values.
+
+The user must review the current item and create a **new** operation if they still want to record it.
+
+### Batch-specific requirement
+
+Catalog/Batch `revision` alone is insufficient because dependency recalculation may change effective nutrient values without changing the parent revision.
+
+Therefore MealEntry safety depends on the effective-value reference fingerprint, not only entity revision.
+
+### Immutable intent time
+
+`eaten_at` and target civil date are fixed when the user first creates the operation.
+
+Retries never replace them with retry time.
+
+## Fixed meal state
+
+For skip/unskip:
+
+- existing fixed meal → queued intent carries expected revision;
+- fixed meal not yet created → carries expected absence;
+- server reads current state and validates that exact condition.
+
+Never read the latest revision and silently treat it as the user's approved base revision.
+
+## Queued dependency and serialization rules
+
+- offline-created entity may not be referenced by another queued operation until it receives a server ID;
+- Batch components must already be synchronized;
+- Product/OCR candidate acquisition is online-only;
+- unresolved updates targeting the same entity are serialized;
+- the client must not automatically rewrite a queued operation's expected revision after an earlier queued operation succeeds;
+- if a dependent follow-up needs new state, it becomes a new user-confirmed operation.
+
+This avoids hidden last-write-wins behavior.
+
+## Receipt retention and replay horizon
+
+Server receipt retention:
+- 90 days from immutable server `first_applied_at`;
+- retry/read does not extend retention;
+- TTL uses server time only;
+- exactly-once semantics are not promised after receipt pruning.
+
+Client automatic replay horizon:
+- 30 days from immutable operation creation time;
+- retry does not reset creation time.
+
+### Expiry resolution
+
+After 30 days:
+
+1. stop automatic mutation replay;
+2. while the server receipt may still exist, perform a **result lookup** for the original operation;
+3. if receipt confirms success → resolve as synced, then refetch current state;
+4. if server confirms no application → user may inspect latest state and create a new operation;
+5. if application status cannot be established (e.g. receipt already pruned or verification unavailable) → show outcome unknown;
+6. never automatically create a replacement operation.
+
+The user may discard an unresolved/unknown local intent, but the app must not claim it was never applied.
+
+### Server first-apply age check
+
+For an operation without an existing receipt, the server validates the supported first-apply horizon.
+
+Client timestamps are not treated as trusted wall-clock authority; contract should include a bounded, server-verifiable mechanism for detecting obviously invalid/stale first application. Exact representation is finalized in Batch 6.1 tests/design notes.
 
 ## Mutation support matrix
 
 ### MealEntry add
 
-Offline queue: YES, if Catalog item is already synchronized.
+Offline queue: YES, when Catalog/Batch item is already synchronized.
 
 Requirements:
-- generate operation ID before optimistic UI update;
-- preserve the same operation ID across retries;
-- existing MealEntry create idempotency may remain, but operation receipt becomes the canonical retry guarantee.
+- stable operation ID;
+- immutable `eaten_at` / target date;
+- server-generated reference fingerprint;
+- one locked value set for compare + snapshot;
+- `reference_changed` on mismatch.
 
 ### Fixed meal skip/unskip
 
 Offline queue: YES.
 
-Rules:
-- capture current meal revision when available;
-- skip creation remains naturally idempotent by date/type;
-- state mutation still receives operation ID;
-- stale revision that was not previously successful returns conflict.
+Requirements:
+- operation ID;
+- expected revision or expected absence;
+- no implicit revision rebasing.
 
 ### Void MealEntry
 
 Offline queue: YES.
 
-Change required:
-- make retry of the same successful void return the original success through operation receipt;
-- a different operation attempting to void an already-voided entry may return current authoritative state instead of pretending it performed a new mutation.
+- same successful operation retry returns receipt result;
+- separate operation against already-voided state follows explicit current-state semantics rather than pretending to perform the original mutation.
 
 ### Catalog create/update
 
 Offline queue: YES.
 
 Create:
-- stable operation ID + existing idempotency key.
+- stable operation ID.
 
 Update:
 - expected revision required;
-- conflict is explicit;
-- no automatic merge.
+- genuine stale state → `revision_conflict`.
 
 ### Batch create/update
 
-Offline queue: YES if all components already have synchronized server IDs.
+Offline queue: YES if components are already synchronized.
 
-An offline-created Catalog item cannot immediately be used as a queued Batch component before it has synchronized.
+- expected revision for updates;
+- same-entity queued updates serialized;
+- new unsynced components cannot be referenced.
 
 ### Product save/update
 
-Offline queue: YES **after** identity/OCR/external candidate data has already been obtained.
+Offline queue: YES only after identity/OCR/external candidate data has already been acquired and the applicable Product v2 contract is available.
 
-Online-only:
-- barcode external lookup;
-- Cloud Vision OCR.
-
-The image itself is never stored in the outbox.
+External lookup/OCR remain online-only.
 
 ### Profile save
 
 Offline queue: YES.
 
-Uses revision conflict behavior.
+Expected revision required.
 
 ### Provider/OAuth/Sleep sync
 
 Offline queue: NO.
 
-Connect, reauth, disconnect, manual sync, stale sync, and morning sync remain online/server-side operations.
+Connect, reauth, disconnect, manual sync, stale sync, morning sync remain online/server operations.
 
 ## Queue processor
 
-Trigger replay on:
-- application foreground;
+Replay triggers:
+- app foreground;
 - browser `online` event;
-- successful login/session restoration;
+- successful restoration of the same owner session;
 - explicit Retry action.
 
-Do not rely on:
+Do not depend on:
 - Background Sync API;
 - long-running background timers;
-- iOS executing a suspended PWA.
+- suspended iOS PWA execution.
 
-### Retry classification
+Only one worker may own a queued operation at a time.
 
-Retryable:
+Use an IndexedDB lease/claim with expiry for correctness. Web Locks/BroadcastChannel may optimize coordination but are not correctness dependencies.
+
+## Retry/error classification
+
+### Retryable transport/server conditions
+
 - network failure;
 - request timeout;
 - HTTP 408;
 - HTTP 425;
 - HTTP 429;
-- HTTP 5xx.
+- HTTP 5xx, except an explicitly classified terminal deletion/outcome state.
 
-Pause for authentication:
-- HTTP 401.
+Use bounded exponential backoff with jitter while the app is active.
 
-Permanent failure:
-- HTTP 400;
-- HTTP 403;
-- HTTP 404 when target no longer exists;
-- HTTP 422.
+### Authentication pause
 
-Conflict:
-- HTTP 409.
+HTTP 401:
+- status → `paused_auth`;
+- stop replay;
+- retain intent;
+- require same-owner login.
 
-Retry schedule:
-- bounded exponential backoff with jitter while the app is active;
-- after the bounded attempts, remain pending/failed and retry on next foreground/manual action while under the 30-day replay horizon;
-- after 30 days, become expired/blocked rather than replaying;
-- never silently discard.
+### Permanent input/authorization failure
 
-## Conflict UX
+HTTP 400 / 403 / 404 / 422 as contractually appropriate:
+- status → `failed` or `blocked`;
+- no blind automatic retry.
 
-When a queued revisioned mutation receives 409:
+### Semantic conflicts
 
-1. mark it `conflict`;
-2. fetch authoritative server record;
-3. show:
-   - server current value;
-   - queued local intended value;
-4. provide:
-   - “サーバー側を採用” → discard queued intent;
-   - “自分の変更を反映” → create a **new** operation against latest revision.
+HTTP 409 must contain a safe machine-readable subtype.
 
-No automatic per-field merge in the MVP.
+Required subtypes:
 
-Rationale:
-- one-user app still runs on iPhone + iPad;
-- explicit resolution is safer than a hidden last-write-wins rule;
-- frequency should be low enough that manual resolution is acceptable.
+- `revision_conflict`
+- `reference_changed`
+- `operation_content_mismatch`
+
+Do not route every 409 into the same generic UI.
+
+## Conflict resolution
+
+### revision_conflict
+
+Show:
+- current server state;
+- queued local intent.
+
+Actions:
+- adopt server state → discard local intent;
+- reapply local intent → user reviews current state, then create a **new operation ID** against the displayed current revision.
+
+If server changes again before reapply, another 409 is correct.
+
+### reference_changed
+
+Show:
+- originally selected item/reference summary;
+- current Catalog/Batch reference state;
+- warning that nutrient/serving values changed.
+
+The user must explicitly review the current values and create a new MealEntry operation.
+
+### operation_content_mismatch
+
+This is an idempotency contract violation.
+
+- stop the operation;
+- do not offer ordinary "reapply" as if it were a normal revision conflict;
+- surface a safe error and require the user to create a separate new action from the current UI.
 
 ## Optimistic UI
 
-Existing Today optimistic feedback remains.
+Existing Today optimistic behavior remains.
 
-Phase 6 adds a stable mutation state vocabulary:
-- pending;
-- failed/retry;
-- conflict;
-- synced.
+Stable state vocabulary:
+
+- pending
+- in_flight
+- failed
+- paused_auth
+- conflict
+- expired
+- blocked
+- synced
 
 The UI must distinguish:
-- “saved locally / waiting to sync” from
-- “server-confirmed synced”.
 
-Do not display “saved” as authoritative until the server receipt has been acknowledged.
+- `端末に保存・未同期`
+- `server成功を確認済み`
+
+Pending/failed local values are provisional UI only and must not be included as authoritative Nutrition analytics/priority evidence until server-confirmed.
 
 ## Service worker / PWA recovery
 
 Current app has a manifest but no service worker.
 
 Phase 6 adds a minimal service worker for:
-- static asset caching;
+- static assets;
 - offline fallback shell;
 - version/update detection.
 
-Must **not** cache:
-- authenticated RSC/HTML health pages for offline history viewing;
+Must not cache:
+- authenticated HTML/RSC health pages for history replay;
 - authenticated API responses;
 - provider responses;
 - OAuth callbacks;
 - export/deletion responses.
 
-Cold-start offline behavior:
-- show an offline shell explaining that authenticated data cannot be loaded;
-- preserve existing IndexedDB queued mutations;
-- never fabricate stale health/nutrition values.
+Cold-start offline:
+- show safe offline shell;
+- show local unsynchronized intent only;
+- never present stale authenticated Nutrition/Sleep history as current server truth.
 
-## Version change behavior
+## Version recovery
 
-Each IndexedDB mutation has `contract_version`.
+Outbox contract versioning is introduced with the outbox in Batch 6.2, not deferred to the later PWA polish batch.
 
-On app update:
-- static caches may be replaced;
-- outbox is preserved;
-- compatible queue migrations run explicitly;
-- unknown/newer/incompatible operation contracts are marked blocked and surfaced to the user;
-- no queue item is dropped because a service worker activates.
-
-## Multi-tab/process coordination
-
-Only one queue worker should own a mutation at a time.
-
-Implementation may use an IndexedDB lease/claim with expiry. Web Locks/BroadcastChannel may be used as optimization, but correctness must not depend on APIs that are unreliable on iOS.
-
-A crashed worker's lease expires and another foreground worker may resume.
+On update:
+- static caches may change independently;
+- IndexedDB outbox is preserved;
+- explicit migrations handle supported old contracts;
+- incompatible records become `blocked`;
+- no pending operation is silently dropped.
 
 ## Acceptance cases
 
 Automated:
-- response lost after successful create → retry returns same result, one DB mutation;
-- response lost after successful revisioned update → retry returns stored success, not 409;
-- same operation ID with different fingerprint → rejected;
-- genuine stale revision → 409;
-- network error → pending;
-- 401 → queue pauses;
-- 400/422 → permanent failure;
-- app version change preserves outbox;
-- no token/password fields can enter queue serializer.
+
+- same operation + same normalized content returns original result;
+- same operation + different content → `operation_content_mismatch`;
+- receipt lookup occurs before revision/reference/deadline checks;
+- response lost after create → one DB mutation;
+- response lost after revisioned update → original success, not false 409;
+- stale revision → `revision_conflict`;
+- changed Catalog/Batch effective values → `reference_changed`;
+- compare + snapshot uses the same locked reference values;
+- fixed meal expected-absence/revision checks;
+- operation creation/retry does not shift `eaten_at`;
+- 30-day replay / 90-day receipt boundary tests;
+- retry does not extend receipt TTL;
+- expired operation resolves receipt success before any replacement action;
+- outcome-unknown path does not auto-recreate;
+- environment/owner mismatch blocks replay;
+- IDB persistence failure never displays "saved locally";
+- 401 → `paused_auth`;
+- incompatible contract → `blocked`;
+- no secret/token/password fields can enter queue serializer.
 
 Preview/device:
-- save MealEntry, disable network before response, restore network → one entry only;
-- same for Catalog/Profile update;
-- concurrent iPhone/iPad revision conflict → explicit conflict UI;
-- pending indicator survives PWA reload;
-- cold-start offline does not display fabricated/stale authenticated data.
 
-## Astra decisions required
+- MealEntry offline/reconnect creates exactly one server row;
+- Catalog update response-loss retry returns original success;
+- Catalog change while MealEntry is pending triggers `reference_changed`;
+- iPhone/iPad revision conflict is explicit;
+- pending state survives reload when storage remains available;
+- logout shows pending-item handling;
+- cold-start offline does not display stale authenticated history as current.
 
-1. approve `private.mutation_receipts` pattern;
-2. approve request fingerprint boundary;
-3. approve 90-day receipt retention;
-4. approve supported/offline-only mutation matrix;
-5. approve 30-day client replay horizon vs 90-day server receipt retention;
-6. approve no-auto-merge conflict policy;
-7. approve browser IndexedDB handling without custom encryption;
-8. approve static-only service-worker cache policy.
+## Approved Astra corrections
+
+A1–A7 are incorporated into this document.
+
+The remaining implementation choices must not weaken:
+- typed `SECURITY DEFINER` boundaries;
+- DB-side fingerprint normalization;
+- reference-value guard;
+- 30-day client / 90-day server asymmetry;
+- explicit 409 subtypes;
+- health-data-aware local-storage semantics.
