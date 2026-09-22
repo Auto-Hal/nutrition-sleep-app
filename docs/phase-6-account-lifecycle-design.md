@@ -1,17 +1,18 @@
 # Phase 6 Export / Account Lifecycle Design
 
-Status: DRAFT FOR ASTRA REVIEW  
-Updated: 2026-09-22
+Status: ASTRA REVIEW CORRECTIONS APPLIED  
+Updated: 2026-09-23
 
 ## Goals
 
 Phase 6 must provide:
 
-1. export of user-owned Nutrition + Sleep data;
-2. deliberate, authenticated account/data deletion;
-3. provider credential cleanup;
-4. local browser-state cleanup;
-5. no accidental exposure of server-only credentials/session internals.
+1. consistent export of user-owned normalized Nutrition + Sleep data;
+2. deliberate authenticated account/data deletion;
+3. provider revocation attempt without making third-party availability a deletion blocker;
+4. deletion-time protection against concurrent writes/sync callbacks;
+5. honest handling of ambiguous deletion outcomes;
+6. local browser-state cleanup without claiming control over other devices/backups/provider data.
 
 ## Export
 
@@ -22,26 +23,62 @@ Proposed:
 `GET /api/account/export`
 
 Requirements:
+
 - authenticated app session;
+- owner = current session/auth user;
 - `Cache-Control: no-store`;
-- same-origin application route;
-- response uses `Content-Disposition: attachment`;
-- no browser-side Supabase token handling.
+- same-origin route;
+- attachment response;
+- no browser-side Supabase token handling;
+- no service-role use for export.
 
-GET is acceptable because export is read-only.
+## Export consistency
 
-### Format
+### Binding decision
 
-Initial MVP format:
-- one versioned JSON document;
-- filename: `nutrition-sleep-export-YYYY-MM-DD.json`.
+Export must be generated from **one consistent database snapshot**.
 
-Top-level shape:
+Preferred MVP implementation:
+
+- one owner-scoped database RPC/function that produces the versioned export from a single SQL statement/snapshot; or
+- another implementation that guarantees equivalent read-only `REPEATABLE READ` consistency.
+
+Do not perform independent HTTP/PostgREST table queries that can observe different revisions while sync/another device writes.
+
+If implementation uses multiple SQL commands:
+- they must run inside one read-only `REPEATABLE READ` transaction.
+
+If a single SQL export statement is used:
+- all exported subqueries must be part of that one statement;
+- owner filtering is derived from `auth.uid()`;
+- no service-role bypass is used.
+
+### Partial export
+
+Never return a truncated/partial payload as a complete export.
+
+If:
+- row limit;
+- payload limit;
+- timeout;
+- serialization failure;
+then fail the export explicitly.
+
+Future streaming/chunked formats may be added later but must preserve a single snapshot.
+
+## Export format
+
+Initial MVP:
+- versioned JSON;
+- filename `nutrition-sleep-export-YYYY-MM-DD.json`.
+
+Top level:
 
 ```json
 {
   "schema_version": 1,
   "exported_at": "...",
+  "definitions": {},
   "profile": {},
   "nutrition": {},
   "sleep": {},
@@ -49,304 +86,508 @@ Top-level shape:
 }
 ```
 
-JSON is chosen for the MVP because:
-- it preserves null vs zero;
-- it preserves nested provenance cleanly;
-- it avoids CSV schema fragmentation;
-- it is easy to version;
-- it is sufficient for user portability and backup.
+Include definitions required to interpret:
+- nutrient codes;
+- units;
+- Product/export schema version;
+- DRI dataset identifier where relevant to derived metadata.
 
-A multi-file ZIP/CSV package may be added later without replacing JSON v1.
+Do not claim the JSON is a fully restorable backup while no import/restore function exists.
 
-## Exported data
+## Export allowlist
+
+Export uses an explicit allowlist.
 
 ### Profile
 
-Include:
-- public user profile fields;
-- revision/timestamps where useful.
+Include user-owned public profile fields and useful revision/timestamps.
 
 ### Nutrition current state
 
 Include owner rows for:
+
 - catalog_items;
 - item_nutrients;
 - products;
 - batches;
 - batch_components.
 
+Include inactive/deactivated current-state rows where they are part of the user's retained data.
+
 ### Nutrition history
 
 Include:
+
 - meals;
-- meal_entries;
+- meal_entries, including voided entries as stored;
 - meal_entry_nutrient_snapshots.
 
-Historical snapshots are exported exactly as stored.
+Snapshots are exported exactly as stored.
 
-Do not “recalculate” historical nutrient amounts during export.
+Do not recalculate historical nutrition during export.
 
 ### Sleep
 
-Include:
-- sleep_sessions;
-- sleep_stage_intervals;
-- sleep_out_of_bed_segments.
+Include all **currently stored normalized rows**, including:
 
-Include superseded observations with their superseded timestamp so the export preserves correction history unless Astra decides only active observations are user-meaningful.
+- active sleep sessions;
+- superseded sleep-session rows that still exist;
+- child stage/out-of-bed rows that still exist;
+- stored revision/superseded metadata.
+
+Important wording:
+
+The export contains **stored current normalized state and stored superseded rows**.
+
+It is not described as a complete correction/revision history because the existing repository may update the same provider resource in place and replace child intervals rather than retaining every historical version.
+
+Do not reconstruct history that the DB never retained.
 
 ### Provider connection metadata
 
-May include:
+Allowlist only user-meaningful connection metadata such as:
+
 - provider;
-- status;
+- connection status;
 - granted scopes;
-- connection/sync timestamps;
-- backfill progress;
-- error code metadata.
+- connected/disconnected timestamps;
+- sync/backfill timestamps;
+- safe last error code.
 
-Do not include:
-- refresh token;
-- access token;
-- encrypted credential ciphertext;
-- encryption key;
-- app-session ciphertext;
-- login-rate-limit rows.
+Exclude internal provider user identifiers unless a concrete portability requirement later justifies them.
 
-Provider internal health-user identifier should be excluded from the initial portable export unless a concrete user need is identified.
+### Never export
 
-## Export privacy
-
-Never export:
 - `private.app_sessions`;
 - `private.health_provider_credentials`;
 - `private.login_rate_limits`;
-- mutation receipt internals unless they become user-visible data;
+- mutation receipt internals;
+- account-deletion lifecycle internals;
+- refresh/access tokens;
+- encrypted ciphertext;
+- encryption keys;
+- passwords;
 - server environment values;
-- provider raw payloads that are not part of normalized user data.
+- raw provider payloads;
+- admin/service-role credentials.
 
-The export itself contains sensitive health/nutrition data. The UI should state this before download.
+Also review provider resource-name/source strings for embedded internal identifiers before inclusion. Use allowlists, not broad object serialization.
 
-## Export consistency
+## Export privacy/security
 
-For the MVP, use a bounded server-side read sequence against the same user.
+The downloaded file contains sensitive health and nutrition information.
 
-Because this is a single-user application and exported tables are modest in size, a short export window is acceptable.
+Before download, UI states this clearly.
 
-If strict cross-table snapshot consistency becomes necessary, add a database export RPC/transaction rather than silently pretending sequential HTTP queries are an atomic snapshot.
+Tests include fixtures containing:
+- token-like strings;
+- ciphertext-like fields;
+- password-like values;
+- internal provider IDs;
+- environment values.
 
-Pagination must be explicit so a long history is not truncated by provider/API defaults.
+The export serializer must prove these are absent.
 
-## Account deletion
+## Account deletion overview
 
-### User experience
+Settings → Data/Account:
 
-Settings → Account / Data:
+1. explain deletion scope;
+2. recommend export;
+3. final confirmation POST includes current password;
+4. fresh reauthentication + shared rate limit;
+5. begin deletion guard;
+6. attempt provider revocation outside DB transaction;
+7. hard-delete Supabase Auth user using server-only Admin API;
+8. verify deletion outcome;
+9. clear current browser state;
+10. show terminal result.
 
-- “データを書き出す”
-- “アカウントとすべてのデータを削除”
+No one-click destructive action.
 
-Destructive flow:
-1. show what will be deleted;
-2. recommend export first;
-3. require current password;
-4. require explicit final confirmation;
-5. perform deletion;
-6. clear local state;
-7. return to a terminal deleted-account screen/login shell.
+## Fresh reauthentication
 
-No one-click destructive button.
+Deletion reuses the existing security posture.
 
-## Fresh authentication
+Requirements:
 
-Account deletion requires the current password even if an app session is active.
+- active app session required;
+- fail-closed Origin check;
+- current session user must equal `APP_ALLOWED_USER_ID`;
+- password is supplied only in the final destructive request;
+- verify password server-side;
+- reuse the existing shared DB-backed login rate-limit mechanism with a distinct action namespace/fingerprint;
+- do not issue/persist a new ordinary app session as a side effect;
+- password and verification token exist only during the request;
+- never put password in URL, logs, outbox, IndexedDB, durable DB state.
 
-Proposed server behavior:
-1. load current app session;
-2. resolve current Supabase Auth user/email server-side;
-3. call password sign-in verification server-side;
-4. ensure returned user ID matches `APP_ALLOWED_USER_ID` and current session user ID;
-5. continue only on successful reauthentication.
+The deletion endpoint must not become an unthrottled password-guessing endpoint.
 
-Password:
-- request body only;
-- no logs;
-- no URL;
-- no DB persistence;
-- no browser storage;
-- response always no-store.
+## Server-only Admin credential
+
+Account deletion may introduce a server-only Supabase Admin/service-role credential.
+
+This credential is powerful; it is **not** a deletion-scoped key.
+
+Required containment:
+
+- dedicated server-only admin module;
+- only account-deletion/lifecycle code may import it;
+- target user ID comes from active session + allowlist, never request body;
+- runtime verifies configured Supabase project/environment matches the current deployment;
+- Preview and Production credentials are separate;
+- no use for export;
+- no use for ordinary CRUD;
+- no use for mutation receipts;
+- no browser bundle exposure;
+- safe error mapping only.
+
+Environment validation rejects:
+- `NEXT_PUBLIC_*` admin/service-role variants;
+- missing/mismatched environment/project configuration.
+
+## Deletion concurrency guard
+
+Deletion must stop new user-owned writes before remote revocation/Auth deletion.
+
+### Proposed private guard
+
+Add a server-only lifecycle guard, e.g.:
+
+```sql
+private.account_deletion_guards (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  deletion_operation_id uuid not null unique,
+  started_at timestamptz not null
+)
+```
+
+### Write-path rule
+
+All Phase 6 app mutation transactions and Google Health write/sync/OAuth callback paths must:
+
+- participate in a user-scoped lifecycle lock/guard contract;
+- reject new writes with safe `account_deletion_in_progress` once guard exists.
+
+To close the race with already-running writes:
+
+- user write/sync transactions acquire the agreed user-scoped shared lifecycle lock before guard check/write;
+- deletion-start transaction acquires the corresponding exclusive user-scoped lifecycle lock;
+- it waits for already-running guarded writers to finish;
+- inserts the deletion guard;
+- commits.
+
+After that:
+- subsequent writers acquire lock, see guard, and stop.
+
+Exact advisory-lock key derivation must be deterministic and collision-safe enough for this single-user application and is tested in fresh DB/pgTAP.
+
+Do not hold a DB transaction or advisory transaction lock while waiting on Google/Supabase external HTTP.
+
+## Deletion operation status
+
+Deletion can succeed remotely/server-side while the HTTP response is lost.
+
+The result must remain queryable briefly without depending on rows that are cascaded when the Auth user disappears.
+
+### Proposed short-lived status
+
+Use a minimal server-only lifecycle status keyed by a random high-entropy deletion operation ID, not by health data.
+
+Example:
+
+```sql
+private.account_deletion_operations (
+  operation_id uuid primary key,
+  user_fingerprint text not null,
+  environment_id text not null,
+  status text not null,
+  provider_revoke_status text,
+  auth_delete_status text,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  expires_at timestamptz not null
+)
+```
+
+Rules:
+
+- do not foreign-key this row to `auth.users` if it must survive Auth deletion;
+- user fingerprint is a one-way server HMAC/opaque identifier, not raw health data;
+- no password;
+- no OAuth token;
+- no provider payload;
+- no exported user data;
+- short TTL, e.g. 24 hours;
+- high-entropy operation ID may be held in a Secure/HttpOnly/SameSite cookie or equivalent safe same-origin status mechanism;
+- status endpoint reveals only deletion state, not user data.
+
+This status is for ambiguous-response recovery, not a permanent audit log.
 
 ## Provider revocation
 
 If Google Health is connected:
 
-1. load server-only provider credential;
-2. attempt remote Google OAuth token revocation;
-3. classify result safely;
-4. continue to local destructive cleanup.
+1. load server-only credential before local deletion;
+2. attempt remote token/authorization revocation;
+3. bounded timeout;
+4. classify result safely;
+5. continue local deletion regardless of transient provider failure.
 
-### Revocation failure policy
+### Environment isolation gate
 
-Local account deletion must remain possible even if remote Google revocation is transiently unavailable.
+Before enabling destructive revocation in an environment, verify:
 
-Reason:
-- a third-party outage must not prevent a user from deleting local health data;
-- once local credential ciphertext is deleted, this application no longer retains the token needed to access the provider.
+- Preview and Production use separate Google Cloud projects as required by CR-001;
+- Preview and Production OAuth clients/secrets are not shared;
+- the active credential belongs to the expected environment/project.
 
-If revocation fails transiently:
-- complete local deletion;
-- return a safe flag indicating that the user should remove the app from Google Account connected-app permissions manually;
-- never retain the provider token solely to retry revocation later.
+This project already intends dedicated Preview/Production Google Cloud projects; Phase 6 acceptance must verify the deployed configuration rather than assume it.
 
-Astra must explicitly approve this policy.
+### Revocation outcomes
 
-Already-invalid/revoked grants count as remotely cleaned.
+- success/already-invalid → mark accordingly;
+- timeout/network/unknown → do **not** claim remote revoke succeeded;
+- local deletion still proceeds;
+- do not retain provider token solely for future retry.
 
-## Auth user deletion
+If revocation succeeds but later Auth deletion fails:
+- local provider connection must not remain displayed as healthy `connected`;
+- mark safe disconnected/reauth/error state as applicable while the account still exists;
+- user can retry deletion.
 
-Preferred implementation:
-- server-only Supabase Admin API;
-- `auth.admin.deleteUser(currentUserId)`;
-- requires server-only service-role/admin credential.
+## Auth user hard deletion
 
-Why:
-- deleting the Auth user is the canonical root deletion;
-- existing foreign keys with `on delete cascade` already remove user-keyed application rows.
+Root deletion mechanism:
 
-### Service-role impact
+`supabase.auth.admin.deleteUser(currentUserId)`
 
-Current application intentionally does not deploy the admin service-role credential for normal runtime auth.
+Hard delete is preferred.
 
-Phase 6 account deletion would introduce a new high-value server secret if this path is approved.
+### Sequence
 
-Required controls:
-- server-only environment variable;
-- explicit rejection of any `NEXT_PUBLIC_*` variant;
-- isolated admin-client module;
-- only account-deletion route may import it;
-- current user must equal `APP_ALLOWED_USER_ID`;
-- fresh password confirmation required;
-- fail closed if admin credential is missing;
-- never log the key or admin-client error payload containing secrets.
+1. final request + fresh reauth;
+2. create deletion operation status;
+3. acquire deletion lifecycle lock and create guard;
+4. commit guard;
+5. attempt Google revoke outside DB transaction;
+6. call Admin deleteUser;
+7. if response is success → verify Auth user no longer exists where supported;
+8. if timeout/ambiguous → perform server-side outcome verification;
+9. update short-lived deletion operation status;
+10. clear cookie/local browser state only after authoritative success is confirmed.
 
-Alternative approaches to deleting `auth.users` directly through a SQL security-definer function are not preferred unless Astra identifies a lower-risk supported path.
+### Ambiguous result
+
+If Admin deletion outcome cannot be determined:
+
+- status = `deletion_outcome_unknown`;
+- do not claim success;
+- do not claim account definitely remains;
+- keep current device in a terminal/recovery state;
+- allow safe status re-check using the deletion operation mechanism.
+
+Do not depend on:
+- ordinary app session (it may already be deleted);
+- `mutation_receipts` (they cascade with the user).
+
+## Existing JWT/app sessions
+
+Deleting Auth user may not instantly invalidate every already-issued upstream token everywhere.
+
+Therefore:
+
+- existing application sessions are invalidated/cascaded;
+- server app-session verification continues to require the allowed current Auth identity;
+- deletion guard prevents app writes while deletion is in progress;
+- current app-session cookie is expired in the confirmed-success response;
+- other devices learn deletion on their next server interaction.
+
+Do not claim remote/local storage on other devices is instantly erased.
 
 ## Cascade inventory
 
-Auth-user deletion should cascade:
-- user_profiles;
-- app_sessions;
-- catalog_items and dependent nutrients/batches/components;
-- meals/entries/snapshots;
-- products;
-- health_provider_connections;
-- health_provider_credentials;
-- sleep sessions/stages/out-of-bed;
-- Phase 6 mutation receipts keyed by user.
+Required user-owned tables:
 
-`private.login_rate_limits` is keyed by HMAC source fingerprint rather than user ID and is not user account data. It should have independent retention/pruning.
+### Profile
+- `user_profiles`
 
-Before implementation, fresh schema tests must prove the complete cascade inventory.
+### Catalog/Product
+- `catalog_items`
+- `item_nutrients`
+- `products`
+- `batches`
+- `batch_components`
 
-## App sessions
+### Meal
+- `meals`
+- `meal_entries`
+- `meal_entry_nutrient_snapshots`
 
-Deletion must invalidate all app sessions.
+### Health/Sleep
+- `health_provider_connections`
+- `sleep_sessions`
+- `sleep_stage_intervals`
+- `sleep_out_of_bed_segments` / final canonical out-of-bed child table name in the Phase 5 schema
 
-Deleting `auth.users` cascades `private.app_sessions`, but the current browser's HttpOnly cookie must also be cleared in the final response.
+### Private
+- `app_sessions`
+- `health_provider_credentials`
+- `account_deletion_guards`
 
-If admin deletion fails:
-- do not claim deletion succeeded;
-- do not clear evidence necessary for safe retry unless the user explicitly requested data-only deletion.
+### Phase 6
+- `mutation_receipts`
+- any additional user-FK lifecycle rows.
+
+Global/non-user rows remain:
+- `nutrient_definitions`;
+- other global reference data.
+
+`private.login_rate_limits` is source-HMAC keyed, not user-owned, and follows independent retention.
+
+`account_deletion_operations` is intentionally short-lived and may survive Auth deletion until its TTL.
+
+### Preflight
+
+Before Admin deletion:
+- verify no unexpected user-owned storage/object resource would prevent or contradict deletion semantics;
+- include Supabase Storage ownership if Phase 6 or future code introduces Storage;
+- do not assume cascade inventory remains complete forever.
+
+## Cascade tests
+
+Use relational fixtures to prove:
+
+- target user removed;
+- another user remains;
+- dependent rows removed through actual FK paths;
+- private credentials/sessions removed;
+- mutation receipts removed;
+- global definitions remain;
+- deletion status row survives only for its short TTL where designed.
+
+Never use the sole Production user for destructive acceptance.
 
 ## Local browser cleanup
 
-After successful account deletion:
-- clear Phase 6 IndexedDB outbox;
-- clear local mutation receipts/status;
-- clear service-worker caches;
-- clear any non-sensitive UI preference storage for this app;
-- expire app-session cookie through server response.
+After confirmed server deletion on the current device:
 
-Do not rely on browser cleanup as the authoritative deletion; server deletion is authoritative.
+- clear Phase 6 IndexedDB outbox;
+- clear local sync/receipt UI state;
+- clear service-worker caches;
+- clear app-local non-sensitive preferences as appropriate;
+- expire app-session cookie.
+
+Server deletion is authoritative.
+
+### Other devices
+
+The app cannot instantly erase:
+- another offline device's IndexedDB;
+- downloaded export files;
+- OS/browser backups;
+- Google/provider-side original health data.
+
+Other devices stop working and clear/offer cleanup on their next successful connection/state check.
+
+UI must distinguish:
+- server account/data deletion;
+- this-device local cleanup;
+- external/provider data ownership.
 
 ## Data-only deletion
 
-Initial Phase 6 design does **not** add a separate “delete all data but keep account” path.
+Not in MVP.
 
-Reason:
-- single-user personal app;
-- reduces destructive semantics and testing surface;
-- the requirement is satisfied by account + data deletion.
+There is no separate "delete all app data but keep account" feature.
 
-A separate reset-data feature can be added later if needed.
+If the user deletes the account, future reuse requires reprovisioning under the app's single-user auth model.
 
 ## Failure semantics
 
-Before Auth user deletion:
-- validation/password failure → no destructive action;
-- provider revocation failure → record safe status and continue local deletion as approved;
-- admin API unavailable → do not claim deletion; user can retry.
+Before deletion guard:
+- auth/origin/password/rate-limit failure → no destructive action.
 
-After Auth user deletion succeeds:
-- local cleanup failure does not restore the server account;
-- show instructions to close/reopen the app if local cache cleanup cannot fully finish.
+After guard, before Auth deletion:
+- provider revoke failure → continue local deletion under approved policy;
+- Admin service unavailable → keep guard/status and expose safe retry/recovery;
+- never return success prematurely.
 
-## Audit/logging
+After confirmed Auth deletion:
+- browser cleanup failure cannot restore the deleted server account;
+- show local cleanup/reopen guidance.
 
-Allowed logs:
+Ambiguous:
+- `deletion_outcome_unknown`;
+- status re-check only;
+- no blind second hard-delete assumption.
+
+## Logging
+
+Allowed safe logs:
+
 - deletion stage;
-- success/failure category;
-- provider revocation status category.
+- deletion operation ID if policy allows non-sensitive correlation;
+- safe success/failure category;
+- provider revoke category;
+- admin delete category.
 
 Never log:
+
 - password;
 - OAuth token;
 - credential ciphertext;
+- service-role/admin secret;
 - exported health data;
 - raw provider response.
 
-Do not create a durable deletion audit row containing deleted-user health metadata unless there is a concrete need.
+No permanent health-bearing deletion audit row is required.
 
 ## Security tests
 
 Automated:
-- no session → 401;
-- missing/wrong password → rejection, no data deleted;
-- allowed-user mismatch → fail closed;
-- provider revoke success;
-- provider already revoked;
-- provider transient revoke failure still permits approved local deletion behavior;
-- admin delete failure does not return success;
-- all user-keyed DB rows cascade;
-- provider credential disappears;
-- app sessions disappear;
-- export excludes private tables;
-- export preserves null vs zero and immutable snapshots;
-- service-role value cannot be exposed through client bundle/env.
 
-Preview:
-- create dedicated synthetic test user only if environment policy permits;
-- otherwise perform cascade acceptance in fresh local Supabase + carefully controlled Preview procedure;
-- never use the sole Production account for destructive acceptance.
+- no session → 401;
+- Origin missing/mismatch → fail closed;
+- wrong/missing password → rejected, no guard/deletion;
+- deletion reauth shares DB-backed rate limiting;
+- allowed-user mismatch → rejected;
+- admin target ignores request-body user ID;
+- Preview/Production admin project mismatch → fail closed;
+- provider revoke success/already-invalid/timeout;
+- revoke timeout still proceeds to approved local deletion;
+- revoke success + Admin failure does not leave connection healthy;
+- new mutation/OAuth callback/sync blocked after deletion guard;
+- in-flight guarded writer completes before deletion guard becomes active;
+- Admin timeout → outcome re-check;
+- unknown outcome not reported as success;
+- all user-keyed cascade fixtures pass;
+- export excludes all private/status/credential fields;
+- admin credential is absent from client bundle/responses/logs.
 
 ## Production gate
 
-Production account deletion must not be exercised destructively as a routine smoke test on the only live account.
+Production destructive smoke test on the only live account is prohibited.
 
-Production verification should validate:
-- route/config availability;
-- secret boundary;
-- non-destructive preflight where possible.
+Production verification is non-destructive:
 
-Full destructive behavior is proven in isolated local/Preview test identity before Production rollout.
+- route/config present;
+- admin secret boundary validated;
+- environment/project match validated;
+- provider project separation validated;
+- preflight/cascade already proven in isolated local/Preview identity.
 
-## Astra decisions required
+## Approved Astra corrections
 
-1. approve server-side service-role introduction;
-2. confirm Supabase Admin API as deletion mechanism;
-3. approve fresh-password confirmation flow;
-4. approve provider-revocation failure policy;
-5. approve exported public-table inventory;
-6. decide active-only vs correction-history Sleep export;
-7. approve exclusion of provider internal user ID from v1 export;
-8. approve no separate data-only reset in MVP.
+D1–D7, X1, and X5 are incorporated.
+
+Binding decisions:
+
+- admin credential is isolated and not reused for export/CRUD;
+- deletion uses lifecycle guard + explicit ambiguous-outcome handling;
+- password reauth is rate-limited;
+- provider revocation is best effort but environment isolation is verified;
+- export uses one consistent owner-scoped snapshot;
+- Sleep export describes only history actually retained;
+- export is allowlist-based and excludes internal provider ID/credentials;
+- no separate data-only reset is added to the MVP.
