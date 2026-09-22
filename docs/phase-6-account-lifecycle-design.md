@@ -428,7 +428,7 @@ Required user-owned tables:
 - `health_provider_connections`
 - `sleep_sessions`
 - `sleep_stage_intervals`
-- `sleep_out_of_bed_segments` / final canonical out-of-bed child table name in the Phase 5 schema
+- `sleep_out_of_bed_segments`
 
 ### Private
 - `app_sessions`
