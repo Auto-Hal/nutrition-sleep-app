@@ -1,195 +1,265 @@
 # Phase 6 Architecture — MVP Completion
 
-Status: DRAFT FOR ASTRA REVIEW  
+Status: ASTRA REVIEWED / REQUIRED CORRECTIONS APPLIED / AWAITING SUPERVISOR ACCEPTANCE  
 Branch: `phase/6-design`  
-Based on Phase 5 head: `bdc509bd38792397507823c6eeb45ee38a9f32c2`  
-Updated: 2026-09-22
+Based on Phase 5 branch: `phase/5-sleep-foundation`  
+Updated: 2026-09-23
 
 ## Purpose
 
-Phase 6 completes the MVP by making the existing Nutrition + Sleep product dependable for daily use and by making Nutrition actionable rather than merely descriptive.
+Phase 6 completes the MVP by:
 
-This design does not start Phase 6 implementation. High-risk semantics remain blocked on Astra review.
+- making daily writes reliable under transient connectivity and multi-device use;
+- making Japanese barcode Product entry practically useful;
+- making Nutrition evidence actionable without overstating DRI semantics;
+- adding user-data export and controlled account deletion;
+- completing PWA/device/security/Production acceptance.
 
-## Binding Phase 6 outcomes
+No Phase 6 implementation has started.
 
-The MVP is not COMPLETE until all of the following are accepted:
+Production remains untouched.
 
-1. daily-critical writes survive transient network failure without duplicate application;
-2. conflicts are explicit and never silently overwritten;
-3. stale PWA/client-version state can recover without losing queued user intent;
-4. Japanese barcode entry is materially more useful than the current Open Food Facts-only path;
-5. Nutrition clearly answers “what should I improve first?” while preserving DRI 2025 semantics;
-6. user-owned Nutrition + Sleep data can be exported;
-7. the account and user-owned data can be deleted, including local provider credentials;
-8. Preview, fresh-DB, iPhone, iPad, security, Production, and runtime gates pass.
+## Astra review outcome
 
-## Non-negotiable invariants carried forward
+Astra verdict:
+
+`PHASE 6 DESIGN APPROVED WITH REQUIRED CORRECTIONS`
+
+Required corrections have now been applied to the canonical design documents.
+
+Implementation remains gated on:
+1. Supervisor/user acceptance of the corrected design;
+2. the per-batch dependencies in the implementation plan;
+3. Phase 5 rollout boundaries where applicable.
+
+## Non-negotiable invariants
 
 - unknown != zero;
 - not_recorded != skipped;
 - historical MealEntry nutrient snapshots are immutable;
-- external product data is never silently promoted to verified;
-- user-confirmed local data outranks later external candidates;
-- provider OAuth tokens never enter browser storage;
-- Sleep provider writes remain server-controlled;
-- Production remains isolated until Preview/acceptance gates pass;
-- no medical diagnosis, deficiency probability, or disease-risk claim;
-- Phase 6 must remain fresh-migration replayable.
+- offline delay must not silently change the Catalog/Batch values used to create a snapshot;
+- external product data never silently overwrites saved local Product data;
+- user-confirmed nutrient data is not replaced by external unverified data without explicit confirmation;
+- owner-scoped RLS remains binding;
+- private schema remains browser-inaccessible;
+- provider/app/admin credentials remain server-only;
+- Phase 4 EAR/RDA/AI/DG/UL/EER semantics remain binding;
+- no medical diagnosis, deficiency probability, or disease-risk score;
+- Preview and Production remain isolated;
+- Phase 6 migrations must replay fresh and upgrade legacy data without guessed provenance.
 
-## Workstreams
+## Workstream A — Reliability / offline-aware writes
 
-### A. Reliability / offline-aware writes
+Canonical design:
+`docs/phase-6-reliability-design.md`
 
-Detailed design: `docs/phase-6-reliability-design.md`
+Binding decisions:
 
-Core decision:
-- use a browser IndexedDB outbox for pending user mutations;
-- replay through existing same-origin application APIs;
-- never store app/provider auth tokens in the outbox;
-- do not rely on Background Sync because iOS/PWA support is not a dependable MVP contract;
-- server mutations gain durable operation-level idempotency so a lost HTTP response cannot cause a duplicate or a false revision conflict;
-- revision conflicts are surfaced for user resolution rather than auto-merged.
+- IndexedDB outbox for supported user writes;
+- outbox bound to owner + environment + contract version;
+- states:
+  - pending;
+  - in_flight;
+  - failed;
+  - paused_auth;
+  - conflict;
+  - expired;
+  - blocked;
+- typed mutation RPCs;
+- narrowly scoped SECURITY DEFINER only where private receipt access requires it;
+- DB/RPC-side canonical fingerprint;
+- `private.mutation_receipts` for durable response-loss idempotency;
+- 30-day automatic client replay horizon;
+- 90-day server receipt retention;
+- receipt lookup before revision/reference/deadline validation;
+- explicit conflict subtypes:
+  - `revision_conflict`;
+  - `reference_changed`;
+  - `operation_content_mismatch`;
+- no automatic merge / last-write-wins;
+- MealEntry uses a server-generated effective Catalog/Batch reference fingerprint;
+- retry never silently changes `eaten_at`, target date, expected revision, or reference values;
+- expired operations perform result lookup before any new action;
+- outcome unknown is represented honestly;
+- no correctness dependency on Background Sync;
+- authenticated health/Nutrition history is not cached for offline replay as current truth.
 
-### B. Japanese product identity / nutrition provider split
+## Workstream B — Japanese Product identity / nutrition provenance
 
-Detailed design: `docs/phase-6-product-provider-design.md`
+Canonical design:
+`docs/phase-6-product-provider-design.md`
 
-Core decision:
-- separate “what product is this?” from “what are its nutrients?”;
-- selected candidate flow:
-  local Library → Open Food Facts → Yahoo! exact JAN identity fallback → Cloud Vision nutrition-label OCR → user confirmation;
-- external providers produce candidates only; they do not silently write the Library;
-- Product identity provenance and nutrient provenance become independently representable.
+Binding resolution flow:
 
-### C. Nutrition Improvement Priority
+local Library
+→ Open Food Facts
+→ Yahoo! exact JAN identity fallback
+→ Cloud Vision physical-label OCR
+→ user confirmation
+→ local Library
 
-Detailed design: `docs/phase-6-nutrition-priority-design.md`
+Binding decisions:
 
-Core decision:
-- the primary output is a ranked, explainable improvement list rather than a single overall score;
-- comparable EAR/RDA nutrients may expose a capped 0–100 adequacy value toward RDA;
-- AI-below-target never becomes a numeric deficiency score;
-- DG is treated as distance from a range in the needed direction;
-- UL is a separate excess alert;
-- EER remains reference-only;
-- evaluable-day coverage and data quality remain separate from nutritional status.
+- Product identity and nutrition candidates are separate;
+- candidates are bound to barcode + active draft generation;
+- package size is not automatically a nutrition serving basis;
+- external providers generate candidates only;
+- Yahoo is identity-only, never nutrition authority;
+- returned Yahoo JAN must match the requested normalized JAN;
+- ambiguous/missing/mismatched JAN is never auto-confirmed;
+- Product provenance migration is additive;
+- old Phase 3 `source_*` stays during compatibility;
+- unproven legacy identity provenance becomes `legacy_unknown`, not guessed;
+- per-nutrient value/unit/provenance/quality/source is an atomic semantic tuple;
+- serving-basis changes update affected nutrient tuples together;
+- external adapters cannot emit verified values;
+- historical MealEntry snapshots remain untouched;
+- real JAN acceptance requires zero false automatic identity matches.
 
-### D. Export / account lifecycle
+## Workstream C — Nutrition review priority
 
-Detailed design: `docs/phase-6-account-lifecycle-design.md`
+Canonical design:
+`docs/phase-6-nutrition-priority-design.md`
 
-Core decision:
-- versioned user-data export contains user-owned public-domain app data, not session/token/rate-limit internals;
-- destructive account deletion requires fresh password confirmation;
-- Google authorization revocation is attempted before local deletion;
-- local account/data deletion must not depend on preserving a provider token afterward;
-- Supabase Auth user deletion cascades user-keyed application/private data;
-- service-role/admin capability, if used for Auth deletion, stays server-only and requires Astra/security review.
+Primary product language:
+
+**記録から、どの項目を先に見直すとよいか**
+
+This is not medical severity.
+
+Binding display order after evidence eligibility:
+
+1. comparable UL exceedance;
+2. record average below EAR;
+3. outside DG;
+4. EAR→RDA;
+5. AI below — indeterminate/watch;
+6. target/reference state met.
+
+Insufficient evidence is separate.
+
+Evidence thresholds:
+
+- 7 days → 3 evaluable days;
+- 30 days → 7 evaluable days;
+- 90 days → 14 evaluable days.
+
+EAR/RDA display:
+- `記録平均：RDAのX%`
+- not `充足度X/100`.
+
+AI below:
+- no numeric deficiency score.
+
+DG:
+- categorical range semantics first;
+- relative boundary distance second;
+- no invented high-severity threshold.
+
+UL:
+- separate factual section;
+- no cross-nutrient danger ranking.
+
+Multiple axes:
+- show all;
+- opposite directions → mixed / inspect details;
+- no single increase/reduce instruction.
+
+Single overall nutrition score remains deferred.
+
+## Workstream D — Export / account lifecycle
+
+Canonical design:
+`docs/phase-6-account-lifecycle-design.md`
+
+Export:
+
+- versioned JSON;
+- explicit allowlist;
+- one owner-scoped consistent DB snapshot;
+- no service-role use;
+- includes stored normalized user data and interpretation definitions;
+- includes currently stored active/superseded Sleep rows but does not claim unavailable full correction history;
+- excludes internal provider IDs where not needed;
+- excludes session/token/ciphertext/admin/lifecycle internals;
+- partial/truncated export is a failure, not success;
+- not advertised as a restorable backup without import support.
+
+Deletion:
+
+- active session + fail-closed Origin;
+- shared-rate-limited current-password reauthentication;
+- server-only isolated Admin credential;
+- target user derived from session + allowlist;
+- deletion lifecycle guard stops new mutation/OAuth/sync writes;
+- in-flight guarded writers complete before guard activation;
+- Google revoke is bounded best effort;
+- Preview/Production Google project/client separation is verified;
+- hard Auth delete is root local deletion;
+- Admin timeout/ambiguous response is re-checked;
+- `deletion_outcome_unknown` is a first-class state;
+- short-lived deletion operation status survives user cascade only for result recovery;
+- local browser cleanup follows confirmed server deletion;
+- UI distinguishes server deletion, this-device cleanup, other devices, downloaded exports and provider-side original data.
 
 ## Offline scope boundary
 
-Phase 6 is **offline-aware**, not a promise that the complete authenticated app cold-starts and displays health history with no network.
+Phase 6 is offline-aware, not a full offline health-record mirror.
 
-MVP offline behavior:
-- an already-open application can accept supported writes while connectivity is lost;
-- pending intent survives reload/version replacement in IndexedDB;
-- static offline fallback is available;
-- authenticated HTML/API health data is not cached for offline replay;
-- external API operations remain online-only.
+Supported:
+- already-open app queues approved user mutations;
+- local pending intent survives reload when browser storage retains it;
+- static offline shell;
+- explicit pending/auth/conflict/version states.
 
-Online-only operations:
-- login/logout session negotiation;
-- Google Health OAuth/connect/reauth/sync/disconnect;
-- barcode provider lookup;
+Not supported offline:
+- login/session negotiation;
+- Google OAuth/connect/reauth/sync/disconnect;
+- external barcode provider lookup;
 - Cloud Vision OCR;
 - export generation;
 - account deletion.
 
-## Supported queued mutation classes
-
-Candidate Phase 6 queued operations:
-- add MealEntry using an already-synced Catalog item;
-- skip/unskip fixed meal;
-- void MealEntry;
-- create/update Catalog item;
-- create/update Batch using already-synced component items;
-- save/update Product after an external/OCR candidate has already been obtained;
-- save Profile.
-
-Dependency rule:
-- a newly created offline entity cannot be referenced by another queued operation until its server identity has synchronized.
-- Phase 6 will not introduce client-generated database primary keys solely to support chained offline creation.
-
-This keeps the existing server-authoritative UUID model and avoids a broad schema rewrite.
-
-## Conflict model
-
-Operations fall into two semantic classes.
-
-### Idempotent intent
-Examples:
-- create with stable operation/idempotency ID;
-- retry after ambiguous network loss.
-
-The same operation ID must return the original successful result and never apply twice.
-
-### Revisioned update
-Examples:
-- Catalog/Profile/Batch/Product edits.
-
-If the base revision is stale:
-- return HTTP 409;
-- keep queued user intent;
-- fetch authoritative server state;
-- show explicit conflict UI;
-- user may discard local intent or explicitly reapply it against the latest revision with a **new** operation ID.
-
-No automatic field merge is required for the MVP.
-
-## Version recovery
-
-Queued mutation records carry a local contract version.
-
-Rules:
-- application/cache upgrades must never clear the outbox;
-- old queued records are migrated explicitly when a compatible migration exists;
-- an incompatible record is shown as blocked rather than dropped or guessed;
-- service-worker cache cleanup is independent from IndexedDB mutation state.
+Authenticated HTML/RSC/API health history is not service-worker cached as current state.
 
 ## Production boundary
 
-This design branch must not:
+The design branch must not:
+
 - migrate Production;
-- add Production secrets;
-- alter Production OAuth;
-- merge Phase 5 before its device gate;
-- start the Phase 6 data migration before Astra review.
+- add Production Phase 6 secrets;
+- change Production OAuth;
+- merge Phase 5;
+- start Phase 6 schema implementation before corrected design acceptance.
 
-## Required Astra review
+## Canonical documents
 
-Astra must explicitly review:
-1. durable mutation receipt/idempotency semantics;
-2. revision-conflict behavior;
-3. IndexedDB health-data handling and retention;
-4. Product identity/nutrient provenance split;
-5. Yahoo provider contract/attribution boundary;
-6. Nutrition priority ordering and continuous mappings;
-7. evidence threshold/suppression semantics;
-8. account deletion/admin-service-role boundary;
-9. remote provider revocation behavior.
+- `docs/phase-6-reliability-design.md`
+- `docs/phase-6-product-provider-design.md`
+- `docs/phase-6-nutrition-priority-design.md`
+- `docs/phase-6-account-lifecycle-design.md`
+- `docs/phase-6-ux-design.md`
+- `docs/phase-6-acceptance-plan.md`
+- `docs/phase-6-implementation-plan.md`
+- `docs/phase-6-astra-review-result.md`
 
-Normal implementation after those decisions remains Sol-first.
+## Sol-first implementation order after acceptance
 
-## Phase 6 implementation order after approval
+1. Batch 6.1 reliability server primitives;
+2. Batch 6.2 client outbox/versioning;
+3. Batch 6.3 non-Product revision conflicts;
+4. Batch 6.4 Product provenance v2;
+5. Batch 6.5 Yahoo exact-JAN identity;
+6. Batch 6.6 Nutrition derivation;
+7. Batch 6.7 Nutrition UX;
+8. Batch 6.8 consistent export;
+9. Batch 6.9 account deletion/lifecycle;
+10. Batch 6.10 PWA integration;
+11. Batch 6.11 full MVP acceptance.
 
-1. reliability primitives + tests;
-2. provider-neutral Product identity split;
-3. Yahoo identity adapter and Japanese JAN acceptance set;
-4. Nutrition Improvement Priority pure derivation + UI;
-5. export;
-6. account deletion;
-7. PWA/update recovery polish;
-8. full Preview/security/device acceptance;
-9. Production rollout;
-10. MVP COMPLETE decision.
+Parallel safe starts after design acceptance:
+- 6.1;
+- 6.4;
+- 6.6.
+
+See the implementation plan for dependencies.
