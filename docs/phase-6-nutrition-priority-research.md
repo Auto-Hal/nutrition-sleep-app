@@ -1,7 +1,7 @@
 # Phase 6 Nutrition Improvement Priority research
 
-Status: PRELIMINARY RESEARCH
-Updated: 2026-09-21
+Status: HISTORICAL RESEARCH — CANONICAL DECISIONS MOVED TO REVIEWED DESIGN
+Updated: 2026-09-23
 
 ## Goal
 
@@ -189,9 +189,11 @@ Automated cases must include:
 - age-band changes;
 - no high nutrient compensating for another low nutrient in any overall summary.
 
-## Astra review questions
+## Historical review questions
 
-Before implementation, Astra must decide/approve:
+These questions were submitted to Astra and are retained for traceability. The reviewed binding answers are in `docs/phase-6-nutrition-priority-design.md` and `docs/phase-6-astra-review-result.md`.
+
+The original questions were:
 - exact continuous mapping for EAR/RDA;
 - whether EAR should affect only priority band or also the numeric curve;
 - exact DG distance function;
@@ -207,4 +209,4 @@ Before implementation, Astra must decide/approve:
 - National Academies discussion notes MAR depends on dietary intake observations and inherits their limitations.
 - FAO dietary-quality material describes MAR as a simple average and notes truncation at 100% to prevent excess masking shortfalls.
 
-This document records design research only. It does not authorize implementation before Astra review.
+This document records preliminary research only. It does not override the reviewed canonical design.
