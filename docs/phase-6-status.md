@@ -1,83 +1,95 @@
 # Phase 6 status
 
-Updated: 2026-09-22
+Updated: 2026-09-23
 
 ## Current state
 
 - Phase 6 implementation: **NOT STARTED**
-- Phase 6 design: **READY FOR ASTRA REVIEW**
+- Phase 6 design: **ASTRA REVIEWED — REQUIRED CORRECTIONS APPLIED**
+- current gate: **AWAITING SUPERVISOR/USER ACCEPTANCE**
 - design branch: `phase/6-design`
 - design PR: #10
 - PR base: `phase/5-sleep-foundation`
 - Production: untouched
 
-## Why design is proceeding before Phase 5 completion
+## Astra review
 
-Phase 5 code/CI/Preview gates are complete except for real wearable Sleep/STAGES device acceptance and subsequent Production rollout.
+Overall verdict:
 
-Phase 6 design does not depend on having real Sleep observations, so design work proceeds in parallel while the wearable gate is pending.
+`PHASE 6 DESIGN APPROVED WITH REQUIRED CORRECTIONS`
 
-No Phase 6 implementation may cross the Phase 5 merge/Production boundary until the corresponding gates are explicitly approved.
+Review result:
+- `docs/phase-6-astra-review-result.md`
 
-## Design package
+All blocking corrections from A1–A7, B1–B6, C1–C7, D1–D7 and X1–X5 have been integrated into the canonical Phase 6 documents.
 
-Ready:
-- architecture
-- reliability/offline/idempotency/conflict
-- Japanese Product identity/nutrition provider split
-- Nutrition Improvement Priority
-- export/account lifecycle
-- acceptance plan
-- Astra review request
-
-## Proposed decisions awaiting Astra
+## Corrected design decisions
 
 ### Reliability
-- IndexedDB outbox
-- server-side durable mutation receipts
-- explicit revision conflicts
-- no automatic merge
-- static-only service-worker caching for authenticated app
 
-### Product database
-- Product identity and nutrition provenance separated
-- local → Open Food Facts → Yahoo exact JAN identity → Cloud Vision OCR → user confirmation
-- no silent external overwrite
+- IndexedDB outbox bound to owner/environment/contract version;
+- typed receipt-aware RPCs;
+- narrow SECURITY DEFINER boundary where private receipt access is required;
+- DB-side canonical fingerprint;
+- 30-day automatic client replay / 90-day server receipt retention;
+- MealEntry effective-reference fingerprint protects delayed snapshots;
+- explicit `revision_conflict`, `reference_changed`, `operation_content_mismatch`;
+- no automatic revision rebasing or merge;
+- `paused_auth`, `expired`, `blocked` are first-class states.
+
+### Product / Japanese barcode
+
+- identity and nutrition provenance separated;
+- local → Open Food Facts → Yahoo exact JAN identity → Cloud Vision OCR → confirmation;
+- candidate bound to barcode/draft generation;
+- package size never becomes serving basis automatically;
+- additive Product provenance migration;
+- legacy identity provenance remains unknown when unproven;
+- verified nutrient replacement requires explicit confirmation;
+- returned Yahoo JAN must exactly match;
+- real acceptance requires zero false automatic identity matches.
 
 ### Nutrition
-- ranked improvement list, not one overall score
-- EAR/RDA adequacy score only where interpretable
-- AI below target remains indeterminate
-- DG range-distance
-- UL separate excess alert
-- EER reference-only
-- evidence coverage separate from nutritional status
 
-### Account lifecycle
-- versioned JSON export
-- no private credential/session data in export
-- fresh password before deletion
-- Google revoke best effort
-- proposed Supabase Admin Auth-user deletion
-- FK cascade as authoritative app-data cleanup
+- product question is `記録から、どの項目を先に見直すとよいか`;
+- no health-severity ranking;
+- `記録平均：RDAのX%`, not `充足度X/100`;
+- evidence thresholds:
+  - 7d: 3
+  - 30d: 7
+  - 90d: 14;
+- AI below remains indeterminate;
+- DG stays factual/range-based;
+- UL separate factual section;
+- mixed axes do not produce one direction;
+- overall score remains deferred.
 
-## Blocking gate
+### Export/account lifecycle
 
-Phase 6 implementation is blocked until:
-1. Astra review returns approval/required corrections;
-2. blocking corrections are applied;
-3. Supervisor/user accepts the corrected design.
+- export uses one consistent owner-scoped DB snapshot;
+- explicit allowlist;
+- no private credential/session/admin data;
+- Sleep export describes only history actually retained;
+- current-password reauth shares DB-backed rate limit;
+- dedicated server-only Admin boundary;
+- lifecycle guard blocks mutation/OAuth/sync writes during deletion;
+- bounded Google revoke with Preview/Production project separation verification;
+- hard Auth delete + outcome re-check;
+- `deletion_outcome_unknown` supported;
+- short-lived deletion status is separate from user-cascaded rows.
 
-## After design approval
+## Current gate
 
-Planned Sol-first implementation order:
-1. reliability primitives;
-2. Product provenance/provider split;
-3. Yahoo identity adapter + Japanese JAN acceptance set;
-4. Nutrition Improvement Priority;
-5. export;
-6. account deletion;
-7. PWA/version recovery;
-8. full Preview/security/device acceptance;
-9. Production rollout after Phase 5 boundary permits it;
-10. MVP COMPLETE decision.
+No Phase 6 code implementation starts until Supervisor/user accepts the corrected design.
+
+After acceptance, safe Sol-first parallel starts are:
+
+1. 6.1 reliability server primitives;
+2. 6.4 Product provenance v2;
+3. 6.6 Nutrition review derivation.
+
+## Phase 5 relationship
+
+Phase 5 real wearable/STAGES/device and Production completion remain separate gates.
+
+Phase 6 design approval does not merge or complete Phase 5.
