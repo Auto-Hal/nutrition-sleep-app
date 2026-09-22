@@ -20,6 +20,7 @@ Canonical Phase 6 design documents:
 - `docs/phase-6-product-provider-design.md`
 - `docs/phase-6-nutrition-priority-design.md`
 - `docs/phase-6-account-lifecycle-design.md`
+- `docs/phase-6-ux-design.md`
 - `docs/phase-6-acceptance-plan.md`
 
 Astra review contract:
