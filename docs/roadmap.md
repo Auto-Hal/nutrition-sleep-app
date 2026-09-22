@@ -24,7 +24,7 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
 | Phase 5 | IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE | Sleep domain and Google Health integration (CR-001 approved) |
-| Phase 6 | PLANNED | Reliability, Japanese product coverage, nutrition improvement priorities, export/account lifecycle, and full MVP acceptance |
+| Phase 6 | DESIGN REVIEWED | Astra corrections applied; awaiting Supervisor/user design acceptance before implementation |
 
 ## Phase 4 — Nutrition Analytics
 
