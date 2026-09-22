@@ -352,9 +352,21 @@ The user may discard an unresolved/unknown local intent, but the app must not cl
 
 ### Server first-apply age check
 
-For an operation without an existing receipt, the server validates the supported first-apply horizon.
+Each operation carries immutable `intent_created_at` in UTC and that value is included in the normalized request fingerprint.
 
-Client timestamps are not treated as trusted wall-clock authority; contract should include a bounded, server-verifiable mechanism for detecting obviously invalid/stale first application. Exact representation is finalized in Batch 6.1 tests/design notes.
+Receipt lookup happens first.
+
+For an operation with no receipt, the server compares `intent_created_at` with server `now()`:
+
+- older than 30 days → reject with safe `operation_expired` / blocked result;
+- more than 24 hours in the future → reject with safe `client_time_invalid` / blocked result;
+- otherwise the operation may proceed to reference/revision validation.
+
+`intent_created_at` is a safety/integrity guard, not an authentication or authorization primitive. The app is single-user and does not treat client time as trusted proof of identity.
+
+Retries must send the identical `intent_created_at`; it is never rewritten.
+
+If a legitimate device clock is outside the accepted bound, the UI blocks automatic application and asks the user to correct device time / recreate the action from current state rather than guessing.
 
 ## Mutation support matrix
 
@@ -364,7 +376,7 @@ Offline queue: YES, when Catalog/Batch item is already synchronized.
 
 Requirements:
 - stable operation ID;
-- immutable `eaten_at` / target date;
+- immutable `intent_created_at`, `eaten_at` / target date;
 - server-generated reference fingerprint;
 - one locked value set for compare + snapshot;
 - `reference_changed` on mismatch.
@@ -576,7 +588,9 @@ Automated:
 - changed Catalog/Batch effective values → `reference_changed`;
 - compare + snapshot uses the same locked reference values;
 - fixed meal expected-absence/revision checks;
-- operation creation/retry does not shift `eaten_at`;
+- operation creation/retry does not shift `intent_created_at` or `eaten_at`;
+- first application older than 30 days → `operation_expired`;
+- first application >24h in the future → `client_time_invalid`;
 - 30-day replay / 90-day receipt boundary tests;
 - retry does not extend receipt TTL;
 - expired operation resolves receipt success before any replacement action;
