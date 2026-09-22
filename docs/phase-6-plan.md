@@ -1,7 +1,7 @@
 # Phase 6 plan — MVP Completion / Reliability
 
-Status: PLANNED  
-Updated: 2026-09-21
+Status: DESIGN DRAFT / READY FOR ASTRA REVIEW  
+Updated: 2026-09-22
 
 ## Goal
 
@@ -11,6 +11,21 @@ Make Nutrition + Sleep dependable for daily use and complete the MVP with two pr
 2. Nutrition analytics must make the highest-priority improvement opportunities visible at a glance without misrepresenting Japanese DRI semantics.
 
 Phase 6 is the earliest phase that may declare the overall MVP COMPLETE.
+
+## Design package
+
+Canonical Phase 6 design documents:
+- `docs/phase-6-architecture.md`
+- `docs/phase-6-reliability-design.md`
+- `docs/phase-6-product-provider-design.md`
+- `docs/phase-6-nutrition-priority-design.md`
+- `docs/phase-6-account-lifecycle-design.md`
+- `docs/phase-6-acceptance-plan.md`
+
+Astra review contract:
+- `docs/phase-6-astra-review-request.md`
+
+Implementation remains blocked on Astra review for the high-risk semantics listed below.
 
 ## Entry gate
 
