@@ -2,7 +2,7 @@
 
 Status: DRAFT FOR ASTRA REVIEW  
 Branch: `phase/6-design`  
-Based on Phase 5 head: `5f1f0d29db55d3e081db5b00c3e4f15d187c2351`  
+Based on Phase 5 head: `bdc509bd38792397507823c6eeb45ee38a9f32c2`  
 Updated: 2026-09-22
 
 ## Purpose
