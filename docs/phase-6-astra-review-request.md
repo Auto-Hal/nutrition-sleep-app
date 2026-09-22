@@ -65,9 +65,16 @@ A3. Is 90-day receipt retention reasonable for this single-user MVP?
 
 A4. Is the proposed offline mutation scope correct, especially the rule that offline-created entities cannot be referenced by another queued entity until the first has synchronized?
 
-A5. Is explicit user conflict resolution preferable to automatic merge/last-write-wins for Profile/Catalog/Batch/Product?
+A5. Approve the bounded retry horizon:
+- client operations automatically replay for at most 30 days;
+- unresolved operations older than 30 days become expired/blocked and require explicit re-creation as a new operation;
+- server mutation receipts are retained for 90 days.
 
-A6. Is IndexedDB without custom application-layer encryption acceptable given that no tokens/passwords/provider payloads are stored and a same-origin persisted decryption key would not create a meaningful boundary?
+This ensures automatic client replay never occurs after the server may have pruned the idempotency receipt.
+
+A6. Is explicit user conflict resolution preferable to automatic merge/last-write-wins for Profile/Catalog/Batch/Product?
+
+A7. Is IndexedDB without custom application-layer encryption acceptable given that no tokens/passwords/provider payloads are stored and a same-origin persisted decryption key would not create a meaningful boundary?
 
 ## Decision group B — Product provider/provenance contract
 
@@ -220,7 +227,7 @@ If no, list missing rows/tables.
 
 ## Requested Astra output
 
-For each item A1–A6, B1–B6, C1–C7, D1–D7 and X1–X5, return one of:
+For each item A1–A7, B1–B6, C1–C7, D1–D7 and X1–X5, return one of:
 
 - APPROVE
 - APPROVE WITH CORRECTION
