@@ -25,6 +25,9 @@ Before Batch 6.1 code begins, the following are now fixed by design:
 - DB/RPC-side canonical fingerprint;
 - 90-day receipt TTL from server first-applied time;
 - 30-day client automatic replay horizon;
+- immutable `intent_created_at` in the fingerprint;
+- first apply >30 days old → blocked/operation_expired;
+- first apply >24h in the future → blocked/client_time_invalid;
 - receipt lookup before revision/reference/deadline checks;
 - explicit 409 codes:
   - revision_conflict;
