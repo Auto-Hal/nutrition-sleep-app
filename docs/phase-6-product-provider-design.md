@@ -1,79 +1,79 @@
 # Phase 6 Product Provider Design
 
-Status: DRAFT FOR ASTRA REVIEW  
-Updated: 2026-09-22
+Status: ASTRA REVIEW CORRECTIONS APPLIED  
+Updated: 2026-09-23
 
 ## Problem
 
-Current Phase 3 product ingestion couples external product identity and nutrition into one `ExternalProductCandidate`.
+Phase 3 models an external product candidate as if one source normally provides:
 
-That worked for Open Food Facts when all of the following exist together:
-- barcode identity;
-- product name;
+- product identity;
 - serving basis;
-- at least one structured nutrient.
+- structured nutrients.
 
-It does not model the selected Phase 6 Japanese path, where one provider may identify the product but another source supplies nutrition.
+That is too restrictive for the selected Japanese workflow.
 
-Example:
-- Yahoo! Shopping identifies JAN → product name/brand;
-- Cloud Vision reads the physical nutrition label;
-- the user confirms both;
-- the final local Product should preserve both provenance paths without pretending Yahoo supplied nutrients or Cloud Vision supplied identity.
+Phase 6 must distinguish:
+
+- **what product is this?**
+- **what nutrition values are associated with the physical label / serving basis?**
+
+without inventing provenance.
 
 ## Selected provider strategy
 
-Resolution:
+Resolution order:
 
-local verified Library
+local Library
 → Open Food Facts
 → Yahoo! Shopping exact JAN identity fallback
 → Cloud Vision nutrition-label OCR
 → user confirmation
 → local Library
 
-External providers are candidate generators only. They never silently write or overwrite local verified Product data.
+External providers generate candidates only.
+
+They never silently mutate a saved local Product.
 
 ## Provider roles
 
 ### Local Library
 
 Role:
-- authoritative local current product for repeated barcode use.
+- authoritative current local Product for repeated barcode use.
 
 Behavior:
 - exact owner + barcode match wins immediately;
-- no external lookup is needed;
-- historical MealEntry snapshots remain unchanged if the Product is later edited.
+- no external lookup is required;
+- Product edits never mutate historical MealEntry nutrient snapshots.
 
 ### Open Food Facts
 
 Role:
-- structured external identity + nutrition candidate when available;
-- identity-only candidate when nutrition is incomplete/unusable.
+- external identity candidate;
+- structured nutrition candidate when usable.
 
-Important Phase 6 change:
-- an OFF product with a usable name but no usable nutrients should no longer be discarded as an invalid product.
-- identity and nutrition are normalized separately.
+Phase 6 change:
+- a usable OFF identity is valuable even when serving basis/nutrients are incomplete;
+- identity-only OFF results are not discarded.
 
 ### Yahoo! Shopping
 
 Role:
 - exact JAN identity fallback only.
 
-Allowed candidate fields:
+Allowed identity fields:
 - barcode/JAN;
 - product name;
-- brand/manufacturer when reliably available;
-- provider/source URL or provider item identifier required for attribution;
+- brand/manufacturer when reliably present;
+- optional package amount/unit when explicitly structured and unambiguous;
+- provider item/source URL/ID required for attribution;
 - observed time.
 
 Must not be used as nutrition authority:
-- do not parse nutrition from product-description free text;
-- do not convert seller listing text into structured nutrients;
-- do not persist price/review/seller ranking as Product nutrition data.
-
-Images are outside the MVP unless current terms are explicitly confirmed to permit the intended display/cache behavior.
+- do not parse free-text listing descriptions into nutrient values;
+- do not infer serving basis from marketing/package text;
+- do not persist seller/price/review/ranking data.
 
 ### Cloud Vision
 
@@ -82,17 +82,36 @@ Role:
 
 Output:
 - serving basis;
-- structured nutrient values;
-- OCR evidence/diagnostics.
+- structured nutrient candidate;
+- OCR diagnostics/evidence needed by confirmation UI.
 
-The uploaded image is transient and is not stored.
+Image remains transient and is not stored.
 
-## Provider-neutral type split
+## Candidate identity binding
+
+Identity and nutrition candidates must be bound to the same active product draft.
+
+Required draft binding includes:
+
+- normalized barcode;
+- draft/session identifier;
+- selected identity candidate ID/version;
+- request generation/version.
+
+A delayed provider/OCR response is ignored if:
+- the active barcode changed;
+- the user selected a different product candidate;
+- the draft generation changed.
+
+Never combine nutrition from an old draft with the current product identity.
+
+## Provider-neutral types
 
 ### ProductIdentityCandidate
 
 ```ts
 type ProductIdentityCandidate = {
+  draft_id: string;
   barcode: string;
   name: string;
   brand: string | null;
@@ -100,26 +119,27 @@ type ProductIdentityCandidate = {
   package_amount: number | null;
   package_unit: "g" | "ml" | null;
   source: {
-    type: "external_database" | "manufacturer_official" | "user_entered";
+    type: "external_database" | "manufacturer_official" | "user_entered" | "legacy_unknown";
     provider: string;
     uri: string | null;
-    observed_at: string;
+    observed_at: string | null;
   };
   quality: "unverified";
 };
 ```
 
-A candidate is not user-verified merely because an external provider returned it.
+External adapters never emit verified identity.
 
 ### NutritionCandidate
 
 ```ts
 type NutritionCandidate = {
-  serving_size: number;
-  serving_unit: string;
+  draft_id: string;
+  serving_size: number | null;
+  serving_unit: string | null;
   nutrients: Array<{
     code: NutrientCode;
-    amount: number;
+    amount: number | null;
     unit: NutrientUnit;
     provenance: "approved_external_db" | "ocr" | "product_label" | "user_entered";
     quality: "unverified" | "user_verified";
@@ -130,193 +150,283 @@ type NutritionCandidate = {
 };
 ```
 
+The type must be able to represent:
+- nutrition not obtained;
+- some nutrient values unknown;
+- serving basis not yet established.
+
 ### ResolvedProductCandidate
+
+A Product may be saved only when the final confirmation contract has an established serving basis.
 
 ```ts
 type ResolvedProductCandidate = {
   identity: ProductIdentityCandidate;
-  nutrition: NutritionCandidate | null;
+  nutrition: NutritionCandidate;
 };
 ```
 
-Open Food Facts may produce identity + nutrition.
-Yahoo produces identity only.
-Cloud Vision produces nutrition only and is combined with the current identity draft in the confirmation UI.
+A package amount is **not** automatically a nutrition serving basis.
+
+If serving basis is unknown:
+- keep the draft;
+- request OCR/manual confirmation;
+- do not save a falsely resolved Product.
 
 ## Resolver behavior
 
 ### Step 1 — local
 
-Exact barcode owner match:
-- return `status: "local"`;
-- stop.
+Exact owner + normalized barcode match:
+- return local Product;
+- stop external lookup.
 
 ### Step 2 — Open Food Facts
 
-If OFF returns:
-- usable identity + usable nutrition → return combined external candidate;
-- usable identity only → retain identity and request label OCR;
-- no usable identity → continue;
-- provider unavailable/rate limited → continue to Yahoo instead of failing the whole resolver.
+OFF result cases:
+
+- usable identity + usable nutrition → combined candidate;
+- usable identity only → keep identity, request OCR;
+- unusable/no identity → continue to Yahoo;
+- outage/rate-limit → continue to Yahoo rather than fail the overall flow.
 
 ### Step 3 — Yahoo exact JAN
 
-Query only exact JAN.
+Call exact JAN search.
 
-If one usable exact identity is returned:
-- return identity-only candidate;
-- UI asks for nutrition-label OCR.
+After response:
+- normalize the returned JAN;
+- verify it equals the requested normalized JAN;
+- do not treat the request parameter alone as proof of exact match.
 
-If no safe exact identity:
-- return OCR/manual identity fallback.
+If:
+- JAN is missing;
+- JAN mismatches;
+- results are ambiguous/multiple without a deterministic exact identity;
+then do not auto-confirm.
 
-Ambiguous listing behavior:
-- do not auto-pick a fuzzy/multiple candidate solely by title similarity;
-- either present explicit candidates for user selection or fall back to manual identity;
-- MVP may prefer a single exact result contract to reduce complexity.
+Fallback:
+- explicit candidate selection if the UI contract supports it;
+- otherwise manual identity + OCR.
 
-## Final confirmation states
+### Step 4 — OCR/manual
 
-### OFF identity + OFF nutrition
+If identity exists but nutrition does not:
+- keep identity draft;
+- ask for physical nutrition-label capture.
 
-User may:
-- save external candidate as unverified nutrition;
-- or choose physical-label OCR.
+If identity does not exist:
+- user enters identity;
+- barcode remains attached to the draft;
+- OCR supplies nutrition.
 
-If saved without physical-label confirmation:
-- identity is user-confirmed as the selected Product identity;
-- nutrient quality remains `unverified`.
+## Confirmation semantics
 
-### OFF/Yahoo identity + OCR nutrition
+### External identity + external nutrition
 
-After user confirms:
-- identity retains external provider provenance and confirmation timestamp;
-- nutrient provenance is `ocr`;
-- nutrient quality becomes `user_verified`;
-- external provider is never recorded as nutrient source.
+User may save after confirmation.
+
+Identity:
+- retains external provider provenance;
+- user confirmation does not rewrite the source as `user_entered`.
+
+Nutrients:
+- remain `unverified` unless the confirmation action explicitly verifies the physical-label values under the approved UI contract.
+
+### External identity + OCR nutrition
+
+After user confirmation:
+
+- identity provenance remains external provider;
+- nutrition provenance = OCR / physical label as applicable;
+- user-confirmed nutrients may become `user_verified`;
+- external identity provider is never recorded as nutrient source.
 
 ### Manual identity + OCR nutrition
 
-When no provider identifies the product:
-- identity source type = `user_entered`;
-- provider = `user`;
-- nutrient provenance = `ocr`;
-- nutrients become `user_verified` after confirmation.
+- identity source = `user_entered`;
+- nutrition source = OCR / product label;
+- confirmed nutrient quality follows the confirmation contract.
 
-## Database semantics
+## Additive Product provenance migration
 
-### Current problem
+### Direct rename is rejected
 
-`public.products.source_type/source_provider/source_uri/source_observed_at` currently behaves like a whole-product source, while `create_product_item` also derives every nutrient provenance from that same source.
+Do **not** rename old Phase 3 `products.source_*` columns into identity provenance.
 
-This cannot correctly represent mixed identity/nutrition sources.
+Reason:
+- old `source_*` may describe a mixed/whole-product acquisition path;
+- `label_ocr` does not prove that OCR established product identity;
+- existing PWA/API/outbox versions cannot be switched atomically with a DB rename.
 
-### Proposed migration
+### Additive v2 columns
 
-Rename Product-level source columns to explicitly mean **identity** provenance:
+Add nullable identity-specific columns, for example:
 
-- `source_type` → `identity_source_type`
-- `source_provider` → `identity_source_provider`
-- `source_uri` → `identity_source_uri`
-- `source_observed_at` → `identity_source_observed_at`
-- `confirmed_at` → `identity_confirmed_at`
+- `identity_source_type`
+- `identity_source_provider`
+- `identity_source_uri`
+- `identity_source_observed_at`
+- `identity_confirmed_at`
 
-Expand identity source enum with:
-- `user_entered`
+Keep existing Phase 3 columns unchanged during the compatibility period.
 
-Historical rows are preserved through column rename and enum expansion.
+### Legacy rows
 
-### Nutrient source
+Existing Products are preserved.
 
-`item_nutrients` already has:
-- provenance;
-- quality;
-- source_uri;
-- source_observed_at.
+Rules:
+- do not infer identity provenance that was never recorded;
+- do not convert old rows wholesale to `user_entered`;
+- do not reinterpret old `label_ocr` as identity OCR;
+- do not infer confirmation timestamps.
 
-Phase 6 Product RPCs must stop deriving all nutrient provenance from Product identity source.
+When identity provenance cannot be proven:
+- read it as `legacy_unknown` in the v2 application model;
+- leave additive DB columns NULL unless/until the user explicitly edits/confirms under v2.
 
-Instead, each nutrient payload carries its own:
+### v2 RPC/API compatibility
+
+Introduce v2 Product write/read contract.
+
+During compatibility:
+- new client reads v2 identity columns when present;
+- otherwise exposes legacy unknown semantics;
+- old Phase 3 columns remain available as needed for old-client compatibility;
+- old clients must not be allowed to destroy v2 identity provenance.
+
+Acceptable strategies:
+- compatibility trigger/function preserving v2 fields on legacy writes; or
+- explicit client contract-version rejection once v2 provenance exists.
+
+The exact strategy is fixed before Batch 6.4 migration.
+
+Old column removal is post-compatibility work and is not required for Phase 6 MVP.
+
+## Per-nutrient source tuple
+
+Product nutrient RPCs must accept/validate each nutrient as one semantic tuple:
+
+- amount;
+- unit;
 - provenance;
 - quality;
 - source URI;
 - source observed time.
 
-Server validates the tuple against `nutrient_definitions` and allowed provenance/quality values.
+### Update semantics
 
-## Confirmation / overwrite policy
+The API must distinguish:
 
-### External lookup
+- omitted field → keep existing value;
+- explicit NULL → clear/unknown where contract permits;
+- explicit value → replace after validation.
 
-External data may prefill UI only.
+Do not conflate "missing in request" with "set unknown".
 
-It must not silently update an existing local Product.
+### Serving-basis change
 
-### Saved local identity
+A serving-basis change may invalidate all nutrient amounts.
 
-Once a user confirms/saves Product identity:
-- subsequent external provider results cannot silently replace name/brand/manufacturer;
-- explicit user edit is allowed;
-- explicit “replace from provider” is allowed only with user confirmation.
+Therefore:
+- show affected nutrient differences;
+- update serving basis and affected nutrient tuples together in one Product mutation;
+- do not leave old per-serving amounts attached to a new serving basis.
 
-This is stronger and easier to reason about than a numeric provider-priority ladder.
+### Verified overwrite
 
-### Nutrients
+External adapters never emit `user_verified`.
 
-Current local nutrient data:
-- user_verified values must not be silently replaced by external unverified values;
-- user-confirmed OCR may replace external unverified values;
-- explicit user edits are allowed;
-- historical MealEntry snapshots never change.
+Replacing an existing verified nutrient requires:
+- explicit difference display;
+- explicit user confirmation;
+- atomic update of value + provenance/quality/source tuple.
+
+Identity provenance never determines nutrient provenance.
+
+## No silent overwrite
+
+External lookup may prefill only.
+
+It never silently changes:
+- saved Product identity;
+- saved serving basis;
+- saved nutrient values;
+- saved provenance.
+
+This applies even when the saved value is currently unverified.
+
+Replacing external/local data is a distinct user-confirmed operation.
+
+Historical MealEntry snapshots remain immutable.
 
 ## Yahoo server boundary
 
 Environment:
-- `YAHOO_SHOPPING_CLIENT_ID`
-- server-only in this app even if the provider credential is not equivalent to a password.
+- `YAHOO_SHOPPING_CLIENT_ID` or the current provider-required credential;
+- server-only by application policy.
 
-Route/provider module:
-- no browser direct call;
+Implementation:
+- fixed official endpoint;
+- exact JAN parameter;
 - timeout;
-- safe status classification;
-- no raw full response logging;
-- no seller/price/review persistence.
+- bounded rate handling;
+- safe error categories;
+- no raw provider-response logging;
+- no browser direct call.
 
-Attribution:
-- any provider credit required by current Yahoo Developer Network terms must appear where Yahoo-derived identity is shown;
-- exact wording/link requirements must be re-verified against current terms immediately before implementation.
+Persistence:
+- only allowlisted Product identity/provenance fields;
+- no seller/price/review persistence;
+- image caching/display only if current terms explicitly allow it.
+
+### Implementation-time terms gate
+
+Immediately before implementation, re-check current Yahoo:
+
+- API terms;
+- attribution/credit requirements;
+- permitted stored fields;
+- storage duration;
+- export/redistribution implications;
+- commercial/personal-use terms.
+
+User confirmation does not erase provider terms.
 
 ## Failure behavior
 
 OFF unavailable:
 - continue Yahoo.
 
-Yahoo unavailable:
-- continue OCR/manual identity.
-
-Both external providers unavailable:
-- barcode decode still succeeds;
-- user may enter identity manually and use OCR.
+Yahoo unavailable/miss/mismatch:
+- continue manual identity + OCR.
 
 Cloud Vision unavailable:
-- keep identity candidate;
-- do not fabricate nutrients;
-- user may retry later or enter nutrition manually if a manual path is explicitly supported.
+- retain identity draft;
+- do not fabricate nutrition;
+- allow retry/manual nutrition only if an explicit supported path exists.
 
-## Privacy/data minimization
+All providers unavailable:
+- barcode may still bind the manual draft;
+- user can enter identity and nutrition manually/OCR later.
 
-Store only fields needed for Product identity and nutrition:
-- no seller account;
-- no price history;
-- no review count;
-- no tracking parameters;
-- no raw provider response.
+## Privacy / data minimization
 
-Provider URL/identifier may be retained as provenance.
+Store only Product identity/nutrition fields needed by the app.
+
+Do not persist:
+- raw provider response;
+- seller account;
+- price history;
+- review metrics;
+- tracking metadata.
+
+Provider source URI/ID may be retained only where needed for provenance/attribution.
 
 ## Japanese JAN acceptance set
 
-Before provider integration is accepted, test 20–50 representative Japanese packaged products covering:
+Test 20–50 representative Japanese packaged products across categories such as:
+
 - bread;
 - dairy;
 - beverages;
@@ -324,39 +434,62 @@ Before provider integration is accepted, test 20–50 representative Japanese pa
 - frozen foods;
 - snacks;
 - seasonings;
-- supplements if practical.
+- supplements where practical.
 
-Record per item:
+Record independently:
+
 - barcode decode success;
 - local hit;
 - OFF identity hit;
 - OFF usable nutrition hit;
-- Yahoo exact identity hit;
+- Yahoo returned result;
+- returned-JAN exact match;
 - mismatch/ambiguity;
 - OCR required;
-- final successful local save;
-- repeat scan local hit.
+- final local save;
+- repeat scan local hit;
+- tap count to confirmed Product.
 
-Primary success metric:
-- reduction in manual identity entry and reduction in unnecessary OCR/manual work.
+### Required correctness criterion
 
-Do not define success as “API returned HTTP 200”.
+**False automatic identity matches must be zero in the acceptance set.**
 
-## Schema compatibility
+Hit rate is useful, but a wrong automatic Product identity is a blocking failure.
 
-Phase 6 migration must:
-- replay cleanly from zero;
-- preserve existing Product rows;
-- preserve current MealEntry snapshots;
-- not change existing historical nutrient provenance;
-- update Product APIs/UI/tests atomically with the renamed columns.
+Do not define success as HTTP 200.
 
-## Astra decisions required
+## Migration tests
 
-1. approve identity/nutrition type split;
-2. approve Product source-column rename vs additive compatibility columns;
-3. approve `user_entered` identity source;
-4. approve external-confirmed identity semantics;
-5. approve per-nutrient provenance payload in Product RPCs;
-6. approve no-silent-external-overwrite rule;
-7. confirm Yahoo terms/attribution/storage boundary at implementation time.
+Fresh replay:
+- new additive columns/types/RPCs from zero;
+- existing Phase 3 migration remains unchanged.
+
+Upgrade fixtures:
+- old Product with external DB source;
+- old Product with label OCR source;
+- old user-confirmed Product;
+- mixed nutrient provenance;
+- NULL source fields;
+- new v2 Product;
+- old-client write against v2 Product.
+
+Must prove:
+- no historical MealEntry snapshot rewrite;
+- no guessed legacy identity provenance;
+- old nutrient provenance preserved;
+- v2 identity provenance not lost by compatibility behavior.
+
+## Approved Astra corrections
+
+B1–B6 and X3 are incorporated.
+
+Binding decisions:
+
+- identity/nutrition candidates are separate and draft-bound;
+- package size never becomes serving basis automatically;
+- Product migration is additive, not direct rename;
+- unproven historical identity becomes legacy unknown;
+- per-nutrient provenance is an atomic semantic tuple;
+- external adapters cannot create verified data;
+- Yahoo exact matching verifies the returned JAN;
+- acceptance requires zero false automatic identity matches.
