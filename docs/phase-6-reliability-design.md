@@ -47,7 +47,7 @@ type PendingMutation = {
   updated_at: string;
   payload: unknown;
   base_revision?: number;
-  status: "pending" | "in_flight" | "failed" | "conflict";
+  status: "pending" | "in_flight" | "failed" | "conflict" | "expired";
   attempt_count: number;
   next_retry_at: string | null;
   last_error_code: string | null;
@@ -72,9 +72,13 @@ Must never contain:
 - raw sleep provider payload.
 
 Retention:
-- pending/conflict records persist until resolved;
+- pending/conflict records remain automatically replayable for at most 30 days from creation;
+- after 30 days, an unresolved record becomes `expired` / blocked and is never automatically replayed;
+- the user may inspect/discard it or explicitly re-create the intended action as a **new** operation against current server state;
 - completed UI receipts expire automatically;
 - logout/account deletion clears local outbox/receipts after server-side destructive action completes or local logout succeeds.
+
+The 30-day replay horizon is intentionally shorter than the server mutation-receipt retention window, so a client never automatically retries an operation after the server may have forgotten its idempotency receipt.
 
 IndexedDB data is same-origin local application data. Phase 6 does not add custom browser-side encryption because a persisted decryption key in the same origin would not create a meaningful security boundary. Minimize retained payload and never store provider credentials instead.
 
@@ -136,12 +140,14 @@ Astra must approve the exact canonicalization boundary.
 
 Candidate MVP retention: 90 days.
 
+Client automatic replay horizon: 30 days.
+
 Reason:
-- comfortably exceeds the offline queue horizon;
+- server receipts remain valid for at least 60 days beyond the longest automatic client retry horizon;
 - avoids unbounded permanent growth;
 - single-user volume is low.
 
-Pruning can be opportunistic/server-side and must never delete a receipt for an operation still present in a client outbox.
+A client operation older than 30 days must not be automatically replayed. It becomes `expired` and requires explicit user review/new operation. This makes server pruning independent from knowing the contents of every client outbox.
 
 ## Mutation support matrix
 
@@ -249,7 +255,8 @@ Conflict:
 
 Retry schedule:
 - bounded exponential backoff with jitter while the app is active;
-- after the bounded attempts, remain pending/failed and retry on next foreground/manual action;
+- after the bounded attempts, remain pending/failed and retry on next foreground/manual action while under the 30-day replay horizon;
+- after 30 days, become expired/blocked rather than replaying;
 - never silently discard.
 
 ## Conflict UX
@@ -354,6 +361,7 @@ Preview/device:
 2. approve request fingerprint boundary;
 3. approve 90-day receipt retention;
 4. approve supported/offline-only mutation matrix;
-5. approve no-auto-merge conflict policy;
-6. approve browser IndexedDB handling without custom encryption;
-7. approve static-only service-worker cache policy.
+5. approve 30-day client replay horizon vs 90-day server receipt retention;
+6. approve no-auto-merge conflict policy;
+7. approve browser IndexedDB handling without custom encryption;
+8. approve static-only service-worker cache policy.
