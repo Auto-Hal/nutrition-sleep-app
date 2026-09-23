@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import {
   applyMealEntryWrite,
@@ -106,7 +105,6 @@ export function MealLog({
   ) => void;
   onOutboxState?: (operationId: string, state: OutboxUiState) => void;
 }) {
-  const router = useRouter();
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [localOperations, setLocalOperations] = useState<LocalMealOperation[]>([]);
@@ -193,7 +191,17 @@ export function MealLog({
           (candidate) => candidate.operationId !== detail.operation_id,
         ));
         setMessage("server成功を確認済み");
-        router.refresh();
+        void fetch(`/api/meals?date=${encodeURIComponent(date)}`, {
+          cache: "no-store",
+        })
+          .then(async (response) => {
+            const payload = (await response.json()) as { meals?: Meal[] };
+            if (response.ok && payload.meals) setMeals(payload.meals);
+          })
+          .catch(() => {
+            // The local success result remains visible; later navigation/reload
+            // will reconcile from the authoritative server state.
+          });
         return;
       }
 
@@ -224,7 +232,7 @@ export function MealLog({
 
     window.addEventListener(OUTBOX_STATE_EVENT, onState);
     return () => window.removeEventListener(OUTBOX_STATE_EVENT, onState);
-  }, [date, items, localOperations, onOutboxState, router]);
+  }, [date, items, localOperations, onOutboxState]);
 
   function openComposer(type: MealType) {
     setComposer(type);
@@ -391,7 +399,6 @@ export function MealLog({
       ));
       onOutboxState?.(operationId, "discarded");
       setMessage("端末の未同期操作を破棄しました。");
-      router.refresh();
     } catch {
       setError("端末の未同期操作を破棄できませんでした。");
     }
