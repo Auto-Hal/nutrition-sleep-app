@@ -1,8 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { NUTRIENT_DEFINITIONS, nutrientFormValues, nutrientPayload, type CatalogItem, type CatalogItemType } from "@/lib/nutrition/catalog";
 import { ProductIngestion } from "@/components/product-ingestion";
+import {
+  createOutboxMutation,
+  type OutboxBinding,
+  type PendingMutation,
+} from "@/lib/offline/outbox-contract";
+import {
+  deleteOutboxMutation,
+  listOutboxMutations,
+  putOutboxMutation,
+  retryOutboxMutation,
+} from "@/lib/offline/outbox-idb";
+import {
+  OUTBOX_STATE_EVENT,
+  requestOutboxDrain,
+} from "@/lib/offline/outbox-events";
+import type { OutboxDrainEvent } from "@/lib/offline/outbox-runtime";
 
 const typeLabels: Record<CatalogItemType, string> = { ingredient: "食材", product: "市販品", supplement: "サプリ", estimated_dish: "外食・推定", batch: "Batch" };
 const blankNutrients = () => Object.fromEntries(NUTRIENT_DEFINITIONS.map(({ code }) => [code, ""]));
@@ -10,7 +26,21 @@ const blankNutrients = () => Object.fromEntries(NUTRIENT_DEFINITIONS.map(({ code
 type BatchComponent = { catalog_item_id: string; quantity: string; quantity_unit: string };
 type BatchRecord = { id: string; name: string; serving_unit: string; revision: number; batch: { dish_name: string | null; servings: number } | null; components: Array<{ catalog_item_id: string; quantity: number; quantity_unit: string }> };
 
-export function CatalogLibrary() {
+type LibraryMutation = Extract<PendingMutation, {
+  kind: "catalog_create" | "catalog_update" | "catalog_active" | "batch_create" | "batch_update";
+}>;
+
+export function CatalogLibrary({
+  ownerUserId,
+  environmentId,
+}: {
+  ownerUserId: string;
+  environmentId: string;
+}) {
+  const binding = useMemo<OutboxBinding>(
+    () => ({ ownerUserId, environmentId }),
+    [ownerUserId, environmentId],
+  );
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [batches, setBatches] = useState<BatchRecord[]>([]);
   const [mode, setMode] = useState<"item" | "batch">("item");
@@ -19,6 +49,7 @@ export function CatalogLibrary() {
   const [form, setForm] = useState({ item_type: "ingredient" as Exclude<CatalogItemType, "batch">, name: "", brand: "", serving_size: "1", serving_unit: "serving", nutrients: blankNutrients() });
   const [batchForm, setBatchForm] = useState({ name: "", dish_name: "", servings: "1", serving_unit: "serving" });
   const [components, setComponents] = useState<BatchComponent[]>([{ catalog_item_id: "", quantity: "1", quantity_unit: "serving" }]);
+  const [pendingMutations, setPendingMutations] = useState<LibraryMutation[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
