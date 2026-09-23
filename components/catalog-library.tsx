@@ -89,6 +89,22 @@ function entityKeyForCatalog(id: string) {
   return `catalog:${id}`;
 }
 
+function localIntentSummary(mutation: LibraryMutation) {
+  if (mutation.kind === "catalog_update") {
+    return `名前「${mutation.payload.name}」・基準量 ${mutation.payload.serving_size} ${mutation.payload.serving_unit}`;
+  }
+  if (mutation.kind === "catalog_active") {
+    return mutation.payload.active ? "再有効化" : "無効化";
+  }
+  if (mutation.kind === "batch_update") {
+    return `Batch「${mutation.payload.name}」・${mutation.payload.servings} servings・構成${mutation.payload.components.length}件`;
+  }
+  if (mutation.kind === "catalog_create") {
+    return `新規項目「${mutation.payload.name}」`;
+  }
+  return `新規Batch「${mutation.payload.name}」`;
+}
+
 export function CatalogLibrary({
   ownerUserId,
   environmentId,
@@ -959,8 +975,11 @@ export function CatalogLibrary({
                         {pending.status === "conflict" && (
                           <>
                             <small className="muted">
-                              サーバー: revision {item.revision} ／
-                              端末の変更: revision {pending.expected_revision ?? "なし"} を基準
+                              サーバー現在値: 「{item.name}」revision {item.revision}
+                            </small>
+                            <small className="muted">
+                              端末の変更: {localIntentSummary(pending)} ／
+                              revision {pending.expected_revision ?? "なし"} を基準
                             </small>
                             <div className="form-actions">
                               <button
