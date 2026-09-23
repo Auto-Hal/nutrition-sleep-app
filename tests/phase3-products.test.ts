@@ -40,20 +40,20 @@ describe("Phase 3 product ingestion", () => {
     }, "4006381333931", "2026-09-14T00:00:00.000Z");
 
     expect(candidate).not.toBeNull();
-    expect(candidate?.serving_size).toBe(100);
-    expect(candidate?.serving_unit).toBe("g");
-    expect(candidate?.package_amount).toBe(500);
-    expect(candidate?.quality).toBe("unverified");
-    expect(candidate?.nutrients).toEqual(expect.arrayContaining([
-      { code: "energy", amount: 250, unit: "kcal" },
-      { code: "protein", amount: 10, unit: "g" },
-      { code: "calcium", amount: 100, unit: "mg" },
-      { code: "vitamin_b12", amount: 2, unit: "ug" },
-      { code: "sodium", amount: 400, unit: "mg" },
-      { code: "salt_equivalent", amount: 1, unit: "g" },
+    expect(candidate?.identity.package_amount).toBe(500);
+    expect(candidate?.identity.quality).toBe("unverified");
+    expect(candidate?.nutrition?.serving_size).toBe(100);
+    expect(candidate?.nutrition?.serving_unit).toBe("g");
+    expect(candidate?.nutrition?.nutrients).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "energy", amount: 250, unit: "kcal", provenance: "approved_external_db", quality: "unverified" }),
+      expect.objectContaining({ code: "protein", amount: 10, unit: "g" }),
+      expect.objectContaining({ code: "calcium", amount: 100, unit: "mg" }),
+      expect.objectContaining({ code: "vitamin_b12", amount: 2, unit: "ug" }),
+      expect.objectContaining({ code: "sodium", amount: 400, unit: "mg" }),
+      expect.objectContaining({ code: "salt_equivalent", amount: 1, unit: "g" }),
     ]));
-    expect(candidate?.nutrients.some((nutrient) => nutrient.code === "vitamin_a")).toBe(false);
-    expect(candidate?.nutrients.some((nutrient) => nutrient.code === "fiber")).toBe(false);
+    expect(candidate?.nutrition?.nutrients.some((nutrient) => nutrient.code === "vitamin_a")).toBe(false);
+    expect(candidate?.nutrition?.nutrients.some((nutrient) => nutrient.code === "fiber")).toBe(false);
   });
 
   it("uses a 100 ml basis for products whose package unit establishes liquid volume", () => {
@@ -64,10 +64,10 @@ describe("Phase 3 product ingestion", () => {
       nutriments: { "energy-kcal_100g": 42 },
     }, "4006381333931");
 
-    expect(candidate?.serving_size).toBe(100);
-    expect(candidate?.serving_unit).toBe("ml");
-    expect(candidate?.package_amount).toBe(330);
-    expect(candidate?.package_unit).toBe("ml");
+    expect(candidate?.nutrition?.serving_size).toBe(100);
+    expect(candidate?.nutrition?.serving_unit).toBe("ml");
+    expect(candidate?.identity.package_amount).toBe(330);
+    expect(candidate?.identity.package_unit).toBe("ml");
   });
 
   it("requires a usable product name instead of fabricating an external product", () => {
@@ -77,20 +77,26 @@ describe("Phase 3 product ingestion", () => {
     }, "4006381333931")).toBeNull();
   });
 
-  it("does not invent a gram basis when external package units are unknown", () => {
-    expect(normalizeOpenFoodFactsProduct({
+  it("keeps identity but leaves nutrition unresolved when a serving basis cannot be established", () => {
+    const candidate = normalizeOpenFoodFactsProduct({
       product_name: "単位不明の商品",
       nutriments: { "energy-kcal_100g": 100 },
-    }, "4006381333931")).toBeNull();
+    }, "4006381333931");
+
+    expect(candidate?.identity.name).toBe("単位不明の商品");
+    expect(candidate?.nutrition).toBeNull();
   });
 
-  it("falls back to OCR when external data has no usable nutrients", () => {
-    expect(normalizeOpenFoodFactsProduct({
+  it("keeps identity for OCR fallback when external data has no usable nutrients", () => {
+    const candidate = normalizeOpenFoodFactsProduct({
       product_name: "栄養値なし",
       product_quantity: 100,
       product_quantity_unit: "g",
       nutriments: {},
-    }, "4006381333931")).toBeNull();
+    }, "4006381333931");
+
+    expect(candidate?.identity.name).toBe("栄養値なし");
+    expect(candidate?.nutrition).toBeNull();
   });
 
   it("models local-first resolution and external/OCR fallbacks", () => {
