@@ -685,7 +685,7 @@ export function ProductIngestion({
           operationId,
           createdAt,
           kind: "product_update",
-          entityKey: `product-barcode:${normalizeBarcode(ocrCandidate.barcode)}`,
+          entityKey: `catalog:${localItem!.id}`,
           payload: {
             catalog_item_id: localItem!.id,
             barcode: ocrCandidate.barcode,
