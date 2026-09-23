@@ -1,4 +1,8 @@
 import type { NutrientCode } from "@/lib/nutrition/catalog";
+import type {
+  ProductCandidateBundle,
+  ProductNutrientCandidate,
+} from "@/lib/products/types";
 
 export type CommercialNutrient = {
   code: NutrientCode;
@@ -6,27 +10,13 @@ export type CommercialNutrient = {
   unit: "kcal" | "g" | "mg" | "ug_rae" | "ug";
 };
 
-export type ExternalProductCandidate = {
-  barcode: string;
-  name: string;
-  brand: string | null;
-  manufacturer: string | null;
-  serving_size: number;
-  serving_unit: "g" | "ml";
-  package_amount: number | null;
-  package_unit: "g" | "ml" | null;
-  source_type: "external_database";
-  source_provider: "open_food_facts";
-  source_uri: string;
-  source_observed_at: string;
-  quality: "unverified";
-  nutrients: CommercialNutrient[];
-};
-
 export type OpenFoodFactsResult =
-  | { status: "found"; candidate: ExternalProductCandidate }
+  | { status: "found"; candidate: ProductCandidateBundle }
   | { status: "not_found" }
-  | { status: "unavailable"; reason: "rate_limited" | "upstream_error" | "invalid_response" | "network_error" };
+  | {
+      status: "unavailable";
+      reason: "rate_limited" | "upstream_error" | "invalid_response" | "network_error";
+    };
 
 type OffProduct = {
   code?: unknown;
@@ -51,9 +41,8 @@ const NUTRIENT_MAP: Array<{
   { code: "calcium", offKey: "calcium", unit: "mg", multiplier: 1_000 },
   { code: "iron", offKey: "iron", unit: "mg", multiplier: 1_000 },
   { code: "zinc", offKey: "zinc", unit: "mg", multiplier: 1_000 },
-  // Open Food Facts normalizes weight-based _100g values to grams. Vitamin A
-  // is intentionally omitted because this app stores vitamin A as ug RAE,
-  // while generic OFF vitamin-a does not guarantee the RAE semantic.
+  // OFF normalizes weight-based _100g values to grams. Vitamin A is omitted:
+  // this app stores ug RAE while generic OFF vitamin-a does not guarantee RAE.
   { code: "vitamin_b1", offKey: "vitamin-b1", unit: "mg", multiplier: 1_000 },
   { code: "vitamin_b2", offKey: "vitamin-b2", unit: "mg", multiplier: 1_000 },
   { code: "vitamin_b6", offKey: "vitamin-b6", unit: "mg", multiplier: 1_000 },
@@ -94,41 +83,77 @@ function normalizePackage(product: OffProduct) {
   return { amount: null, unit: null, basisUnit: null };
 }
 
-export function normalizeOpenFoodFactsProduct(product: OffProduct, barcode: string, observedAt = new Date().toISOString()): ExternalProductCandidate | null {
-  const name = nullableText(product.product_name);
-  if (!name) return null;
-
+function normalizeNutrients(
+  product: OffProduct,
+  sourceUri: string,
+  observedAt: string,
+): ProductNutrientCandidate[] {
   const nutriments = product.nutriments && typeof product.nutriments === "object"
     ? product.nutriments as Record<string, unknown>
     : {};
-  const nutrients = NUTRIENT_MAP.flatMap(({ code, offKey, unit, multiplier }) => {
+
+  return NUTRIENT_MAP.flatMap(({ code, offKey, unit, multiplier }) => {
     const normalized = finiteNonNegative(nutriments[`${offKey}_100g`]);
     if (normalized === null) return [];
-    return [{ code, amount: normalized * multiplier, unit }];
-  });
 
+    return [{
+      code,
+      amount: normalized * multiplier,
+      unit,
+      provenance: "approved_external_db" as const,
+      quality: "unverified" as const,
+      source_uri: sourceUri,
+      source_observed_at: observedAt,
+    }];
+  });
+}
+
+export function normalizeOpenFoodFactsProduct(
+  product: OffProduct,
+  barcode: string,
+  observedAt = new Date().toISOString(),
+  draftId = crypto.randomUUID(),
+): ProductCandidateBundle | null {
+  const name = nullableText(product.product_name);
+  if (!name) return null;
+
+  const sourceUri = `https://world.openfoodfacts.org/product/${encodeURIComponent(barcode)}`;
   const packageInfo = normalizePackage(product);
-  if (!packageInfo.basisUnit || nutrients.length === 0) return null;
+  const nutrients = normalizeNutrients(product, sourceUri, observedAt);
 
   return {
-    barcode,
-    name,
-    brand: nullableText(product.brands),
-    manufacturer: nullableText(product.brands),
-    serving_size: 100,
-    serving_unit: packageInfo.basisUnit,
-    package_amount: packageInfo.amount,
-    package_unit: packageInfo.unit,
-    source_type: "external_database",
-    source_provider: "open_food_facts",
-    source_uri: `https://world.openfoodfacts.org/product/${encodeURIComponent(barcode)}`,
-    source_observed_at: observedAt,
-    quality: "unverified",
-    nutrients,
+    identity: {
+      draft_id: draftId,
+      barcode,
+      name,
+      brand: nullableText(product.brands),
+      manufacturer: nullableText(product.brands),
+      package_amount: packageInfo.amount,
+      package_unit: packageInfo.unit,
+      source: {
+        type: "external_database",
+        provider: "open_food_facts",
+        uri: sourceUri,
+        observed_at: observedAt,
+      },
+      quality: "unverified",
+    },
+    nutrition: packageInfo.basisUnit && nutrients.length > 0
+      ? {
+          draft_id: draftId,
+          serving_size: 100,
+          serving_unit: packageInfo.basisUnit,
+          nutrients,
+          source_provider: "open_food_facts",
+        }
+      : null,
   };
 }
 
-export async function fetchOpenFoodFactsProduct(barcode: string): Promise<OpenFoodFactsResult> {
+export async function fetchOpenFoodFactsProduct(
+  barcode: string,
+  draftId = crypto.randomUUID(),
+): Promise<OpenFoodFactsResult> {
   const fields = [
     "code",
     "product_name",
@@ -160,7 +185,12 @@ export async function fetchOpenFoodFactsProduct(barcode: string): Promise<OpenFo
         : { status: "unavailable", reason: "invalid_response" };
     }
 
-    const candidate = normalizeOpenFoodFactsProduct(body.product as OffProduct, barcode);
+    const candidate = normalizeOpenFoodFactsProduct(
+      body.product as OffProduct,
+      barcode,
+      new Date().toISOString(),
+      draftId,
+    );
     return candidate
       ? { status: "found", candidate }
       : { status: "unavailable", reason: "invalid_response" };
