@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import {
   applyMealEntryWrite,
@@ -128,6 +128,18 @@ export function MealLog({
     setMeals(initialMeals);
   }, [initialMeals]);
 
+  const refreshMeals = useCallback(async () => {
+    const response = await fetch(`/api/meals?date=${encodeURIComponent(date)}`, {
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as { meals?: Meal[] };
+    if (!response.ok || !payload.meals) {
+      throw new Error("食事状態を更新できませんでした。");
+    }
+    setMeals(payload.meals);
+    return payload.meals;
+  }, [date]);
+
   useEffect(() => {
     let cancelled = false;
     void listOutboxMutations(outboxBinding)
@@ -164,7 +176,42 @@ export function MealLog({
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
-      if (!detail || detail.kind !== "meal_entry_create") return;
+      if (!detail) return;
+
+      if (detail.kind === "fixed_meal_state") {
+        if (detail.state === "synced") {
+          setFixedStateOperations((current) => current.filter(
+            (candidate) => candidate.operation_id !== detail.operation_id,
+          ));
+          setMessage("server成功を確認済み");
+          void refreshMeals().catch(() => {
+            setMessage("server成功を確認済み · 最新表示は次回更新時に反映します");
+          });
+          return;
+        }
+
+        const localStatus: PendingMutationStatus = detail.state;
+        setFixedStateOperations((current) => current.map((candidate) =>
+          candidate.operation_id === detail.operation_id
+            ? { ...candidate, status: localStatus, last_error_code: detail.error_code }
+            : candidate
+        ));
+        if (detail.state === "conflict") {
+          setMessage(null);
+          setError("食事状態が別の状態に更新されています。現在値を確認してください。");
+          void refreshMeals().catch(() => undefined);
+        } else if (detail.state === "failed") {
+          setMessage("食事状態は端末に保存済みです。接続回復後に再試行します。");
+        } else if (detail.state === "paused_auth") {
+          setMessage("食事状態は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+        } else if (detail.state === "blocked" || detail.state === "expired") {
+          setMessage(null);
+          setError("未同期の食事状態は自動適用を停止しました。");
+        }
+        return;
+      }
+
+      if (detail.kind !== "meal_entry_create") return;
 
       const operation = localOperations.find(
         (candidate) => candidate.operationId === detail.operation_id,
@@ -197,17 +244,10 @@ export function MealLog({
           (candidate) => candidate.operationId !== detail.operation_id,
         ));
         setMessage("server成功を確認済み");
-        void fetch(`/api/meals?date=${encodeURIComponent(date)}`, {
-          cache: "no-store",
-        })
-          .then(async (response) => {
-            const payload = (await response.json()) as { meals?: Meal[] };
-            if (response.ok && payload.meals) setMeals(payload.meals);
-          })
-          .catch(() => {
-            // The local success result remains visible; later navigation/reload
-            // will reconcile from the authoritative server state.
-          });
+        void refreshMeals().catch(() => {
+          // The local success result remains visible; later navigation/reload
+          // will reconcile from the authoritative server state.
+        });
         return;
       }
 
@@ -238,7 +278,7 @@ export function MealLog({
 
     window.addEventListener(OUTBOX_STATE_EVENT, onState);
     return () => window.removeEventListener(OUTBOX_STATE_EVENT, onState);
-  }, [date, items, localOperations, onOutboxState]);
+  }, [date, items, localOperations, onOutboxState, refreshMeals]);
 
   function openComposer(type: MealType) {
     setComposer(type);
