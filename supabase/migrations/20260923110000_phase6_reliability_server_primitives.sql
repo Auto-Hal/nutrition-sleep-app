@@ -672,7 +672,7 @@ begin
       perform private.phase6_raise_http(409, 'revision_conflict');
     end if;
 
-    select pg_catalog.exists(
+    select exists (
       select 1
       from public.meal_entries e
       where e.meal_id = meal.id
