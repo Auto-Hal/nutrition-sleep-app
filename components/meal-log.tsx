@@ -183,6 +183,41 @@ export function MealLog({
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
       if (!detail) return;
 
+      if (detail.kind === "meal_entry_void") {
+        onOutboxState?.(detail.operation_id, detail.state);
+        if (detail.state === "synced") {
+          setVoidOperations((current) => current.filter(
+            (candidate) => candidate.operation_id !== detail.operation_id,
+          ));
+          setMessage("server成功を確認済み");
+          void refreshMeals().catch(() => {
+            setMessage("server成功を確認済み · 最新表示は次回更新時に反映します");
+          });
+          return;
+        }
+
+        const localStatus: PendingMutationStatus = detail.state;
+        setVoidOperations((current) => current.map((candidate) =>
+          candidate.operation_id === detail.operation_id
+            ? { ...candidate, status: localStatus, last_error_code: detail.error_code }
+            : candidate
+        ));
+
+        if (detail.state === "conflict") {
+          setMessage(null);
+          setError("食事記録の現在状態が変わっています。内容を確認してください。");
+          void refreshMeals().catch(() => undefined);
+        } else if (detail.state === "failed") {
+          setMessage("取消操作は端末に保存済みです。接続回復後に再試行します。");
+        } else if (detail.state === "paused_auth") {
+          setMessage("取消操作は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+        } else if (detail.state === "blocked" || detail.state === "expired") {
+          setMessage(null);
+          setError("未同期の取消操作は自動適用を停止しました。");
+        }
+        return;
+      }
+
       if (detail.kind === "fixed_meal_state") {
         if (detail.state === "synced") {
           setFixedStateOperations((current) => current.filter(
