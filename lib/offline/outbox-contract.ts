@@ -250,7 +250,7 @@ export function createOutboxMutation<K extends OutboxMutationKind>(
   };
 
   assertSafeOutboxValue(mutation);
-  return mutation as Extract<PendingMutation, { kind: K }>;
+  return mutation as unknown as Extract<PendingMutation, { kind: K }>;
 }
 
 export function createMealEntryMutation(
@@ -290,9 +290,7 @@ export function matchesOutboxBinding(
     && mutation.environment_id === binding.environmentId;
 }
 
-export function deriveLegacyEntityKey(
-  mutation: Pick<PendingMutation, "operation_id" | "kind" | "payload">,
-) {
+export function deriveLegacyEntityKey(mutation: PendingMutation) {
   if (mutation.kind === "meal_entry_create") {
     return mutation.payload.meal_type === "custom"
       ? `custom-meal:${mutation.operation_id}`
