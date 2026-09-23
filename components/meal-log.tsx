@@ -578,6 +578,9 @@ export function MealLog({
           {fixedMeals.map(({ type, label }) => {
             const meal = meals.find((candidate) => candidate.meal_type === type);
             const pending = localOperations.filter((operation) => operation.mealType === type);
+            const fixedStateOperation = fixedStateOperations.find(
+              (operation) => operation.payload.meal_type === type,
+            );
             return (
               <div className="meal-row" key={type}>
                 <div>
@@ -589,6 +592,59 @@ export function MealLog({
                       </span>
                     ))}
                     {pending.map(renderPendingOperation)}
+                    {fixedStateOperation && (
+                      <div className="pending-operation">
+                        <span>
+                          状態変更 → {fixedStateOperation.payload.state === "skipped" ? "skipped" : "未登録"}
+                        </span>
+                        <span className="pill pending">{operationLabel(fixedStateOperation.status)}</span>
+                        {fixedStateOperation.status === "conflict" && (
+                          <>
+                            <small className="muted">
+                              サーバー: {stateLabel(meal?.state)} revision {meal?.revision ?? "なし"} ／
+                              端末: {fixedStateOperation.payload.state}（revision {fixedStateOperation.expected_revision ?? "absence"}）
+                            </small>
+                            <div className="form-actions">
+                              <button
+                                className="button secondary"
+                                type="button"
+                                onClick={() => void resolveFixedMealConflict(fixedStateOperation, false)}
+                                disabled={busy}
+                              >
+                                サーバー状態を採用
+                              </button>
+                              <button
+                                className="button"
+                                type="button"
+                                onClick={() => void resolveFixedMealConflict(fixedStateOperation, true)}
+                                disabled={busy}
+                              >
+                                現在revisionへ再適用
+                              </button>
+                            </div>
+                          </>
+                        )}
+                        {fixedStateOperation.status === "failed" && (
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => void retryOperation(fixedStateOperation.operation_id)}
+                          >
+                            今すぐ再試行
+                          </button>
+                        )}
+                        {(fixedStateOperation.status === "expired"
+                          || fixedStateOperation.status === "blocked") && (
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => void discardFixedMealOperation(fixedStateOperation)}
+                          >
+                            サーバー状態を採用して破棄
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="meal-actions">
@@ -599,20 +655,33 @@ export function MealLog({
                     className="button secondary"
                     type="button"
                     onClick={() => openComposer(type)}
-                    disabled={busy}
+                    disabled={busy || Boolean(fixedStateOperation)}
                   >
                     追加
                   </button>
                   {(meal?.entries.length ?? 0) === 0
-                    && meal?.state !== "skipped"
-                    && localOperations.every((operation) => operation.mealType !== type) && (
+                    && !fixedStateOperation
+                    && localOperations.every((operation) => operation.mealType !== type)
+                    && meal?.state !== "skipped" && (
                     <button
                       className="button ghost"
                       type="button"
-                      onClick={() => void setSkipped(type)}
+                      onClick={() => void queueFixedMealState(type, "skipped")}
                       disabled={busy}
                     >
                       skipped
+                    </button>
+                  )}
+                  {(meal?.entries.length ?? 0) === 0
+                    && !fixedStateOperation
+                    && meal?.state === "skipped" && (
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void queueFixedMealState(type, "not_recorded", meal)}
+                      disabled={busy}
+                    >
+                      未登録に戻す
                     </button>
                   )}
                 </div>
