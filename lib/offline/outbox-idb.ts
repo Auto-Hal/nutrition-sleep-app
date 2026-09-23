@@ -26,9 +26,9 @@ function openOutboxDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
-      if (request.oldVersion === 0) {
+      if (event.oldVersion === 0) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: "operation_id" });
         store.createIndex(
           BINDING_INDEX,
