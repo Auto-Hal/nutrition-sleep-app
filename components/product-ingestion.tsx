@@ -10,6 +10,23 @@ import type {
   ProductIdentityCandidate,
   ProductNutrientCandidate,
 } from "@/lib/products/types";
+import {
+  createOutboxMutation,
+  type OutboxBinding,
+  type PendingMutation,
+  type PendingMutationStatus,
+} from "@/lib/offline/outbox-contract";
+import {
+  deleteOutboxMutation,
+  listOutboxMutations,
+  putOutboxMutation,
+  retryOutboxMutation,
+} from "@/lib/offline/outbox-idb";
+import {
+  OUTBOX_STATE_EVENT,
+  requestOutboxDrain,
+} from "@/lib/offline/outbox-events";
+import type { OutboxDrainEvent } from "@/lib/offline/outbox-runtime";
 
 type ProductItemType = "product" | "supplement";
 
@@ -91,6 +108,24 @@ type OcrResponse = {
 };
 
 type NutrientDraft = Record<NutrientCode, string>;
+
+type ProductMutation = Extract<PendingMutation, {
+  kind: "product_create" | "product_update";
+}>;
+
+function isProductMutation(mutation: PendingMutation): mutation is ProductMutation {
+  return mutation.kind === "product_create" || mutation.kind === "product_update";
+}
+
+function productMutationLabel(status: PendingMutationStatus) {
+  if (status === "pending") return "端末に保存・未同期";
+  if (status === "in_flight") return "同期中…";
+  if (status === "failed") return "再試行待ち";
+  if (status === "paused_auth") return "ログイン待ち";
+  if (status === "conflict") return "競合・確認が必要";
+  if (status === "expired") return "期限切れ";
+  return "同期停止";
+}
 
 function nutrientDraft(
   values: Array<{ code: NutrientCode; amount: number | null }>,
@@ -174,7 +209,13 @@ function identitySourceLabel(source: LocalIdentitySource) {
   return source.provider ? `外部DB: ${source.provider}` : "外部DB";
 }
 
-export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) {
+export function ProductIngestion({
+  onSaved,
+  outboxBinding,
+}: {
+  onSaved: () => Promise<void>;
+  outboxBinding: OutboxBinding;
+}) {
   const [barcode, setBarcode] = useState("");
   const [itemType, setItemType] = useState<ProductItemType>("product");
   const [externalCandidate, setExternalCandidate] = useState<ProductCandidateBundle | null>(null);
@@ -183,6 +224,7 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
   const [ocrNutrients, setOcrNutrients] = useState<NutrientDraft>(() => nutrientDraft([]));
   const [scannerOpen, setScannerOpen] = useState(false);
   const [needsOcr, setNeedsOcr] = useState(false);
+  const [pendingProductMutations, setPendingProductMutations] = useState<ProductMutation[]>([]);
   const [busy, setBusy] = useState(false);
   const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
