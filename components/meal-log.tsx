@@ -375,42 +375,110 @@ export function MealLog({
     }
   }
 
-  async function setSkipped(type: Exclude<MealType, "custom">) {
+  async function queueFixedMealState(
+    type: Exclude<MealType, "custom">,
+    state: "not_recorded" | "skipped",
+    reviewedMeal?: Meal,
+  ) {
+    if (fixedStateOperations.some((operation) => operation.payload.meal_type === type)) {
+      setError("この食事枠には未同期の変更があります。先に解決してください。");
+      return;
+    }
+
+    const currentMeal = reviewedMeal ?? meals.find((candidate) => candidate.meal_type === type);
+    if (state === "not_recorded" && !currentMeal) {
+      setError("現在の食事状態を取得してから操作してください。");
+      return;
+    }
+
     setBusy(true);
     setPendingMealType(type);
     setError(null);
-    setMessage("保存中…");
+    setMessage("端末に保存中…");
 
     try {
-      const response = await fetch("/api/meals/state", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      const mutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "fixed_meal_state",
+        entityKey: `fixed-meal:${date}:${type}`,
+        payload: {
           meal_date: date,
           meal_type: type,
-          state: "skipped",
-        }),
+          state,
+          eaten_at: null,
+        },
+        expectedRevision: currentMeal?.revision ?? null,
+        expectedAbsence: !currentMeal,
       });
-      const payload = (await response.json()) as {
-        meal?: MealStateWriteResult;
-        error?: string;
-      };
-      if (!response.ok || !payload.meal) {
-        throw new Error(payload.error ?? "食事状態を保存できませんでした。");
-      }
-
-      setMeals((current) => applyMealStateWrite(current, payload.meal!));
-      setMessage("skippedとして記録しました");
+      await putOutboxMutation(mutation);
+      setFixedStateOperations((current) => [...current, mutation]);
+      setMessage("端末に保存・未同期");
+      requestOutboxDrain();
     } catch (requestError) {
       setMessage(null);
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "食事状態の保存に失敗しました。",
-      );
+      setError(requestError instanceof Error ? requestError.message : "端末に保存できませんでした。");
     } finally {
       setPendingMealType(null);
       setBusy(false);
+    }
+  }
+
+  async function resolveFixedMealConflict(
+    operation: FixedMealStateMutation,
+    reapply: boolean,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const currentMeals = await refreshMeals();
+      const currentMeal = currentMeals.find(
+        (meal) => meal.meal_type === operation.payload.meal_type,
+      );
+      await deleteOutboxMutation(operation.operation_id);
+      setFixedStateOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+
+      if (!reapply) {
+        setMessage("サーバーの現在状態を採用しました。");
+        return;
+      }
+      if (operation.payload.state === "not_recorded" && !currentMeal) {
+        setMessage("サーバー側には対象の食事枠がないため、現在状態を採用しました。");
+        return;
+      }
+
+      const replacementMutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "fixed_meal_state",
+        entityKey: operation.entity_key,
+        payload: operation.payload,
+        expectedRevision: currentMeal?.revision ?? null,
+        expectedAbsence: !currentMeal,
+      });
+      await putOutboxMutation(replacementMutation);
+      setFixedStateOperations((current) => [...current, replacementMutation]);
+      setMessage("現在のrevisionに対して再適用を開始しました。");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "競合を解決できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardFixedMealOperation(operation: FixedMealStateMutation) {
+    try {
+      await deleteOutboxMutation(operation.operation_id);
+      setFixedStateOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+      setMessage("端末の未同期食事状態を破棄しました。");
+      void refreshMeals().catch(() => undefined);
+    } catch {
+      setError("端末の未同期食事状態を破棄できませんでした。");
     }
   }
 
@@ -426,6 +494,11 @@ export function MealLog({
             status: "pending",
             lastErrorCode: null,
           }
+          : operation
+      ));
+      setFixedStateOperations((current) => current.map((operation) =>
+        operation.operation_id === operationId
+          ? { ...operation, status: "pending", last_error_code: null }
           : operation
       ));
       setMessage("再同期を開始します。");
