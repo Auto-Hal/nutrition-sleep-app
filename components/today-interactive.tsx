@@ -88,13 +88,18 @@ export function TodayInteractive({
 
   const handleOutboxState = useCallback((
     operationId: string,
-    state: PendingMutationStatus | "synced",
+    state: PendingMutationStatus | "synced" | "discarded",
   ) => {
     if (state === "synced") {
       refreshSummary(operationId);
       return;
     }
-    if (state === "conflict" || state === "expired" || state === "blocked") {
+    if (
+      state === "conflict"
+      || state === "expired"
+      || state === "blocked"
+      || state === "discarded"
+    ) {
       setPendingNutrition((current) => {
         const next = { ...current };
         delete next[operationId];
