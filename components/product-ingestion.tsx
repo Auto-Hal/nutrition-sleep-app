@@ -822,6 +822,88 @@ export function ProductIngestion({
         </div>
       </div>
 
+      {pendingProductMutations.length > 0 && (
+        <div className="empty-state" aria-live="polite">
+          {pendingProductMutations.map((mutation) => {
+            const serverItem = localItem?.product.barcode === mutation.payload.barcode
+              ? localItem
+              : null;
+            return (
+              <div className="pending-operation" key={mutation.operation_id}>
+                <strong>{mutation.payload.name}</strong>
+                <small className="muted">JAN: {mutation.payload.barcode}</small>
+                <span className="pill pending">{productMutationLabel(mutation.status)}</span>
+
+                {mutation.status === "conflict" && (
+                  <>
+                    <small className="muted">
+                      端末の変更: 「{mutation.payload.name}」
+                      {mutation.kind === "product_update"
+                        ? ` · revision ${mutation.expected_revision ?? "不明"} を基準`
+                        : " · 新規登録"}
+                    </small>
+                    <small className="muted">
+                      サーバー現在値: {serverItem
+                        ? `「${serverItem.name}」 · revision ${serverItem.revision}`
+                        : "同じJANの現在値を安全に確認できません"}
+                    </small>
+                    <div className="form-actions">
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => void adoptProductServer(mutation)}
+                        disabled={busy}
+                      >
+                        サーバー状態を採用
+                      </button>
+                      {mutation.kind === "product_update" && serverItem && (
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={() => void reapplyProductUpdate(mutation)}
+                          disabled={busy}
+                        >
+                          現在revisionへ再適用
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {mutation.status === "failed" && (
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => void retryProductMutation(mutation.operation_id)}
+                    disabled={busy}
+                  >
+                    今すぐ再試行
+                  </button>
+                )}
+
+                {(mutation.status === "blocked" || mutation.status === "expired") && (
+                  <>
+                    <small className="muted">
+                      {mutation.last_error_code === "operation_content_mismatch"
+                        ? "同じoperation IDに異なる内容が検出されたため、自動再適用しません。"
+                        : "自動同期を停止しています。現在状態を確認して必要なら新しい操作を作成してください。"}
+                    </small>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void discardProductMutation(mutation)}
+                      disabled={busy}
+                    >
+                      端末の未同期操作を破棄
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="grid-2">
         <div className="field">
           <label htmlFor="commercial-item-type">種類</label>
