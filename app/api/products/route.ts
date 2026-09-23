@@ -6,14 +6,45 @@ import { isAllowedOrigin } from "@/lib/security/request";
 import { isValidGtin } from "@/lib/products/barcode";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
-const sourceTypeSchema = z.enum(["manufacturer_official", "label_ocr", "external_database"]);
+const identitySourceTypeSchema = z.enum([
+  "manufacturer_official",
+  "external_database",
+  "user_entered",
+]);
+
+const nutrientProvenanceSchema = z.enum([
+  "user_entered",
+  "product_label",
+  "barcode_db",
+  "approved_external_db",
+  "ocr",
+  "estimated_dish",
+  "batch_calculation",
+]);
+
+const nutrientQualitySchema = z.enum(["unknown", "unverified", "user_verified"]);
+
 const nutrientSchema = z.object({
-  code: z.string().refine((value) => NUTRIENT_DEFINITIONS.some((definition) => definition.code === value), "unknown nutrient"),
-  amount: z.number().finite().min(0),
+  code: z.string().refine(
+    (value) => NUTRIENT_DEFINITIONS.some((definition) => definition.code === value),
+    "unknown nutrient",
+  ),
+  amount: z.number().finite().min(0).nullable(),
   unit: z.enum(["kcal", "g", "mg", "ug_rae", "ug"]),
+  provenance: nutrientProvenanceSchema,
+  quality: nutrientQualitySchema,
+  source_uri: z.string().url().max(1000).nullable().optional(),
+  source_observed_at: z.string().datetime().nullable().optional(),
+}).superRefine((value, context) => {
+  if (value.provenance === "approved_external_db" && value.quality === "user_verified") {
+    context.addIssue({
+      code: "custom",
+      message: "external database nutrients cannot be adapter-verified",
+    });
+  }
 });
 
-const baseProductSchema = z.object({
+const createSchema = z.object({
   item_type: z.enum(["product", "supplement"]),
   barcode: z.string().trim().refine(isValidGtin, "invalid GTIN"),
   name: z.string().trim().min(1).max(200),
@@ -23,11 +54,12 @@ const baseProductSchema = z.object({
   manufacturer: z.string().trim().max(200).nullable().optional(),
   package_amount: z.number().finite().positive().nullable().optional(),
   package_unit: z.string().trim().min(1).max(32).nullable().optional(),
-  source_type: sourceTypeSchema,
-  source_provider: z.string().trim().min(1).max(80),
-  source_uri: z.string().url().max(1000).nullable().optional(),
-  source_observed_at: z.string().datetime(),
+  identity_source_type: identitySourceTypeSchema,
+  identity_source_provider: z.string().trim().min(1).max(80),
+  identity_source_uri: z.string().url().max(1000).nullable().optional(),
+  identity_source_observed_at: z.string().datetime(),
   nutrients: z.array(nutrientSchema).max(NUTRIENT_DEFINITIONS.length),
+  idempotency_key: z.string().trim().min(1).max(128).optional(),
 }).superRefine((value, context) => {
   if ((value.package_amount == null) !== (value.package_unit == null)) {
     context.addIssue({ code: "custom", message: "package amount and unit must be provided together" });
@@ -38,11 +70,32 @@ const baseProductSchema = z.object({
   }
 });
 
-const createSchema = baseProductSchema.and(z.object({
-  idempotency_key: z.string().trim().min(1).max(128).optional(),
-}));
-
 export const dynamic = "force-dynamic";
+
+function effectiveIdentitySource<T extends {
+  identity_source_type: string | null;
+  identity_source_provider: string | null;
+  identity_source_uri: string | null;
+  identity_source_observed_at: string | null;
+  identity_confirmed_at: string | null;
+}>(product: T) {
+  if (product.identity_source_type) {
+    return {
+      type: product.identity_source_type,
+      provider: product.identity_source_provider,
+      uri: product.identity_source_uri,
+      observed_at: product.identity_source_observed_at,
+      confirmed_at: product.identity_confirmed_at,
+    };
+  }
+  return {
+    type: "legacy_unknown" as const,
+    provider: null,
+    uri: null,
+    observed_at: null,
+    confirmed_at: null,
+  };
+}
 
 export async function GET() {
   const session = await getAppSession();
@@ -50,7 +103,7 @@ export async function GET() {
   const client = createUserClient(session.accessToken);
   const productsResult = await client
     .from("products")
-    .select("catalog_item_id,barcode,manufacturer,package_amount,package_unit,source_type,source_provider,source_uri,source_observed_at,confirmed_at")
+    .select("catalog_item_id,barcode,manufacturer,package_amount,package_unit,source_type,source_provider,source_uri,source_observed_at,confirmed_at,identity_source_type,identity_source_provider,identity_source_uri,identity_source_observed_at,identity_confirmed_at")
     .order("updated_at", { ascending: false });
 
   if (productsResult.error) {
@@ -67,7 +120,7 @@ export async function GET() {
       .in("id", ids),
     client
       .from("item_nutrients")
-      .select("catalog_item_id,nutrient_code,amount,unit,provenance,quality")
+      .select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at")
       .in("catalog_item_id", ids),
   ]);
 
@@ -80,8 +133,13 @@ export async function GET() {
     if (!item) return [];
     return [{
       ...item,
-      product,
-      nutrients: (nutrientsResult.data ?? []).filter((nutrient) => nutrient.catalog_item_id === item.id),
+      product: {
+        ...product,
+        identity_source: effectiveIdentitySource(product),
+      },
+      nutrients: (nutrientsResult.data ?? []).filter(
+        (nutrient) => nutrient.catalog_item_id === item.id,
+      ),
     }];
   });
 
@@ -101,7 +159,7 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
-  const result = await createUserClient(session.accessToken).rpc("create_product_item", {
+  const result = await createUserClient(session.accessToken).rpc("create_product_item_v2", {
     p_item_type: input.item_type,
     p_barcode: input.barcode,
     p_name: input.name,
@@ -111,10 +169,10 @@ export async function POST(request: Request) {
     p_manufacturer: input.manufacturer ?? null,
     p_package_amount: input.package_amount ?? null,
     p_package_unit: input.package_unit ?? null,
-    p_source_type: input.source_type,
-    p_source_provider: input.source_provider,
-    p_source_uri: input.source_uri ?? null,
-    p_source_observed_at: input.source_observed_at,
+    p_identity_source_type: input.identity_source_type,
+    p_identity_source_provider: input.identity_source_provider,
+    p_identity_source_uri: input.identity_source_uri ?? null,
+    p_identity_source_observed_at: input.identity_source_observed_at,
     p_nutrients: input.nutrients,
     p_idempotency_key: input.idempotency_key ?? null,
   });
