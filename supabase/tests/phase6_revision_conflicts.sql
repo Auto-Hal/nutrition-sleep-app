@@ -1,6 +1,6 @@
 begin;
 
-select plan(33);
+select plan(37);
 
 select has_function(
   'public', 'upsert_user_profile_v2',
