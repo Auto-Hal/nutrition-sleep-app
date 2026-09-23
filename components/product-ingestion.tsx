@@ -246,6 +246,93 @@ export function ProductIngestion({
     if (ocrPreviewRef.current) URL.revokeObjectURL(ocrPreviewRef.current);
   }, []);
 
+  const reloadPendingProducts = useCallback(async () => {
+    const rows = await listOutboxMutations(outboxBinding);
+    const products = rows.filter(isProductMutation);
+    setPendingProductMutations(products);
+    return products;
+  }, [outboxBinding]);
+
+  const loadLocalProduct = useCallback(async (value: string) => {
+    const normalized = normalizeBarcode(value);
+    if (!isValidGtin(normalized)) return null;
+    const draftId = crypto.randomUUID();
+    const response = await fetch(
+      `/api/products/resolve?barcode=${encodeURIComponent(normalized)}&draft_id=${encodeURIComponent(draftId)}`,
+      { cache: "no-store" },
+    );
+    const result = await response.json() as ResolveResponse;
+    if (!response.ok || "error" in result) {
+      throw new Error("現在の商品状態を取得できませんでした。");
+    }
+    return result.status === "local" ? result.item : null;
+  }, []);
+
+  const clearConfirmedDraft = useCallback(() => {
+    activeDraftRef.current = null;
+    setExternalCandidate(null);
+    setLocalItem(null);
+    setOcrCandidate(null);
+    setOcrNutrients(nutrientDraft([]));
+    replaceOcrPreview(null);
+    setNeedsOcr(false);
+  }, [replaceOcrPreview]);
+
+  useEffect(() => {
+    void reloadPendingProducts().catch(() => {
+      setError("端末の未同期商品を確認できませんでした。");
+    });
+  }, [reloadPendingProducts]);
+
+  useEffect(() => {
+    const onState = (event: Event) => {
+      const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
+      if (!detail || (detail.kind !== "product_create" && detail.kind !== "product_update")) {
+        return;
+      }
+
+      if (detail.state === "synced") {
+        setPendingProductMutations((current) => current.filter(
+          (mutation) => mutation.operation_id !== detail.operation_id,
+        ));
+        setMessage("server成功を確認済み");
+        void onSaved().catch(() => {
+          setMessage("server成功を確認済み · Library表示は次回更新時に反映します。");
+        });
+        return;
+      }
+
+      void reloadPendingProducts().then((rows) => {
+        const mutation = rows.find(
+          (candidate) => candidate.operation_id === detail.operation_id,
+        );
+        if (detail.state === "conflict" && mutation) {
+          void loadLocalProduct(mutation.payload.barcode)
+            .then((current) => {
+              setLocalItem(current);
+              if (current) setItemType(current.item_type);
+            })
+            .catch(() => undefined);
+        }
+      });
+
+      if (detail.state === "conflict") {
+        setMessage(null);
+        setError("商品が別の状態に更新されています。サーバー現在値と端末の変更を確認してください。");
+      } else if (detail.state === "failed") {
+        setMessage("商品変更は端末に保存済みです。接続回復後に再試行します。");
+      } else if (detail.state === "paused_auth") {
+        setMessage("商品変更は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+      } else if (detail.state === "blocked" || detail.state === "expired") {
+        setMessage(null);
+        setError("未同期の商品変更は自動適用を停止しました。");
+      }
+    };
+
+    window.addEventListener(OUTBOX_STATE_EVENT, onState);
+    return () => window.removeEventListener(OUTBOX_STATE_EVENT, onState);
+  }, [loadLocalProduct, onSaved, reloadPendingProducts]);
+
   const resetResolution = useCallback(() => {
     setExternalCandidate(null);
     setLocalItem(null);
