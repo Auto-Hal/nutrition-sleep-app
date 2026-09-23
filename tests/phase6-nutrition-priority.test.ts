@@ -510,7 +510,7 @@ describe("Phase 6 required boundary coverage", () => {
         nutrients: [nutrient({
           eligible_days: eligibleDays,
           daily: Array.from({ length: eligibleDays }, (_, index) => ({
-            meal_date: \`2026-08-\${String(index + 1).padStart(2, "0")}\`,
+            meal_date: `2026-08-${String(index + 1).padStart(2, "0")}`,
             known_amount: 500,
             eligible_for_reference: true,
           })),
