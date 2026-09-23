@@ -522,6 +522,100 @@ export function MealLog({
     }
   }
 
+  async function queueMealEntryVoid(meal: Meal, entryId: string) {
+    if (voidOperations.some((operation) => operation.payload.entry_id === entryId)) {
+      setError("この食事記録には未同期の取消操作があります。");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage("端末に保存中…");
+    try {
+      const mutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "meal_entry_void",
+        entityKey: `meal:${meal.id}`,
+        payload: {
+          entry_id: entryId,
+          meal_id: meal.id,
+        },
+        expectedRevision: meal.revision,
+      });
+      await putOutboxMutation(mutation);
+      setVoidOperations((current) => [...current, mutation]);
+      setMessage("端末に保存・未同期");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setMessage(null);
+      setError(requestError instanceof Error ? requestError.message : "取消操作を端末に保存できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resolveMealEntryVoidConflict(
+    operation: MealEntryVoidMutation,
+    reapply: boolean,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const currentMeals = await refreshMeals();
+      const currentMeal = currentMeals.find(
+        (meal) => meal.id === operation.payload.meal_id,
+      );
+      const entryStillActive = currentMeal?.entries.some(
+        (entry) => entry.id === operation.payload.entry_id,
+      ) ?? false;
+
+      await deleteOutboxMutation(operation.operation_id);
+      setVoidOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+
+      if (!reapply || !currentMeal || !entryStillActive) {
+        setMessage(
+          entryStillActive
+            ? "サーバーの現在状態を採用しました。"
+            : "対象記録は現在のサーバー状態では取消済みまたは存在しないため、サーバー状態を採用しました。",
+        );
+        return;
+      }
+
+      const replacementMutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "meal_entry_void",
+        entityKey: operation.entity_key,
+        payload: operation.payload,
+        expectedRevision: currentMeal.revision,
+      });
+      await putOutboxMutation(replacementMutation);
+      setVoidOperations((current) => [...current, replacementMutation]);
+      setMessage("現在のrevisionに対して取消を再適用しました。");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "取消競合を解決できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardMealEntryVoid(operation: MealEntryVoidMutation) {
+    try {
+      await deleteOutboxMutation(operation.operation_id);
+      setVoidOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+      setMessage("端末の未同期取消操作を破棄しました。");
+      void refreshMeals().catch(() => undefined);
+    } catch {
+      setError("端末の未同期取消操作を破棄できませんでした。");
+    }
+  }
+
   async function retryOperation(operationId: string) {
     setError(null);
     try {
@@ -537,6 +631,11 @@ export function MealLog({
           : operation
       ));
       setFixedStateOperations((current) => current.map((operation) =>
+        operation.operation_id === operationId
+          ? { ...operation, status: "pending", last_error_code: null }
+          : operation
+      ));
+      setVoidOperations((current) => current.map((operation) =>
         operation.operation_id === operationId
           ? { ...operation, status: "pending", last_error_code: null }
           : operation
