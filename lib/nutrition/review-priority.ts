@@ -184,7 +184,7 @@ function makeDirectSignals(
   minimumDays: number,
 ): NutritionReviewSignal[] {
   const value = nutrient.average_known_amount;
-  if (value === null || !Number.isFinite(value) || !nutrient.dri.stable) return [];
+  if (value === null || !Number.isFinite(value)) return [];
 
   const unit = nutrient.unit as DriUnit;
   const refs = nutrient.dri.references;
@@ -344,7 +344,7 @@ function makePercentEnergySignals(
   minimumDays: number,
 ): NutritionReviewSignal[] {
   const value = nutrient.percent_energy;
-  if (value === null || !Number.isFinite(value) || !nutrient.dri.stable) return [];
+  if (value === null || !Number.isFinite(value)) return [];
 
   const dg = comparableReference(nutrient.dri.references, "DG", "percent_energy");
   if (!dg) return [];
