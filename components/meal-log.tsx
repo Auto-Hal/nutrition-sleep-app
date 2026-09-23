@@ -664,6 +664,89 @@ export function MealLog({
 
   const selected = items.find((item) => item.id === itemId);
 
+  function renderVoidOperation(operation: MealEntryVoidMutation, meal?: Meal) {
+    const entry = meal?.entries.find((candidate) => candidate.id === operation.payload.entry_id);
+    return (
+      <div className="pending-operation" key={operation.operation_id}>
+        <span>
+          {entry
+            ? `${entry.name} × ${entry.quantity}${entry.quantity_unit} を取り消し`
+            : "食事記録の取消操作"}
+        </span>
+        <span className="pill pending">{operationLabel(operation.status)}</span>
+        {operation.status === "conflict" && (
+          <>
+            <small className="muted">
+              サーバー: meal revision {meal?.revision ?? "取得済み状態では対象なし"} ／
+              端末の取消: revision {operation.expected_revision ?? "不明"} を基準
+            </small>
+            <div className="form-actions">
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void resolveMealEntryVoidConflict(operation, false)}
+                disabled={busy}
+              >
+                サーバー状態を採用
+              </button>
+              {entry && meal && (
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => void resolveMealEntryVoidConflict(operation, true)}
+                  disabled={busy}
+                >
+                  現在revisionへ再適用
+                </button>
+              )}
+            </div>
+          </>
+        )}
+        {operation.status === "failed" && (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void retryOperation(operation.operation_id)}
+          >
+            今すぐ再試行
+          </button>
+        )}
+        {(operation.status === "blocked" || operation.status === "expired") && (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void discardMealEntryVoid(operation)}
+          >
+            サーバー状態を採用して破棄
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  function renderConfirmedEntry(meal: Meal, entry: Meal["entries"][number]) {
+    const voidOperation = voidOperations.find(
+      (operation) => operation.payload.entry_id === entry.id,
+    );
+    return (
+      <div className="pending-operation" key={entry.id}>
+        <span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>
+        {voidOperation ? (
+          renderVoidOperation(voidOperation, meal)
+        ) : (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void queueMealEntryVoid(meal, entry.id)}
+            disabled={busy}
+          >
+            取り消す
+          </button>
+        )}
+      </div>
+    );
+  }
+
   function renderPendingOperation(operation: LocalMealOperation) {
     const item = items.find((candidate) => candidate.id === operation.catalogItemId);
     const detail = operationMessage(operation);
@@ -725,11 +808,14 @@ export function MealLog({
                 <div>
                   <strong>{label}</strong>
                   <div className="meal-items">
-                    {meal?.entries.map((entry) => (
-                      <span key={entry.id}>
-                        {entry.name} × {entry.quantity}{entry.quantity_unit}
-                      </span>
-                    ))}
+                    {meal?.entries.map((entry) => renderConfirmedEntry(meal, entry))}
+                    {meal && voidOperations
+                      .filter(
+                        (operation) =>
+                          operation.payload.meal_id === meal.id
+                          && !meal.entries.some((entry) => entry.id === operation.payload.entry_id),
+                      )
+                      .map((operation) => renderVoidOperation(operation, meal))}
                     {pending.map(renderPendingOperation)}
                     {fixedStateOperation && (
                       <div className="pending-operation">
@@ -835,7 +921,7 @@ export function MealLog({
                 <div>
                   <strong>追加</strong>
                   <div className="meal-items">
-                    <span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>
+                    {renderConfirmedEntry(meal, entry)}
                   </div>
                 </div>
                 <span className="pill">
