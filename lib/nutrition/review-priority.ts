@@ -85,6 +85,7 @@ export type NutritionReviewSignal = {
   target_distance_percent: number | null;
   concern_days: number | null;
   concern_day_ratio: number | null;
+  concern_evaluable_dates: string[] | null;
   summary: string;
 };
 
@@ -174,9 +175,13 @@ function directConcern(
   predicate: (value: number) => boolean,
 ) {
   const eligible = nutrient.daily.filter((row) => row.eligible_for_reference);
-  if (eligible.length === 0) return { days: null, ratio: null };
+  if (eligible.length === 0) return { days: null, ratio: null, dates: null };
   const days = eligible.filter((row) => predicate(row.known_amount)).length;
-  return { days, ratio: days / eligible.length };
+  return {
+    days,
+    ratio: days / eligible.length,
+    dates: eligible.map((row) => row.meal_date).sort(),
+  };
 }
 
 function makeDirectSignals(
@@ -216,6 +221,7 @@ function makeDirectSignals(
       target_distance_percent: null,
       concern_days: concern.days,
       concern_day_ratio: concern.ratio,
+      concern_evaluable_dates: concern.dates,
       summary: state === "above_ul"
         ? `記録平均がULを上回っています`
         : `記録平均がUL以下`,
@@ -263,6 +269,7 @@ function makeDirectSignals(
       target_distance_percent: null,
       concern_days: concern.days,
       concern_day_ratio: concern.ratio,
+      concern_evaluable_dates: concern.dates,
       summary: state === "below_ear"
         ? "記録平均がEAR未満"
         : state === "ear_to_rda"
@@ -291,6 +298,7 @@ function makeDirectSignals(
       target_distance_percent: null,
       concern_days: null,
       concern_day_ratio: null,
+      concern_evaluable_dates: null,
       summary: state === "at_or_above_ai"
         ? "記録平均がAI以上"
         : "記録平均がAI未満（不足とは判定できません）",
@@ -328,6 +336,7 @@ function makeDirectSignals(
       target_distance_percent: distance === null ? null : roundOne(distance),
       concern_days: concern.days,
       concern_day_ratio: concern.ratio,
+      concern_evaluable_dates: concern.dates,
       summary: state === "below_dg"
         ? "記録平均がDG範囲より低い"
         : state === "above_dg"
@@ -381,13 +390,23 @@ function makePercentEnergySignals(
 }
 
 function semanticRank(signal: NutritionReviewSignal) {
-  if (signal.band === "insufficient_evidence") return 60;
-  if (signal.metric === "UL" && signal.state === "above_ul") return 0;
-  if (signal.metric === "EAR_RDA" && signal.state === "below_ear") return 10;
-  if (signal.metric === "DG" && signal.state !== "within_dg") return 20;
-  if (signal.metric === "EAR_RDA" && signal.state === "ear_to_rda") return 30;
-  if (signal.metric === "AI" && signal.state === "below_ai_indeterminate") return 40;
-  return 50;
+  if (signal.evidence_eligible) {
+    if (signal.metric === "UL" && signal.state === "above_ul") return 0;
+    if (signal.metric === "EAR_RDA" && signal.state === "below_ear") return 10;
+    if (signal.metric === "DG" && signal.state !== "within_dg") return 20;
+    if (signal.metric === "EAR_RDA" && signal.state === "ear_to_rda") return 30;
+    if (signal.metric === "AI" && signal.state === "below_ai_indeterminate") return 40;
+    return 50;
+  }
+
+  const observedConcern = signal.state === "above_ul"
+    || signal.state === "below_ear"
+    || signal.state === "ear_to_rda"
+    || signal.state === "below_ai_indeterminate"
+    || signal.state === "below_dg"
+    || signal.state === "above_dg";
+
+  return observedConcern ? 45 : 60;
 }
 
 function primarySignal(signals: NutritionReviewSignal[]) {
@@ -409,6 +428,7 @@ function itemDirection(signals: NutritionReviewSignal[]): NutritionReviewDirecti
   if (directions.size > 1) return "mixed";
   if (directions.size === 1) return [...directions][0];
   const primary = primarySignal(signals);
+  if (primary?.band === "insufficient_evidence") return "indeterminate";
   return primary?.direction ?? "indeterminate";
 }
 
@@ -439,7 +459,13 @@ function compareItems(a: NutritionReviewItem, b: NutritionReviewItem) {
     && ap.state === bp.state
     && ap.direction === bp.direction
     && ap.concern_day_ratio !== null
-    && bp.concern_day_ratio !== null;
+    && bp.concern_day_ratio !== null
+    && ap.concern_evaluable_dates !== null
+    && bp.concern_evaluable_dates !== null
+    && ap.concern_evaluable_dates.length === bp.concern_evaluable_dates.length
+    && ap.concern_evaluable_dates.every(
+      (date, index) => date === bp.concern_evaluable_dates?.[index],
+    );
 
   if (comparablePersistence && ap.concern_day_ratio !== bp.concern_day_ratio) {
     return bp.concern_day_ratio! - ap.concern_day_ratio!;
