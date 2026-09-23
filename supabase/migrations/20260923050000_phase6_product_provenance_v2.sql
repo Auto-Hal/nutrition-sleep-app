@@ -478,12 +478,12 @@ begin
       raise exception using errcode = '22023', message = 'nutrient code is required';
     end if;
 
-    select *
+    select n0.*
     into existing_nutrient
-    from public.item_nutrients
-    where catalog_item_id = item.id
-      and user_id = owner_id
-      and nutrient_code = nutrient_code
+    from public.item_nutrients n0
+    where n0.catalog_item_id = item.id
+      and n0.user_id = owner_id
+      and n0.nutrient_code = v_nutrient_code
     for update;
 
     if p_replace_all_nutrients or existing_nutrient.catalog_item_id is null then
