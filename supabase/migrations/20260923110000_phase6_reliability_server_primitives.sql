@@ -272,6 +272,7 @@ as $$
 declare
   owner_id uuid := (select auth.uid());
   request_fingerprint text;
+  reference_payload jsonb;
   current_reference_fingerprint text;
   receipt private.mutation_receipts;
   item public.catalog_items;
@@ -376,8 +377,10 @@ begin
     and n.user_id = owner_id
   for share;
 
+  reference_payload :=
+    private.phase6_catalog_reference_payload(owner_id, item.id);
   current_reference_fingerprint :=
-    private.phase6_catalog_reference_fingerprint(owner_id, item.id);
+    private.phase6_sha256_jsonb(reference_payload);
 
   if not item.active
      or current_reference_fingerprint
@@ -478,22 +481,32 @@ begin
   )
   select
     entry.id,
-    d.code,
+    n.code,
     case
       when n.amount is null then null
-      else n.amount * (p_quantity / item.serving_size)
+      else n.amount * (
+        p_quantity / (reference_payload->>'serving_size')::numeric
+      )
     end,
-    d.unit,
+    n.unit,
     n.provenance,
-    item.revision,
+    (reference_payload->>'revision')::integer,
     coalesce(n.quality, 'unknown'),
     n.source_uri,
-    n.source_observed_at
-  from public.nutrient_definitions d
-  left join public.item_nutrients n
-    on n.catalog_item_id = item.id
-   and n.user_id = owner_id
-   and n.nutrient_code = d.code;
+    case
+      when n.source_observed_at is null then null
+      else n.source_observed_at::timestamptz
+    end
+  from pg_catalog.jsonb_to_recordset(reference_payload->'nutrients')
+    as n(
+      code text,
+      amount numeric,
+      unit text,
+      provenance text,
+      quality text,
+      source_uri text,
+      source_observed_at text
+    );
 
   result_payload := pg_catalog.jsonb_build_object(
     'entry_id', entry.id,
