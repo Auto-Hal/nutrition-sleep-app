@@ -51,6 +51,7 @@ type LocalMealOperation = {
 };
 
 type FixedMealStateMutation = Extract<PendingMutation, { kind: "fixed_meal_state" }>;
+type MealEntryVoidMutation = Extract<PendingMutation, { kind: "meal_entry_void" }>;
 
 type OutboxUiState = PendingMutationStatus | "synced" | "discarded";
 
@@ -111,6 +112,7 @@ export function MealLog({
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [localOperations, setLocalOperations] = useState<LocalMealOperation[]>([]);
   const [fixedStateOperations, setFixedStateOperations] = useState<FixedMealStateMutation[]>([]);
+  const [voidOperations, setVoidOperations] = useState<MealEntryVoidMutation[]>([]);
   const [composer, setComposer] = useState<MealType | null>(null);
   const [itemId, setItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -161,6 +163,9 @@ export function MealLog({
         );
         setFixedStateOperations(
           rows.filter((row): row is FixedMealStateMutation => row.kind === "fixed_meal_state"),
+        );
+        setVoidOperations(
+          rows.filter((row): row is MealEntryVoidMutation => row.kind === "meal_entry_void"),
         );
       })
       .catch(() => {
