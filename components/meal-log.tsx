@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import {
   applyMealEntryWrite,
+  applyMealStateWrite,
   type MealEntryWriteResult,
+  type MealStateWriteResult,
 } from "@/lib/nutrition/meal-optimistic";
 import {
   createMealEntryMutation,
@@ -319,6 +321,45 @@ export function MealLog({
     }
   }
 
+  async function setSkipped(type: Exclude<MealType, "custom">) {
+    setBusy(true);
+    setPendingMealType(type);
+    setError(null);
+    setMessage("保存中…");
+
+    try {
+      const response = await fetch("/api/meals/state", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          meal_date: date,
+          meal_type: type,
+          state: "skipped",
+        }),
+      });
+      const payload = (await response.json()) as {
+        meal?: MealStateWriteResult;
+        error?: string;
+      };
+      if (!response.ok || !payload.meal) {
+        throw new Error(payload.error ?? "食事状態を保存できませんでした。");
+      }
+
+      setMeals((current) => applyMealStateWrite(current, payload.meal!));
+      setMessage("skippedとして記録しました");
+    } catch (requestError) {
+      setMessage(null);
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "食事状態の保存に失敗しました。",
+      );
+    } finally {
+      setPendingMealType(null);
+      setBusy(false);
+    }
+  }
+
   async function retryOperation(operationId: string) {
     setError(null);
     try {
@@ -436,6 +477,18 @@ export function MealLog({
                   >
                     追加
                   </button>
+                  {(meal?.entries.length ?? 0) === 0
+                    && meal?.state !== "skipped"
+                    && localOperations.every((operation) => operation.mealType !== type) && (
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void setSkipped(type)}
+                      disabled={busy}
+                    >
+                      skipped
+                    </button>
+                  )}
                 </div>
               </div>
             );
