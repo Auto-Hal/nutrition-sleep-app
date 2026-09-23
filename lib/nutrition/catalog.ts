@@ -44,6 +44,7 @@ export type CatalogItem = {
   serving_unit: string;
   active: boolean;
   revision: number;
+  reference_fingerprint?: string | null;
   nutrients: NutrientValue[];
 };
 
