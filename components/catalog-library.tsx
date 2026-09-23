@@ -625,7 +625,10 @@ export function CatalogLibrary({
 
   return (
     <div className="stack">
-      <ProductIngestion onSaved={async () => { await load(); }} />
+      <ProductIngestion
+        onSaved={async () => { await load(); }}
+        outboxBinding={binding}
+      />
       <section className="card">
         <div className="section-heading">
           <div>
