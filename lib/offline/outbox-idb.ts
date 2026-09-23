@@ -118,6 +118,23 @@ function mutationOrder(a: PendingMutation, b: PendingMutation) {
   return byTime !== 0 ? byTime : a.operation_id.localeCompare(b.operation_id);
 }
 
+export function selectClaimCandidate(
+  records: PendingMutation[],
+  nowMs: number,
+) {
+  const ordered = [...records].sort(mutationOrder);
+  for (let indexValue = 0; indexValue < ordered.length; indexValue += 1) {
+    const current = ordered[indexValue];
+    const hasEarlierSameEntity = ordered
+      .slice(0, indexValue)
+      .some((earlier) => earlier.entity_key === current.entity_key);
+    if (hasEarlierSameEntity) continue;
+    if (!eligibleForClaim(current, nowMs)) continue;
+    return current;
+  }
+  return null;
+}
+
 export async function putOutboxMutation(mutation: PendingMutation) {
   assertSafeOutboxValue(mutation);
   const db = await openOutboxDb();
@@ -197,17 +214,7 @@ export async function claimNextOutboxMutation(
       }
     }
 
-    let candidate: PendingMutation | null = null;
-    for (let indexValue = 0; indexValue < ordered.length; indexValue += 1) {
-      const current = ordered[indexValue];
-      const hasEarlierSameEntity = ordered
-        .slice(0, indexValue)
-        .some((earlier) => earlier.entity_key === current.entity_key);
-      if (hasEarlierSameEntity) continue;
-      if (!eligibleForClaim(current, nowMs)) continue;
-      candidate = current;
-      break;
-    }
+    const candidate = selectClaimCandidate(ordered, nowMs);
 
     if (!candidate) {
       await transactionDone(transaction);
