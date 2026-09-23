@@ -97,7 +97,7 @@ declare
   item public.catalog_items;
   product public.products;
   nutrient jsonb;
-  nutrient_code text;
+  v_nutrient_code text;
   nutrient_amount numeric;
   nutrient_unit text;
   nutrient_provenance text;
@@ -232,12 +232,12 @@ begin
   for nutrient in
     select value from jsonb_array_elements(p_nutrients)
   loop
-    nutrient_code := nullif(trim(nutrient->>'code'), '');
+    v_nutrient_code := nullif(trim(nutrient->>'code'), '');
     nutrient_unit := nullif(trim(nutrient->>'unit'), '');
     nutrient_provenance := nullif(trim(nutrient->>'provenance'), '');
     nutrient_quality := nullif(trim(nutrient->>'quality'), '');
 
-    if nutrient_code is null
+    if v_nutrient_code is null
        or not (nutrient ? 'amount')
        or nutrient_unit is null
        or nutrient_provenance is null
@@ -262,7 +262,7 @@ begin
     if not exists (
       select 1
       from public.nutrient_definitions d
-      where d.code = nutrient_code
+      where d.code = v_nutrient_code
         and d.unit = nutrient_unit
     ) then
       raise exception using errcode = '22023', message = 'invalid nutrient code or unit';
@@ -303,7 +303,7 @@ begin
     values (
       item.id,
       owner_id,
-      nutrient_code,
+      v_nutrient_code,
       nutrient_amount,
       nutrient_unit,
       nutrient_provenance,
@@ -352,7 +352,7 @@ declare
   product public.products;
   existing_nutrient public.item_nutrients;
   nutrient jsonb;
-  nutrient_code text;
+  v_nutrient_code text;
   next_amount numeric;
   next_unit text;
   next_provenance text;
@@ -473,8 +473,8 @@ begin
   for nutrient in
     select value from jsonb_array_elements(p_nutrients)
   loop
-    nutrient_code := nullif(trim(nutrient->>'code'), '');
-    if nutrient_code is null then
+    v_nutrient_code := nullif(trim(nutrient->>'code'), '');
+    if v_nutrient_code is null then
       raise exception using errcode = '22023', message = 'nutrient code is required';
     end if;
 
@@ -565,7 +565,7 @@ begin
     if not exists (
       select 1
       from public.nutrient_definitions d
-      where d.code = nutrient_code
+      where d.code = v_nutrient_code
         and d.unit = next_unit
     ) then
       raise exception using errcode = '22023', message = 'invalid nutrient code or unit';
@@ -606,7 +606,7 @@ begin
     values (
       item.id,
       owner_id,
-      nutrient_code,
+      v_nutrient_code,
       next_amount,
       next_unit,
       next_provenance,
