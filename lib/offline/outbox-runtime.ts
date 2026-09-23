@@ -64,19 +64,127 @@ function errorCode(payload: Record<string, unknown>) {
       : null;
 }
 
-function mutationRequestBody(mutation: PendingMutation) {
-  return {
+function mutationRequest(mutation: PendingMutation): {
+  url: string;
+  init: RequestInit;
+} {
+  const common = {
     operation_id: mutation.operation_id,
     contract_version: mutation.contract_version,
     intent_created_at: mutation.created_at,
-    meal_date: mutation.payload.meal_date,
-    meal_type: mutation.payload.meal_type,
-    eaten_at: mutation.payload.eaten_at,
-    catalog_item_id: mutation.payload.catalog_item_id,
-    quantity: mutation.payload.quantity,
-    quantity_unit: mutation.payload.quantity_unit,
-    reference_fingerprint: mutation.reference_fingerprint,
   };
+
+  switch (mutation.kind) {
+    case "meal_entry_create":
+      return {
+        url: "/api/meals/reliable",
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+            reference_fingerprint: mutation.reference_fingerprint,
+          }),
+        },
+      };
+    case "fixed_meal_state":
+      return {
+        url: "/api/meals/state/reliable",
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+            expected_revision: mutation.expected_revision,
+            expected_absence: mutation.expected_absence,
+          }),
+        },
+      };
+    case "profile_upsert":
+      return {
+        url: "/api/profile/reliable",
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+            expected_revision: mutation.expected_revision,
+          }),
+        },
+      };
+    case "catalog_create":
+      return {
+        url: "/api/catalog/reliable",
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...common, ...mutation.payload }),
+        },
+      };
+    case "catalog_update":
+      return {
+        url: `/api/catalog/${encodeURIComponent(mutation.payload.catalog_item_id)}/reliable`,
+        init: {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+            expected_revision: mutation.expected_revision,
+          }),
+        },
+      };
+    case "catalog_active":
+      return {
+        url: `/api/catalog/${encodeURIComponent(mutation.payload.catalog_item_id)}/active/reliable`,
+        init: {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            active: mutation.payload.active,
+            expected_revision: mutation.expected_revision,
+          }),
+        },
+      };
+    case "batch_create":
+      return {
+        url: "/api/batches/reliable",
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...common, ...mutation.payload }),
+        },
+      };
+    case "batch_update":
+      return {
+        url: `/api/batches/${encodeURIComponent(mutation.payload.batch_id)}/reliable`,
+        init: {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+            expected_revision: mutation.expected_revision,
+          }),
+        },
+      };
+    case "meal_entry_void":
+      return {
+        url: `/api/meals/entries/${encodeURIComponent(mutation.payload.entry_id)}/void/reliable`,
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            expected_meal_revision: mutation.expected_revision,
+          }),
+        },
+      };
+  }
 }
 
 async function markRetryableFailure(
@@ -269,11 +377,8 @@ async function sendMutation(
 ): Promise<{ event: OutboxDrainEvent; stop: boolean }> {
   let response: Response;
   try {
-    response = await fetchImpl("/api/meals/reliable", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(mutationRequestBody(mutation)),
-    });
+    const request = mutationRequest(mutation);
+    response = await fetchImpl(request.url, request.init);
   } catch {
     await markRetryableFailure(
       mutation,

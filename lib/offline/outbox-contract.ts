@@ -12,7 +12,16 @@ export type PendingMutationStatus =
   | "expired"
   | "blocked";
 
-export type OutboxMutationKind = "meal_entry_create";
+export type OutboxMutationKind =
+  | "meal_entry_create"
+  | "fixed_meal_state"
+  | "profile_upsert"
+  | "catalog_create"
+  | "catalog_update"
+  | "catalog_active"
+  | "batch_create"
+  | "batch_update"
+  | "meal_entry_void";
 
 export type OutboxBinding = {
   ownerUserId: string;
@@ -28,24 +37,128 @@ export type MealEntryOutboxPayload = {
   quantity_unit: string;
 };
 
-export type PendingMutation = {
+export type FixedMealStateOutboxPayload = {
+  meal_date: string;
+  meal_type: "breakfast" | "lunch" | "dinner";
+  state: "not_recorded" | "skipped";
+  eaten_at: null;
+};
+
+export type ProfileOutboxPayload = {
+  birth_date: string | null;
+  sex: "male" | "female" | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  weight_updated_on: string | null;
+  activity_level: "low" | "moderate" | "high" | null;
+  nutrition_goal_note: string | null;
+  time_zone: string;
+};
+
+export type NutrientOutboxValue = {
+  code: string;
+  amount: number | null;
+  unit: string;
+  provenance: string;
+  quality: string;
+  source_uri?: string | null;
+  source_observed_at?: string | null;
+};
+
+export type CatalogCreateOutboxPayload = {
+  item_type: "ingredient" | "estimated_dish";
+  name: string;
+  brand: string | null;
+  serving_size: number;
+  serving_unit: string;
+  nutrients: NutrientOutboxValue[];
+};
+
+export type CatalogUpdateOutboxPayload = {
+  catalog_item_id: string;
+  name: string;
+  brand: string | null;
+  serving_size: number;
+  serving_unit: string;
+  active: boolean;
+  nutrients: NutrientOutboxValue[];
+};
+
+export type CatalogActiveOutboxPayload = {
+  catalog_item_id: string;
+  active: boolean;
+};
+
+export type BatchComponentOutboxValue = {
+  catalog_item_id: string;
+  quantity: number;
+  quantity_unit: string;
+};
+
+export type BatchCreateOutboxPayload = {
+  name: string;
+  dish_name: string | null;
+  servings: number;
+  serving_unit: string;
+  components: BatchComponentOutboxValue[];
+};
+
+export type BatchUpdateOutboxPayload = BatchCreateOutboxPayload & {
+  batch_id: string;
+};
+
+export type MealEntryVoidOutboxPayload = {
+  entry_id: string;
+  meal_id: string;
+};
+
+export type OutboxPayloadByKind = {
+  meal_entry_create: MealEntryOutboxPayload;
+  fixed_meal_state: FixedMealStateOutboxPayload;
+  profile_upsert: ProfileOutboxPayload;
+  catalog_create: CatalogCreateOutboxPayload;
+  catalog_update: CatalogUpdateOutboxPayload;
+  catalog_active: CatalogActiveOutboxPayload;
+  batch_create: BatchCreateOutboxPayload;
+  batch_update: BatchUpdateOutboxPayload;
+  meal_entry_void: MealEntryVoidOutboxPayload;
+};
+
+type PendingMutationBase = {
   operation_id: string;
   contract_version: number;
   environment_id: string;
   owner_user_id: string;
-  kind: OutboxMutationKind;
+  entity_key: string;
   created_at: string;
   updated_at: string;
-  payload: MealEntryOutboxPayload;
-  reference_fingerprint: string;
-  expected_revision?: number;
-  expected_absence?: boolean;
+  reference_fingerprint: string | null;
+  expected_revision: number | null;
+  expected_absence: boolean | null;
   status: PendingMutationStatus;
   attempt_count: number;
   next_retry_at: string | null;
   last_error_code: string | null;
   lease_owner: string | null;
   lease_expires_at: string | null;
+};
+
+export type PendingMutation = {
+  [K in OutboxMutationKind]: PendingMutationBase & {
+    kind: K;
+    payload: OutboxPayloadByKind[K];
+  }
+}[OutboxMutationKind];
+
+export type OutboxMutationInput<K extends OutboxMutationKind> = {
+  operationId: string;
+  createdAt: string;
+  kind: K;
+  entityKey: string;
+  payload: OutboxPayloadByKind[K];
+  referenceFingerprint?: string | null;
+  expectedRevision?: number | null;
+  expectedAbsence?: boolean | null;
 };
 
 export type MealEntryMutationInput = {
@@ -72,6 +185,11 @@ function requireUuid(value: string, field: string) {
   if (!UUID_RE.test(value)) throw new Error(`${field} must be a UUID`);
 }
 
+function requireBinding(binding: OutboxBinding) {
+  requireUuid(binding.ownerUserId, "ownerUserId");
+  if (!binding.environmentId.trim()) throw new Error("environmentId is required");
+}
+
 export function assertSafeOutboxValue(value: unknown, path = "record"): void {
   if (value === null || value === undefined) return;
   if (Array.isArray(value)) {
@@ -88,43 +206,42 @@ export function assertSafeOutboxValue(value: unknown, path = "record"): void {
   }
 }
 
-export function createMealEntryMutation(
+export function createOutboxMutation<K extends OutboxMutationKind>(
   binding: OutboxBinding,
-  input: MealEntryMutationInput,
-): PendingMutation {
-  requireUuid(binding.ownerUserId, "ownerUserId");
-  if (!binding.environmentId.trim()) throw new Error("environmentId is required");
+  input: OutboxMutationInput<K>,
+): Extract<PendingMutation, { kind: K }> {
+  requireBinding(binding);
   requireUuid(input.operationId, "operationId");
   requireIsoTimestamp(input.createdAt, "createdAt");
-  if (!DATE_RE.test(input.payload.meal_date)) throw new Error("meal_date is invalid");
-  requireIsoTimestamp(input.payload.eaten_at, "eaten_at");
-  requireUuid(input.payload.catalog_item_id, "catalog_item_id");
-  if (!Number.isFinite(input.payload.quantity) || input.payload.quantity <= 0) {
-    throw new Error("quantity must be positive");
+  if (!input.entityKey.trim()) throw new Error("entityKey is required");
+  if (
+    input.expectedRevision !== undefined
+    && input.expectedRevision !== null
+    && (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 0)
+  ) {
+    throw new Error("expectedRevision is invalid");
   }
-  if (!input.payload.quantity_unit.trim()) throw new Error("quantity_unit is required");
-  if (!SHA256_RE.test(input.referenceFingerprint)) {
+  if (
+    input.referenceFingerprint
+    && !SHA256_RE.test(input.referenceFingerprint)
+  ) {
     throw new Error("referenceFingerprint must be SHA-256 hex");
   }
 
-  const mutation: PendingMutation = {
+  const mutation = {
     operation_id: input.operationId,
     contract_version: OUTBOX_CONTRACT_VERSION,
     environment_id: binding.environmentId,
     owner_user_id: binding.ownerUserId,
-    kind: "meal_entry_create",
+    entity_key: input.entityKey.trim(),
+    kind: input.kind,
     created_at: input.createdAt,
     updated_at: input.createdAt,
-    payload: {
-      meal_date: input.payload.meal_date,
-      meal_type: input.payload.meal_type,
-      eaten_at: input.payload.eaten_at,
-      catalog_item_id: input.payload.catalog_item_id,
-      quantity: input.payload.quantity,
-      quantity_unit: input.payload.quantity_unit.trim(),
-    },
-    reference_fingerprint: input.referenceFingerprint,
-    status: "pending",
+    payload: input.payload,
+    reference_fingerprint: input.referenceFingerprint ?? null,
+    expected_revision: input.expectedRevision ?? null,
+    expected_absence: input.expectedAbsence ?? null,
+    status: "pending" as const,
     attempt_count: 0,
     next_retry_at: null,
     last_error_code: null,
@@ -133,7 +250,36 @@ export function createMealEntryMutation(
   };
 
   assertSafeOutboxValue(mutation);
-  return mutation;
+  return mutation as unknown as Extract<PendingMutation, { kind: K }>;
+}
+
+export function createMealEntryMutation(
+  binding: OutboxBinding,
+  input: MealEntryMutationInput,
+): Extract<PendingMutation, { kind: "meal_entry_create" }> {
+  if (!DATE_RE.test(input.payload.meal_date)) throw new Error("meal_date is invalid");
+  requireIsoTimestamp(input.payload.eaten_at, "eaten_at");
+  requireUuid(input.payload.catalog_item_id, "catalog_item_id");
+  if (!Number.isFinite(input.payload.quantity) || input.payload.quantity <= 0) {
+    throw new Error("quantity must be positive");
+  }
+  if (!input.payload.quantity_unit.trim()) throw new Error("quantity_unit is required");
+
+  const entityKey = input.payload.meal_type === "custom"
+    ? `custom-meal:${input.operationId}`
+    : `fixed-meal:${input.payload.meal_date}:${input.payload.meal_type}`;
+
+  return createOutboxMutation(binding, {
+    operationId: input.operationId,
+    createdAt: input.createdAt,
+    kind: "meal_entry_create",
+    entityKey,
+    payload: {
+      ...input.payload,
+      quantity_unit: input.payload.quantity_unit.trim(),
+    },
+    referenceFingerprint: input.referenceFingerprint,
+  });
 }
 
 export function matchesOutboxBinding(
@@ -142,6 +288,15 @@ export function matchesOutboxBinding(
 ) {
   return mutation.owner_user_id === binding.ownerUserId
     && mutation.environment_id === binding.environmentId;
+}
+
+export function deriveLegacyEntityKey(mutation: PendingMutation) {
+  if (mutation.kind === "meal_entry_create") {
+    return mutation.payload.meal_type === "custom"
+      ? `custom-meal:${mutation.operation_id}`
+      : `fixed-meal:${mutation.payload.meal_date}:${mutation.payload.meal_type}`;
+  }
+  return `${mutation.kind}:${mutation.operation_id}`;
 }
 
 export function mutationAgeMs(

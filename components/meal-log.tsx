@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import {
   applyMealEntryWrite,
-  applyMealStateWrite,
   type MealEntryWriteResult,
-  type MealStateWriteResult,
 } from "@/lib/nutrition/meal-optimistic";
 import {
   createMealEntryMutation,
+  createOutboxMutation,
   type OutboxBinding,
+  type PendingMutation,
   type PendingMutationStatus,
 } from "@/lib/offline/outbox-contract";
 import {
@@ -49,6 +49,9 @@ type LocalMealOperation = {
   status: PendingMutationStatus;
   lastErrorCode: string | null;
 };
+
+type FixedMealStateMutation = Extract<PendingMutation, { kind: "fixed_meal_state" }>;
+type MealEntryVoidMutation = Extract<PendingMutation, { kind: "meal_entry_void" }>;
 
 type OutboxUiState = PendingMutationStatus | "synced" | "discarded";
 
@@ -108,6 +111,8 @@ export function MealLog({
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [localOperations, setLocalOperations] = useState<LocalMealOperation[]>([]);
+  const [fixedStateOperations, setFixedStateOperations] = useState<FixedMealStateMutation[]>([]);
+  const [voidOperations, setVoidOperations] = useState<MealEntryVoidMutation[]>([]);
   const [composer, setComposer] = useState<MealType | null>(null);
   const [itemId, setItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -124,6 +129,18 @@ export function MealLog({
   useEffect(() => {
     setMeals(initialMeals);
   }, [initialMeals]);
+
+  const refreshMeals = useCallback(async () => {
+    const response = await fetch(`/api/meals?date=${encodeURIComponent(date)}`, {
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as { meals?: Meal[] };
+    if (!response.ok || !payload.meals) {
+      throw new Error("食事状態を更新できませんでした。");
+    }
+    setMeals(payload.meals);
+    return payload.meals;
+  }, [date]);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +161,12 @@ export function MealLog({
               lastErrorCode: row.last_error_code,
             })),
         );
+        setFixedStateOperations(
+          rows.filter((row): row is FixedMealStateMutation => row.kind === "fixed_meal_state"),
+        );
+        setVoidOperations(
+          rows.filter((row): row is MealEntryVoidMutation => row.kind === "meal_entry_void"),
+        );
       })
       .catch(() => {
         if (!cancelled) {
@@ -158,7 +181,77 @@ export function MealLog({
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
-      if (!detail || detail.kind !== "meal_entry_create") return;
+      if (!detail) return;
+
+      if (detail.kind === "meal_entry_void") {
+        onOutboxState?.(detail.operation_id, detail.state);
+        if (detail.state === "synced") {
+          setVoidOperations((current) => current.filter(
+            (candidate) => candidate.operation_id !== detail.operation_id,
+          ));
+          setMessage("server成功を確認済み");
+          void refreshMeals().catch(() => {
+            setMessage("server成功を確認済み · 最新表示は次回更新時に反映します");
+          });
+          return;
+        }
+
+        const localStatus: PendingMutationStatus = detail.state;
+        setVoidOperations((current) => current.map((candidate) =>
+          candidate.operation_id === detail.operation_id
+            ? { ...candidate, status: localStatus, last_error_code: detail.error_code }
+            : candidate
+        ));
+
+        if (detail.state === "conflict") {
+          setMessage(null);
+          setError("食事記録の現在状態が変わっています。内容を確認してください。");
+          void refreshMeals().catch(() => undefined);
+        } else if (detail.state === "failed") {
+          setMessage("取消操作は端末に保存済みです。接続回復後に再試行します。");
+        } else if (detail.state === "paused_auth") {
+          setMessage("取消操作は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+        } else if (detail.state === "blocked" || detail.state === "expired") {
+          setMessage(null);
+          setError("未同期の取消操作は自動適用を停止しました。");
+        }
+        return;
+      }
+
+      if (detail.kind === "fixed_meal_state") {
+        if (detail.state === "synced") {
+          setFixedStateOperations((current) => current.filter(
+            (candidate) => candidate.operation_id !== detail.operation_id,
+          ));
+          setMessage("server成功を確認済み");
+          void refreshMeals().catch(() => {
+            setMessage("server成功を確認済み · 最新表示は次回更新時に反映します");
+          });
+          return;
+        }
+
+        const localStatus: PendingMutationStatus = detail.state;
+        setFixedStateOperations((current) => current.map((candidate) =>
+          candidate.operation_id === detail.operation_id
+            ? { ...candidate, status: localStatus, last_error_code: detail.error_code }
+            : candidate
+        ));
+        if (detail.state === "conflict") {
+          setMessage(null);
+          setError("食事状態が別の状態に更新されています。現在値を確認してください。");
+          void refreshMeals().catch(() => undefined);
+        } else if (detail.state === "failed") {
+          setMessage("食事状態は端末に保存済みです。接続回復後に再試行します。");
+        } else if (detail.state === "paused_auth") {
+          setMessage("食事状態は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+        } else if (detail.state === "blocked" || detail.state === "expired") {
+          setMessage(null);
+          setError("未同期の食事状態は自動適用を停止しました。");
+        }
+        return;
+      }
+
+      if (detail.kind !== "meal_entry_create") return;
 
       const operation = localOperations.find(
         (candidate) => candidate.operationId === detail.operation_id,
@@ -191,17 +284,10 @@ export function MealLog({
           (candidate) => candidate.operationId !== detail.operation_id,
         ));
         setMessage("server成功を確認済み");
-        void fetch(`/api/meals?date=${encodeURIComponent(date)}`, {
-          cache: "no-store",
-        })
-          .then(async (response) => {
-            const payload = (await response.json()) as { meals?: Meal[] };
-            if (response.ok && payload.meals) setMeals(payload.meals);
-          })
-          .catch(() => {
-            // The local success result remains visible; later navigation/reload
-            // will reconcile from the authoritative server state.
-          });
+        void refreshMeals().catch(() => {
+          // The local success result remains visible; later navigation/reload
+          // will reconcile from the authoritative server state.
+        });
         return;
       }
 
@@ -232,7 +318,7 @@ export function MealLog({
 
     window.addEventListener(OUTBOX_STATE_EVENT, onState);
     return () => window.removeEventListener(OUTBOX_STATE_EVENT, onState);
-  }, [date, items, localOperations, onOutboxState]);
+  }, [date, items, localOperations, onOutboxState, refreshMeals]);
 
   function openComposer(type: MealType) {
     setComposer(type);
@@ -329,42 +415,204 @@ export function MealLog({
     }
   }
 
-  async function setSkipped(type: Exclude<MealType, "custom">) {
+  async function queueFixedMealState(
+    type: Exclude<MealType, "custom">,
+    state: "not_recorded" | "skipped",
+    reviewedMeal?: Meal,
+  ) {
+    if (fixedStateOperations.some((operation) => operation.payload.meal_type === type)) {
+      setError("この食事枠には未同期の変更があります。先に解決してください。");
+      return;
+    }
+
+    const currentMeal = reviewedMeal ?? meals.find((candidate) => candidate.meal_type === type);
+    if (state === "not_recorded" && !currentMeal) {
+      setError("現在の食事状態を取得してから操作してください。");
+      return;
+    }
+
     setBusy(true);
     setPendingMealType(type);
     setError(null);
-    setMessage("保存中…");
+    setMessage("端末に保存中…");
 
     try {
-      const response = await fetch("/api/meals/state", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      const mutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "fixed_meal_state",
+        entityKey: `fixed-meal:${date}:${type}`,
+        payload: {
           meal_date: date,
           meal_type: type,
-          state: "skipped",
-        }),
+          state,
+          eaten_at: null,
+        },
+        expectedRevision: currentMeal?.revision ?? null,
+        expectedAbsence: !currentMeal,
       });
-      const payload = (await response.json()) as {
-        meal?: MealStateWriteResult;
-        error?: string;
-      };
-      if (!response.ok || !payload.meal) {
-        throw new Error(payload.error ?? "食事状態を保存できませんでした。");
-      }
-
-      setMeals((current) => applyMealStateWrite(current, payload.meal!));
-      setMessage("skippedとして記録しました");
+      await putOutboxMutation(mutation);
+      setFixedStateOperations((current) => [...current, mutation]);
+      setMessage("端末に保存・未同期");
+      requestOutboxDrain();
     } catch (requestError) {
       setMessage(null);
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "食事状態の保存に失敗しました。",
-      );
+      setError(requestError instanceof Error ? requestError.message : "端末に保存できませんでした。");
     } finally {
       setPendingMealType(null);
       setBusy(false);
+    }
+  }
+
+  async function resolveFixedMealConflict(
+    operation: FixedMealStateMutation,
+    reapply: boolean,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const currentMeals = await refreshMeals();
+      const currentMeal = currentMeals.find(
+        (meal) => meal.meal_type === operation.payload.meal_type,
+      );
+      await deleteOutboxMutation(operation.operation_id);
+      setFixedStateOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+
+      if (!reapply) {
+        setMessage("サーバーの現在状態を採用しました。");
+        return;
+      }
+      if (operation.payload.state === "not_recorded" && !currentMeal) {
+        setMessage("サーバー側には対象の食事枠がないため、現在状態を採用しました。");
+        return;
+      }
+
+      const replacementMutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "fixed_meal_state",
+        entityKey: operation.entity_key,
+        payload: operation.payload,
+        expectedRevision: currentMeal?.revision ?? null,
+        expectedAbsence: !currentMeal,
+      });
+      await putOutboxMutation(replacementMutation);
+      setFixedStateOperations((current) => [...current, replacementMutation]);
+      setMessage("現在のrevisionに対して再適用を開始しました。");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "競合を解決できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardFixedMealOperation(operation: FixedMealStateMutation) {
+    try {
+      await deleteOutboxMutation(operation.operation_id);
+      setFixedStateOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+      setMessage("端末の未同期食事状態を破棄しました。");
+      void refreshMeals().catch(() => undefined);
+    } catch {
+      setError("端末の未同期食事状態を破棄できませんでした。");
+    }
+  }
+
+  async function queueMealEntryVoid(meal: Meal, entryId: string) {
+    if (voidOperations.some((operation) => operation.payload.entry_id === entryId)) {
+      setError("この食事記録には未同期の取消操作があります。");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage("端末に保存中…");
+    try {
+      const mutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "meal_entry_void",
+        entityKey: `meal:${meal.id}`,
+        payload: {
+          entry_id: entryId,
+          meal_id: meal.id,
+        },
+        expectedRevision: meal.revision,
+      });
+      await putOutboxMutation(mutation);
+      setVoidOperations((current) => [...current, mutation]);
+      setMessage("端末に保存・未同期");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setMessage(null);
+      setError(requestError instanceof Error ? requestError.message : "取消操作を端末に保存できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resolveMealEntryVoidConflict(
+    operation: MealEntryVoidMutation,
+    reapply: boolean,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const currentMeals = await refreshMeals();
+      const currentMeal = currentMeals.find(
+        (meal) => meal.id === operation.payload.meal_id,
+      );
+      const entryStillActive = currentMeal?.entries.some(
+        (entry) => entry.id === operation.payload.entry_id,
+      ) ?? false;
+
+      await deleteOutboxMutation(operation.operation_id);
+      setVoidOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+
+      if (!reapply || !currentMeal || !entryStillActive) {
+        setMessage(
+          entryStillActive
+            ? "サーバーの現在状態を採用しました。"
+            : "対象記録は現在のサーバー状態では取消済みまたは存在しないため、サーバー状態を採用しました。",
+        );
+        return;
+      }
+
+      const replacementMutation = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "meal_entry_void",
+        entityKey: operation.entity_key,
+        payload: operation.payload,
+        expectedRevision: currentMeal.revision,
+      });
+      await putOutboxMutation(replacementMutation);
+      setVoidOperations((current) => [...current, replacementMutation]);
+      setMessage("現在のrevisionに対して取消を再適用しました。");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "取消競合を解決できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardMealEntryVoid(operation: MealEntryVoidMutation) {
+    try {
+      await deleteOutboxMutation(operation.operation_id);
+      setVoidOperations((current) => current.filter(
+        (candidate) => candidate.operation_id !== operation.operation_id,
+      ));
+      setMessage("端末の未同期取消操作を破棄しました。");
+      void refreshMeals().catch(() => undefined);
+    } catch {
+      setError("端末の未同期取消操作を破棄できませんでした。");
     }
   }
 
@@ -380,6 +628,16 @@ export function MealLog({
             status: "pending",
             lastErrorCode: null,
           }
+          : operation
+      ));
+      setFixedStateOperations((current) => current.map((operation) =>
+        operation.operation_id === operationId
+          ? { ...operation, status: "pending", last_error_code: null }
+          : operation
+      ));
+      setVoidOperations((current) => current.map((operation) =>
+        operation.operation_id === operationId
+          ? { ...operation, status: "pending", last_error_code: null }
           : operation
       ));
       setMessage("再同期を開始します。");
@@ -405,6 +663,89 @@ export function MealLog({
   }
 
   const selected = items.find((item) => item.id === itemId);
+
+  function renderVoidOperation(operation: MealEntryVoidMutation, meal?: Meal) {
+    const entry = meal?.entries.find((candidate) => candidate.id === operation.payload.entry_id);
+    return (
+      <div className="pending-operation" key={operation.operation_id}>
+        <span>
+          {entry
+            ? `${entry.name} × ${entry.quantity}${entry.quantity_unit} を取り消し`
+            : "食事記録の取消操作"}
+        </span>
+        <span className="pill pending">{operationLabel(operation.status)}</span>
+        {operation.status === "conflict" && (
+          <>
+            <small className="muted">
+              サーバー: meal revision {meal?.revision ?? "取得済み状態では対象なし"} ／
+              端末の取消: revision {operation.expected_revision ?? "不明"} を基準
+            </small>
+            <div className="form-actions">
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => void resolveMealEntryVoidConflict(operation, false)}
+                disabled={busy}
+              >
+                サーバー状態を採用
+              </button>
+              {entry && meal && (
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => void resolveMealEntryVoidConflict(operation, true)}
+                  disabled={busy}
+                >
+                  現在revisionへ再適用
+                </button>
+              )}
+            </div>
+          </>
+        )}
+        {operation.status === "failed" && (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void retryOperation(operation.operation_id)}
+          >
+            今すぐ再試行
+          </button>
+        )}
+        {(operation.status === "blocked" || operation.status === "expired") && (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void discardMealEntryVoid(operation)}
+          >
+            サーバー状態を採用して破棄
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  function renderConfirmedEntry(meal: Meal, entry: Meal["entries"][number]) {
+    const voidOperation = voidOperations.find(
+      (operation) => operation.payload.entry_id === entry.id,
+    );
+    return (
+      <div className="pending-operation" key={entry.id}>
+        <span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>
+        {voidOperation ? (
+          renderVoidOperation(voidOperation, meal)
+        ) : (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void queueMealEntryVoid(meal, entry.id)}
+            disabled={busy}
+          >
+            取り消す
+          </button>
+        )}
+      </div>
+    );
+  }
 
   function renderPendingOperation(operation: LocalMealOperation) {
     const item = items.find((candidate) => candidate.id === operation.catalogItemId);
@@ -459,17 +800,76 @@ export function MealLog({
           {fixedMeals.map(({ type, label }) => {
             const meal = meals.find((candidate) => candidate.meal_type === type);
             const pending = localOperations.filter((operation) => operation.mealType === type);
+            const fixedStateOperation = fixedStateOperations.find(
+              (operation) => operation.payload.meal_type === type,
+            );
             return (
               <div className="meal-row" key={type}>
                 <div>
                   <strong>{label}</strong>
                   <div className="meal-items">
-                    {meal?.entries.map((entry) => (
-                      <span key={entry.id}>
-                        {entry.name} × {entry.quantity}{entry.quantity_unit}
-                      </span>
-                    ))}
+                    {meal?.entries.map((entry) => renderConfirmedEntry(meal, entry))}
+                    {meal && voidOperations
+                      .filter(
+                        (operation) =>
+                          operation.payload.meal_id === meal.id
+                          && !meal.entries.some((entry) => entry.id === operation.payload.entry_id),
+                      )
+                      .map((operation) => renderVoidOperation(operation, meal))}
                     {pending.map(renderPendingOperation)}
+                    {fixedStateOperation && (
+                      <div className="pending-operation">
+                        <span>
+                          状態変更 → {fixedStateOperation.payload.state === "skipped" ? "skipped" : "未登録"}
+                        </span>
+                        <span className="pill pending">{operationLabel(fixedStateOperation.status)}</span>
+                        {fixedStateOperation.status === "conflict" && (
+                          <>
+                            <small className="muted">
+                              サーバー: {stateLabel(meal?.state)} revision {meal?.revision ?? "なし"} ／
+                              端末: {fixedStateOperation.payload.state}（revision {fixedStateOperation.expected_revision ?? "absence"}）
+                            </small>
+                            <div className="form-actions">
+                              <button
+                                className="button secondary"
+                                type="button"
+                                onClick={() => void resolveFixedMealConflict(fixedStateOperation, false)}
+                                disabled={busy}
+                              >
+                                サーバー状態を採用
+                              </button>
+                              <button
+                                className="button"
+                                type="button"
+                                onClick={() => void resolveFixedMealConflict(fixedStateOperation, true)}
+                                disabled={busy}
+                              >
+                                現在revisionへ再適用
+                              </button>
+                            </div>
+                          </>
+                        )}
+                        {fixedStateOperation.status === "failed" && (
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => void retryOperation(fixedStateOperation.operation_id)}
+                          >
+                            今すぐ再試行
+                          </button>
+                        )}
+                        {(fixedStateOperation.status === "expired"
+                          || fixedStateOperation.status === "blocked") && (
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => void discardFixedMealOperation(fixedStateOperation)}
+                          >
+                            サーバー状態を採用して破棄
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="meal-actions">
@@ -480,20 +880,33 @@ export function MealLog({
                     className="button secondary"
                     type="button"
                     onClick={() => openComposer(type)}
-                    disabled={busy}
+                    disabled={busy || Boolean(fixedStateOperation)}
                   >
                     追加
                   </button>
                   {(meal?.entries.length ?? 0) === 0
-                    && meal?.state !== "skipped"
-                    && localOperations.every((operation) => operation.mealType !== type) && (
+                    && !fixedStateOperation
+                    && localOperations.every((operation) => operation.mealType !== type)
+                    && meal?.state !== "skipped" && (
                     <button
                       className="button ghost"
                       type="button"
-                      onClick={() => void setSkipped(type)}
+                      onClick={() => void queueFixedMealState(type, "skipped")}
                       disabled={busy}
                     >
                       skipped
+                    </button>
+                  )}
+                  {(meal?.entries.length ?? 0) === 0
+                    && !fixedStateOperation
+                    && meal?.state === "skipped" && (
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void queueFixedMealState(type, "not_recorded", meal)}
+                      disabled={busy}
+                    >
+                      未登録に戻す
                     </button>
                   )}
                 </div>
@@ -508,7 +921,7 @@ export function MealLog({
                 <div>
                   <strong>追加</strong>
                   <div className="meal-items">
-                    <span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>
+                    {renderConfirmedEntry(meal, entry)}
                   </div>
                 </div>
                 <span className="pill">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProfileForm } from "@/components/profile-form";
+import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
@@ -20,9 +21,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <Link href="/settings?view=library" aria-current={view === "library" ? "page" : undefined}>Library</Link>
       </nav>
       {view === "library" ? (
-        <CatalogLibrary />
+        <CatalogLibrary
+          ownerUserId={session?.userId ?? ""}
+          environmentId={appEnvironmentId()}
+        />
       ) : (
-        <ProfileForm initialProfile={profile} />
+        <ProfileForm
+          initialProfile={profile}
+          ownerUserId={session?.userId ?? ""}
+          environmentId={appEnvironmentId()}
+        />
       )}
     </main>
   );

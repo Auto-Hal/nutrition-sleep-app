@@ -2,6 +2,7 @@ import {
   OUTBOX_CONTRACT_VERSION,
   OUTBOX_LEASE_MS,
   assertSafeOutboxValue,
+  deriveLegacyEntityKey,
   isReplayableStatus,
   type OutboxBinding,
   type PendingMutation,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/offline/outbox-contract";
 
 const DB_NAME = "nutrition-sleep-outbox";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "mutations";
 const BINDING_INDEX = "by_binding";
 
@@ -28,8 +29,10 @@ function openOutboxDb() {
 
     request.onupgradeneeded = (event) => {
       const db = request.result;
+      let store: IDBObjectStore;
+
       if (event.oldVersion === 0) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "operation_id" });
+        store = db.createObjectStore(STORE_NAME, { keyPath: "operation_id" });
         store.createIndex(
           BINDING_INDEX,
           ["owner_user_id", "environment_id"],
@@ -38,6 +41,16 @@ function openOutboxDb() {
         store.createIndex("by_status", "status", { unique: false });
         store.createIndex("by_next_retry", "next_retry_at", { unique: false });
         store.createIndex("by_lease_expiry", "lease_expires_at", { unique: false });
+      } else {
+        store = request.transaction!.objectStore(STORE_NAME);
+      }
+
+      if (event.oldVersion < 2 && !store.indexNames.contains("by_entity")) {
+        store.createIndex(
+          "by_entity",
+          ["owner_user_id", "environment_id", "entity_key", "created_at"],
+          { unique: false },
+        );
       }
     };
 
@@ -59,17 +72,32 @@ function bindingKey(binding: OutboxBinding) {
   return IDBKeyRange.only([binding.ownerUserId, binding.environmentId]);
 }
 
-function normalizeRecord(record: PendingMutation, nowIso: string) {
-  if (record.contract_version === OUTBOX_CONTRACT_VERSION) return record;
-  return {
+function normalizeRecord(record: PendingMutation, nowIso: string): PendingMutation {
+  const legacy = record as PendingMutation & {
+    entity_key?: string;
+    reference_fingerprint?: string | null;
+    expected_revision?: number | null;
+    expected_absence?: boolean | null;
+  };
+
+  const migrated = {
     ...record,
-    status: "blocked" as const,
+    entity_key: legacy.entity_key?.trim() || deriveLegacyEntityKey(record),
+    reference_fingerprint: legacy.reference_fingerprint ?? null,
+    expected_revision: legacy.expected_revision ?? null,
+    expected_absence: legacy.expected_absence ?? null,
+  } as PendingMutation;
+
+  if (migrated.contract_version === OUTBOX_CONTRACT_VERSION) return migrated;
+  return {
+    ...migrated,
+    status: "blocked",
     updated_at: nowIso,
     next_retry_at: null,
     last_error_code: "unsupported_contract_version",
     lease_owner: null,
     lease_expires_at: null,
-  };
+  } as PendingMutation;
 }
 
 function eligibleForClaim(record: PendingMutation, nowMs: number) {
@@ -83,6 +111,28 @@ function eligibleForClaim(record: PendingMutation, nowMs: number) {
     if (Number.isFinite(leaseExpiry) && leaseExpiry > nowMs) return false;
   }
   return true;
+}
+
+function mutationOrder(a: PendingMutation, b: PendingMutation) {
+  const byTime = a.created_at.localeCompare(b.created_at);
+  return byTime !== 0 ? byTime : a.operation_id.localeCompare(b.operation_id);
+}
+
+export function selectClaimCandidate(
+  records: PendingMutation[],
+  nowMs: number,
+) {
+  const ordered = [...records].sort(mutationOrder);
+  for (let indexValue = 0; indexValue < ordered.length; indexValue += 1) {
+    const current = ordered[indexValue];
+    const hasEarlierSameEntity = ordered
+      .slice(0, indexValue)
+      .some((earlier) => earlier.entity_key === current.entity_key);
+    if (hasEarlierSameEntity) continue;
+    if (!eligibleForClaim(current, nowMs)) continue;
+    return current;
+  }
+  return null;
 }
 
 export async function putOutboxMutation(mutation: PendingMutation) {
@@ -112,10 +162,16 @@ export async function listOutboxMutations(binding: OutboxBinding) {
 
     const normalized = rows.map((row) => normalizeRecord(row, nowIso));
     normalized.forEach((row, indexValue) => {
-      if (row !== rows[indexValue]) store.put(row);
+      if (
+        row.entity_key !== (rows[indexValue] as PendingMutation & { entity_key?: string }).entity_key
+        || row.contract_version !== rows[indexValue].contract_version
+        || row.status !== rows[indexValue].status
+      ) {
+        store.put(row);
+      }
     });
     await transactionDone(transaction);
-    return normalized.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return normalized.sort(mutationOrder);
   } finally {
     db.close();
   }
@@ -135,43 +191,45 @@ export async function claimNextOutboxMutation(
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     const index = store.index(BINDING_INDEX);
-    const cursorRequest = index.openCursor(bindingKey(binding));
+    const request = index.getAll(bindingKey(binding));
     const nowIso = new Date(nowMs).toISOString();
 
-    const claimed = await new Promise<PendingMutation | null>((resolve, reject) => {
-      cursorRequest.onerror = () => reject(cursorRequest.error ?? new Error("IndexedDB cursor failed"));
-      cursorRequest.onsuccess = () => {
-        const cursor = cursorRequest.result;
-        if (!cursor) {
-          resolve(null);
-          return;
-        }
-
-        const current = normalizeRecord(cursor.value as PendingMutation, nowIso);
-        if (current.contract_version !== OUTBOX_CONTRACT_VERSION) {
-          cursor.update(current);
-          cursor.continue();
-          return;
-        }
-
-        if (!eligibleForClaim(current, nowMs)) {
-          cursor.continue();
-          return;
-        }
-
-        const next: PendingMutation = {
-          ...current,
-          status: "in_flight",
-          attempt_count: current.attempt_count + 1,
-          updated_at: nowIso,
-          lease_owner: workerId,
-          lease_expires_at: new Date(nowMs + OUTBOX_LEASE_MS).toISOString(),
-        };
-        cursor.update(next);
-        resolve(next);
-      };
+    const rows = await new Promise<PendingMutation[]>((resolve, reject) => {
+      request.onsuccess = () => resolve((request.result ?? []) as PendingMutation[]);
+      request.onerror = () => reject(request.error ?? new Error("IndexedDB read failed"));
     });
 
+    const ordered = rows
+      .map((row) => normalizeRecord(row, nowIso))
+      .sort(mutationOrder);
+
+    for (const row of ordered) {
+      const stored = rows.find((candidate) => candidate.operation_id === row.operation_id);
+      if (
+        !stored
+        || (stored as PendingMutation & { entity_key?: string }).entity_key !== row.entity_key
+        || stored.status !== row.status
+      ) {
+        store.put(row);
+      }
+    }
+
+    const candidate = selectClaimCandidate(ordered, nowMs);
+
+    if (!candidate) {
+      await transactionDone(transaction);
+      return null;
+    }
+
+    const claimed = {
+      ...candidate,
+      status: "in_flight" as const,
+      attempt_count: candidate.attempt_count + 1,
+      updated_at: nowIso,
+      lease_owner: workerId,
+      lease_expires_at: new Date(nowMs + OUTBOX_LEASE_MS).toISOString(),
+    } as PendingMutation;
+    store.put(claimed);
     await transactionDone(transaction);
     return claimed;
   } finally {
@@ -202,7 +260,7 @@ export async function transitionOutboxMutation(
           return;
         }
         const nextStatus = patch.status ?? current.status;
-        const next: PendingMutation = {
+        const next = {
           ...current,
           ...patch,
           updated_at: new Date().toISOString(),
@@ -212,7 +270,7 @@ export async function transitionOutboxMutation(
           lease_expires_at: nextStatus === "in_flight"
             ? patch.lease_expires_at ?? current.lease_expires_at
             : null,
-        };
+        } as PendingMutation;
         assertSafeOutboxValue(next);
         store.put(next);
         resolve(true);
@@ -271,7 +329,7 @@ async function rewriteBindingStatuses(
           resolve();
           return;
         }
-        const current = cursor.value as PendingMutation;
+        const current = normalizeRecord(cursor.value as PendingMutation, nowIso);
         if (predicate(current.status)) {
           cursor.update({
             ...current,
