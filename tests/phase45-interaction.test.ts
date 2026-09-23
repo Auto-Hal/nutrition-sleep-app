@@ -78,17 +78,16 @@ describe("Phase 4.5 optimistic meal interaction", () => {
     expect(updated[0]).toEqual(expect.objectContaining({ state: "skipped", entries: [] }));
   });
 
-  it("keeps Catalog fetch out of the post-write critical path", () => {
+  it("keeps Catalog fetch out of the local-save critical path", () => {
     const source = readFileSync(resolve(process.cwd(), "components/meal-log.tsx"), "utf8");
     expect(source).not.toContain("await load()");
     expect(source).not.toContain('fetch("/api/catalog")');
     expect(source).not.toContain('fetch(\`/api/meals?date=\${date}\`)');
-    expect(source).not.toContain("router.refresh()");
-    expect(source).toContain('setMessage("保存中…")');
+    expect(source).toContain("await putOutboxMutation(mutation)");
+    expect(source).toContain('setMessage("端末に保存・未同期")');
     expect(source).toContain("setComposer(null)");
-    expect(source).toContain("onPendingNutrition?.({ energyAmount, energyKnown })");
-    expect(source).toContain("onCommitted?.()");
-    expect(source).toContain("onFailed?.()");
+    expect(source).toContain("onQueuedNutrition?.(operationId, { energyAmount, energyKnown })");
+    expect(source).toContain("requestOutboxDrain()");
   });
 });
 
@@ -117,13 +116,14 @@ describe("Phase 4.5 Today bootstrap", () => {
 
 
 describe("Phase 4.5 Today nutrition refresh", () => {
-  it("refreshes only the nutrition card after a confirmed write", () => {
+  it("refreshes the nutrition card after confirmed outbox sync", () => {
     const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");
     expect(source).toContain('/api/nutrition/today?date=');
     expect(source).toContain("setSummary(payload.summary)");
-    expect(source).toContain("onPendingNutrition={applyPendingNutrition}");
-    expect(source).toContain("onCommitted={refreshSummary}");
-    expect(source).toContain("onFailed={rollbackPendingNutrition}");
+    expect(source).toContain("onQueuedNutrition={queuePendingNutrition}");
+    expect(source).toContain("onOutboxState={handleOutboxState}");
+    expect(source).toContain('if (state === "synced")');
+    expect(source).toContain("refreshSummary(operationId)");
     expect(source).not.toContain("router.refresh()");
   });
 
@@ -142,10 +142,13 @@ describe("Phase 4.5 optimistic Today energy", () => {
     expect(source).toContain("Promise.all([");
   });
 
-  it("marks the optimistic card as provisional until reconciliation", () => {
+  it("marks local outbox nutrition as provisional until reconciliation", () => {
     const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");
-    expect(source).toContain("optimisticBase.current = current");
-    expect(source).toContain("暫定値を表示中");
-    expect(source).toContain("rollbackPendingNutrition");
+    expect(source).toContain("pendingNutrition");
+    expect(source).toContain("端末に保存・未同期");
+    expect(source).toContain("栄養値は暫定表示です");
+    expect(source).toContain('state === "conflict"');
+    expect(source).toContain('state === "expired"');
+    expect(source).toContain('state === "blocked"');
   });
 });
