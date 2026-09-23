@@ -49,7 +49,7 @@ create or replace function public.protect_phase6_product_legacy_source()
 returns trigger
 language plpgsql
 set search_path = public, pg_catalog
-as $
+as $$
 begin
   if old.identity_source_type is not null
      and coalesce(current_setting('app.product_v2_write', true), '') <> '1' then
@@ -59,7 +59,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 create trigger products_protect_v2_legacy_source
 before update on public.products
