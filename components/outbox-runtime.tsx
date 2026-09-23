@@ -9,7 +9,13 @@ import { resumePausedOutboxForBinding } from "@/lib/offline/outbox-idb";
 import { drainOutbox } from "@/lib/offline/outbox-runtime";
 import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 
-export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
+export function OutboxRuntime({
+  binding,
+  onServerSync,
+}: {
+  binding: OutboxBinding;
+  onServerSync?: () => void;
+}) {
   const running = useRef(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
@@ -27,7 +33,10 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
     running.current = true;
     try {
       const result = await drainOutbox(binding);
-      for (const event of result.events) emitOutboxState(event);
+      for (const event of result.events) {
+        emitOutboxState(event);
+        if (event.state === "synced") onServerSync?.();
+      }
       if (!result.pausedAuth) {
         scheduleRetry(result.nextRetryAt, () => {
           void run();
@@ -41,7 +50,7 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
     } finally {
       running.current = false;
     }
-  }, [binding, scheduleRetry]);
+  }, [binding, onServerSync, scheduleRetry]);
 
   useEffect(() => {
     mounted.current = true;
