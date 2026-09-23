@@ -34,7 +34,11 @@ function mutation(createdAt = "2026-09-23T09:00:00.000Z") {
 function storeFor(record: PendingMutation) {
   let claimed = false;
   const store: OutboxStore = {
-    claimNext: vi.fn(async (_binding, workerId, nowMs) => {
+    claimNext: vi.fn(async (
+      _binding: OutboxBinding,
+      workerId: string,
+      nowMs = Date.now(),
+    ): Promise<PendingMutation | null> => {
       if (claimed) return null;
       claimed = true;
       return {
@@ -64,9 +68,13 @@ describe("Phase 6 outbox replay", () => {
   it("sends immutable intent timestamps and removes the local operation only after server success", async () => {
     const record = mutation();
     const store = storeFor(record);
-    const fetchImpl = vi.fn(async () => jsonResponse({
-      result: { entry_id: "entry-1", meal_id: "meal-1" },
-    }, 201));
+    const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push([input, init]);
+      return jsonResponse({
+        result: { entry_id: "entry-1", meal_id: "meal-1" },
+      }, 201);
+    };
 
     const result = await drainOutbox(binding, {
       store,
@@ -78,7 +86,7 @@ describe("Phase 6 outbox replay", () => {
 
     expect(result.events[0]).toMatchObject({ state: "synced" });
     expect(store.remove).toHaveBeenCalledWith(record.operation_id, "worker-1");
-    const [, init] = fetchImpl.mock.calls[0];
+    const [, init] = requests[0];
     const body = JSON.parse(String(init?.body));
     expect(body.operation_id).toBe(record.operation_id);
     expect(body.intent_created_at).toBe(record.created_at);
@@ -89,7 +97,9 @@ describe("Phase 6 outbox replay", () => {
   it("blocks replay before HTTP when owner or environment binding differs", async () => {
     const record = mutation();
     const store = storeFor(record);
-    const fetchImpl = vi.fn();
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({}, 500)
+    );
 
     const result = await drainOutbox({
       ...binding,
@@ -197,7 +207,11 @@ describe("Phase 6 outbox replay", () => {
     const now = Date.parse("2026-09-23T12:00:00.000Z");
     const record = mutation(new Date(now - 31 * DAY_MS).toISOString());
     const store = storeFor(record);
-    const fetchImpl = vi.fn(async () => jsonResponse({ result: null }, 200));
+    const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push([input, init]);
+      return jsonResponse({ result: null }, 200);
+    };
 
     const result = await drainOutbox(binding, {
       store,
@@ -206,7 +220,7 @@ describe("Phase 6 outbox replay", () => {
       workerId: "worker-7",
     });
 
-    expect(fetchImpl.mock.calls[0][0]).toBe(`/api/mutations/${record.operation_id}`);
+    expect(requests[0][0]).toBe(`/api/mutations/${record.operation_id}`);
     expect(result.events[0]).toMatchObject({
       state: "expired",
       error_code: "operation_not_applied",
