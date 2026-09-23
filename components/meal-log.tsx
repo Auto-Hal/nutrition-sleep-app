@@ -195,11 +195,12 @@ export function MealLog({
         return;
       }
 
+      const localStatus: PendingMutationStatus = detail.state;
       setLocalOperations((current) => current.map((candidate) =>
         candidate.operationId === detail.operation_id
           ? {
             ...candidate,
-            status: detail.state,
+            status: localStatus,
             lastErrorCode: detail.error_code,
           }
           : candidate
