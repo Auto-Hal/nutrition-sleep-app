@@ -102,7 +102,7 @@ export async function GET(request: Request) {
     });
   }
   if (external.status === "not_found") {
-    return NextResponse.json({ status: "not_found", draft_id: draftId, fallback: "ocr" });
+    return NextResponse.json({ status: "not_found", fallback: "ocr", draft_id: draftId });
   }
 
   return NextResponse.json({
