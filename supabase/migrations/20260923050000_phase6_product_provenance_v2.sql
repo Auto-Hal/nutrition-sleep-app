@@ -49,22 +49,17 @@ create or replace function public.protect_phase6_product_legacy_source()
 returns trigger
 language plpgsql
 set search_path = public, pg_catalog
-as $$
+as $
 begin
   if old.identity_source_type is not null
-     and (
-       new.source_type is distinct from old.source_type
-       or new.source_provider is distinct from old.source_provider
-       or new.source_uri is distinct from old.source_uri
-       or new.source_observed_at is distinct from old.source_observed_at
-     ) then
+     and coalesce(current_setting('app.product_v2_write', true), '') <> '1' then
     raise exception using
       errcode = '22023',
       message = 'Phase 6 product must be updated through v2 product RPC';
   end if;
   return new;
 end;
-$$;
+$;
 
 create trigger products_protect_v2_legacy_source
 before update on public.products
@@ -119,11 +114,19 @@ begin
      or p_identity_source_observed_at is null then
     raise exception using errcode = '22023', message = 'identity provenance is required';
   end if;
-  if p_package_amount is null <> (nullif(trim(p_package_unit), '') is null) then
+  if (p_package_amount is null) <> (nullif(trim(p_package_unit), '') is null) then
     raise exception using errcode = '22023', message = 'package amount and unit must be provided together';
   end if;
   if p_nutrients is null or jsonb_typeof(p_nutrients) <> 'array' then
     raise exception using errcode = '22023', message = 'nutrients must be an array';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_nutrients) n(value)
+    group by nullif(trim(n.value->>'code'), '')
+    having count(*) > 1
+  ) then
+    raise exception using errcode = '22023', message = 'nutrient codes must be unique';
   end if;
 
   perform pg_advisory_xact_lock(
@@ -372,12 +375,22 @@ begin
      or p_identity_source_observed_at is null then
     raise exception using errcode = '22023', message = 'identity provenance is required';
   end if;
-  if p_package_amount is null <> (nullif(trim(p_package_unit), '') is null) then
+  if (p_package_amount is null) <> (nullif(trim(p_package_unit), '') is null) then
     raise exception using errcode = '22023', message = 'package amount and unit must be provided together';
   end if;
   if p_nutrients is null or jsonb_typeof(p_nutrients) <> 'array' then
     raise exception using errcode = '22023', message = 'nutrients must be an array';
   end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_nutrients) n(value)
+    group by nullif(trim(n.value->>'code'), '')
+    having count(*) > 1
+  ) then
+    raise exception using errcode = '22023', message = 'nutrient codes must be unique';
+  end if;
+
+  perform set_config('app.product_v2_write', '1', true);
 
   select *
   into item
