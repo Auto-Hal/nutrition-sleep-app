@@ -494,3 +494,180 @@ describe("Phase 6 multi-axis and ranking semantics", () => {
     );
   });
 });
+
+
+describe("Phase 6 required boundary coverage", () => {
+  it.each([
+    [7, 2, "insufficient_evidence"],
+    [7, 3, "review_first"],
+    [90, 13, "insufficient_evidence"],
+    [90, 14, "review_first"],
+  ] as const)(
+    "applies the %d-day evidence boundary at %d evaluable days",
+    (range, eligibleDays, expectedBand) => {
+      const result = deriveNutritionReview({
+        range,
+        nutrients: [nutrient({
+          eligible_days: eligibleDays,
+          daily: Array.from({ length: eligibleDays }, (_, index) => ({
+            meal_date: \`2026-08-\${String(index + 1).padStart(2, "0")}\`,
+            known_amount: 500,
+            eligible_for_reference: true,
+          })),
+          dri: {
+            references: [
+              ref("calcium", "EAR", "mg", { value: 650 }),
+              ref("calcium", "RDA", "mg", { value: 800 }),
+            ],
+            stable: true,
+            unavailable_reason: null,
+            unstable_metrics: [],
+          },
+        })],
+      });
+
+      expect(result.items[0].band).toBe(expectedBand);
+    },
+  );
+
+  it("treats exactly EAR as EAR-to-RDA rather than below EAR", () => {
+    const result = deriveNutritionReview({
+      range: 30,
+      nutrients: [nutrient({
+        average_known_amount: 650,
+        dri: {
+          references: [
+            ref("calcium", "EAR", "mg", { value: 650 }),
+            ref("calcium", "RDA", "mg", { value: 800 }),
+          ],
+          stable: true,
+          unavailable_reason: null,
+          unstable_metrics: [],
+        },
+      })],
+    });
+
+    expect(result.items[0].primary?.state).toBe("ear_to_rda");
+  });
+
+  it("treats exactly RDA as at-or-above RDA", () => {
+    const result = deriveNutritionReview({
+      range: 30,
+      nutrients: [nutrient({
+        average_known_amount: 800,
+        dri: {
+          references: [
+            ref("calcium", "EAR", "mg", { value: 650 }),
+            ref("calcium", "RDA", "mg", { value: 800 }),
+          ],
+          stable: true,
+          unavailable_reason: null,
+          unstable_metrics: [],
+        },
+      })],
+    });
+
+    expect(result.items[0].primary?.state).toBe("at_or_above_rda");
+    expect(result.items[0].primary?.rda_ratio_percent).toBe(100);
+  });
+
+  it("treats exactly AI as at-or-above AI", () => {
+    const result = deriveNutritionReview({
+      range: 30,
+      nutrients: [nutrient({
+        code: "vitamin_d",
+        label: "ビタミンD",
+        unit: "ug",
+        average_known_amount: 9,
+        dri: {
+          references: [ref("vitamin_d", "AI", "ug", { value: 9 })],
+          stable: true,
+          unavailable_reason: null,
+          unstable_metrics: [],
+        },
+      })],
+    });
+
+    expect(result.items[0].primary?.state).toBe("at_or_above_ai");
+    expect(result.items[0].primary?.band).toBe("within_reference");
+  });
+
+  it("keeps inclusive DG lower and upper boundaries within range", () => {
+    for (const value of [13, 20]) {
+      const result = deriveNutritionReview({
+        range: 30,
+        nutrients: [nutrient({
+          code: "protein",
+          label: "たんぱく質",
+          unit: "g",
+          average_known_amount: value,
+          dri: {
+            references: [
+              ref("protein", "DG", "g", {
+                lower: 13,
+                upper: 20,
+                lowerInclusive: true,
+                upperInclusive: true,
+              }),
+            ],
+            stable: true,
+            unavailable_reason: null,
+            unstable_metrics: [],
+          },
+        })],
+      });
+
+      expect(result.items[0].primary?.state).toBe("within_dg");
+    }
+  });
+
+  it("treats exactly a comparable UL as at-or-below UL", () => {
+    const result = deriveNutritionReview({
+      range: 30,
+      nutrients: [nutrient({
+        code: "vitamin_d",
+        label: "ビタミンD",
+        unit: "ug",
+        average_known_amount: 100,
+        dri: {
+          references: [ref("vitamin_d", "UL", "ug", { value: 100 })],
+          stable: true,
+          unavailable_reason: null,
+          unstable_metrics: [],
+        },
+      })],
+    });
+
+    expect(result.items[0].primary?.state).toBe("at_or_below_ul");
+    expect(result.items[0].primary?.band).toBe("within_reference");
+  });
+
+  it("excludes non-evaluable days from the concern-day denominator", () => {
+    const result = deriveNutritionReview({
+      range: 7,
+      nutrients: [nutrient({
+        eligible_days: 3,
+        average_known_amount: 500,
+        daily: [
+          { meal_date: "2026-09-01", known_amount: 500, eligible_for_reference: true },
+          { meal_date: "2026-09-02", known_amount: 700, eligible_for_reference: true },
+          { meal_date: "2026-09-03", known_amount: 500, eligible_for_reference: true },
+          { meal_date: "2026-09-04", known_amount: 0, eligible_for_reference: false },
+        ],
+        dri: {
+          references: [
+            ref("calcium", "EAR", "mg", { value: 650 }),
+            ref("calcium", "RDA", "mg", { value: 800 }),
+          ],
+          stable: true,
+          unavailable_reason: null,
+          unstable_metrics: [],
+        },
+      })],
+    });
+
+    expect(result.items[0].primary?.concern_days).toBe(2);
+    expect(result.items[0].primary?.concern_day_ratio).toBeCloseTo(2 / 3);
+    expect(result.items[0].primary?.concern_evaluable_dates).toHaveLength(3);
+  });
+});
