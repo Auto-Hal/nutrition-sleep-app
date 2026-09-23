@@ -1,6 +1,6 @@
 # Phase 6 plan — MVP Completion / Reliability
 
-Status: ASTRA REVIEWED / REQUIRED CORRECTIONS APPLIED / AWAITING SUPERVISOR ACCEPTANCE  
+Status: DESIGN APPROVED / IMPLEMENTATION AUTHORIZED  
 Updated: 2026-09-23
 
 ## Goal
@@ -28,16 +28,16 @@ Astra review:
 - request: `docs/phase-6-astra-review-request.md`
 - result: `docs/phase-6-astra-review-result.md`
 
-Astra returned `PHASE 6 DESIGN APPROVED WITH REQUIRED CORRECTIONS`. The blocking corrections are now applied. Implementation remains blocked only on Supervisor/user acceptance of the corrected design and the per-batch dependency gates.
+Astra returned `PHASE 6 DESIGN APPROVED WITH REQUIRED CORRECTIONS`. The blocking corrections are applied, and Supervisor/user accepted the corrected design on 2026-09-23. Implementation is authorized subject to the per-batch dependency gates.
 
 ## Entry gate
 
 Astra high-risk design review is complete and the required corrections are reflected in the canonical documents.
 
-Before implementation starts:
-- Supervisor/user accepts the corrected design;
-- the Phase 6 batch follows `docs/phase-6-implementation-plan.md`;
-- Phase 5 merge/Production boundaries remain independently enforced.
+Implementation is authorized. Each Phase 6 batch must:
+- follow `docs/phase-6-implementation-plan.md`;
+- pass its own acceptance gates;
+- keep Phase 5 merge/Production boundaries independently enforced.
 
 Normal implementation remains Sol-first. Astra is not re-entered for approved routine implementation unless a new high-risk semantic change appears.
 
