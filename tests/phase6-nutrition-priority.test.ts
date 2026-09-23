@@ -270,6 +270,37 @@ describe("Phase 6 AI/DG/UL semantics", () => {
     expect(ul?.summary).toContain("ULを上回っています");
   });
 
+  it("keeps a low-evidence UL concern in the insufficient-evidence section instead of hiding it behind an AI-within state", () => {
+    const result = deriveNutritionReview({
+      range: 30,
+      nutrients: [nutrient({
+        code: "vitamin_d",
+        label: "ビタミンD",
+        unit: "ug",
+        eligible_days: 2,
+        average_known_amount: 120,
+        daily: [
+          { meal_date: "2026-09-01", known_amount: 120, eligible_for_reference: true },
+          { meal_date: "2026-09-02", known_amount: 120, eligible_for_reference: true },
+        ],
+        dri: {
+          references: [
+            ref("vitamin_d", "AI", "ug", { value: 9 }),
+            ref("vitamin_d", "UL", "ug", { value: 100 }),
+          ],
+          stable: true,
+          unavailable_reason: null,
+          unstable_metrics: [],
+        },
+      })],
+    });
+
+    expect(result.items[0].primary?.metric).toBe("UL");
+    expect(result.items[0].band).toBe("insufficient_evidence");
+    expect(result.items[0].direction).toBe("indeterminate");
+    expect(result.sections.insufficient_evidence).toHaveLength(1);
+  });
+
   it("does not create an alert from a non-comparable UL", () => {
     const result = deriveNutritionReview({
       range: 30,
