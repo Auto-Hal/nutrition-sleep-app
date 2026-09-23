@@ -184,6 +184,31 @@ function mutationRequest(mutation: PendingMutation): {
           }),
         },
       };
+    case "product_create":
+      return {
+        url: "/api/products/reliable",
+        init: {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+          }),
+        },
+      };
+    case "product_update":
+      return {
+        url: `/api/products/${encodeURIComponent(mutation.payload.catalog_item_id)}/reliable`,
+        init: {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...common,
+            ...mutation.payload,
+            expected_revision: mutation.expected_revision,
+          }),
+        },
+      };
   }
 }
 

@@ -21,7 +21,9 @@ export type OutboxMutationKind =
   | "catalog_active"
   | "batch_create"
   | "batch_update"
-  | "meal_entry_void";
+  | "meal_entry_void"
+  | "product_create"
+  | "product_update";
 
 export type OutboxBinding = {
   ownerUserId: string;
@@ -112,6 +114,48 @@ export type MealEntryVoidOutboxPayload = {
   meal_id: string;
 };
 
+export type ProductIdentitySourceType =
+  | "manufacturer_official"
+  | "external_database"
+  | "user_entered";
+
+export type ProductCreateOutboxPayload = {
+  item_type: "product" | "supplement";
+  barcode: string;
+  name: string;
+  brand: string | null;
+  serving_size: number;
+  serving_unit: string;
+  manufacturer: string | null;
+  package_amount: number | null;
+  package_unit: string | null;
+  identity_source_type: ProductIdentitySourceType;
+  identity_source_provider: string;
+  identity_source_uri: string | null;
+  identity_source_observed_at: string;
+  nutrients: NutrientOutboxValue[];
+};
+
+export type ProductUpdateOutboxPayload = {
+  catalog_item_id: string;
+  barcode: string;
+  name: string;
+  brand: string | null;
+  serving_size: number;
+  serving_unit: string;
+  active: boolean;
+  manufacturer: string | null;
+  package_amount: number | null;
+  package_unit: string | null;
+  identity_source_type: ProductIdentitySourceType;
+  identity_source_provider: string;
+  identity_source_uri: string | null;
+  identity_source_observed_at: string;
+  nutrients: NutrientOutboxValue[];
+  replace_all_nutrients: boolean;
+  confirm_verified_overwrite: boolean;
+};
+
 export type OutboxPayloadByKind = {
   meal_entry_create: MealEntryOutboxPayload;
   fixed_meal_state: FixedMealStateOutboxPayload;
@@ -122,6 +166,8 @@ export type OutboxPayloadByKind = {
   batch_create: BatchCreateOutboxPayload;
   batch_update: BatchUpdateOutboxPayload;
   meal_entry_void: MealEntryVoidOutboxPayload;
+  product_create: ProductCreateOutboxPayload;
+  product_update: ProductUpdateOutboxPayload;
 };
 
 type PendingMutationBase = {

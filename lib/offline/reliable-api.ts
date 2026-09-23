@@ -19,6 +19,9 @@ const SAFE_ERROR_CODES = new Set([
   "invalid_operation_id",
   "custom_intake_requires_eaten_at",
   "product_v2_required",
+  "product_not_found",
+  "serving_basis_requires_full_replacement",
+  "verified_overwrite_confirmation_required",
   "batch_rpc_required",
 ]);
 

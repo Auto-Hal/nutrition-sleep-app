@@ -4,25 +4,55 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { isValidGtin, normalizeBarcode } from "@/lib/products/barcode";
 import { prepareNutritionLabelImage } from "@/lib/products/image-prep";
-import type { CommercialNutrient, ExternalProductCandidate } from "@/lib/products/open-food-facts";
+import type { CommercialNutrient } from "@/lib/products/open-food-facts";
+import type {
+  ProductCandidateBundle,
+  ProductIdentityCandidate,
+  ProductNutrientCandidate,
+} from "@/lib/products/types";
+import {
+  createOutboxMutation,
+  type OutboxBinding,
+  type PendingMutation,
+  type PendingMutationStatus,
+} from "@/lib/offline/outbox-contract";
+import {
+  deleteOutboxMutation,
+  listOutboxMutations,
+  putOutboxMutation,
+  retryOutboxMutation,
+} from "@/lib/offline/outbox-idb";
+import {
+  OUTBOX_STATE_EVENT,
+  requestOutboxDrain,
+} from "@/lib/offline/outbox-events";
+import type { OutboxDrainEvent } from "@/lib/offline/outbox-runtime";
 
 type ProductItemType = "product" | "supplement";
-type SourceType = "label_ocr" | "external_database";
 
-type DraftCandidate = {
+type PersistableIdentitySource = ProductIdentityCandidate["source"];
+
+type OcrDraftCandidate = {
+  draft_id: string;
   barcode: string;
   name: string;
   brand: string | null;
   manufacturer: string | null;
-  serving_size: number;
-  serving_unit: string;
   package_amount: number | null;
   package_unit: string | null;
-  source_type: SourceType;
-  source_provider: string;
-  source_uri: string | null;
-  source_observed_at: string;
-  nutrients: CommercialNutrient[];
+  serving_size: number;
+  serving_unit: string;
+  identity_source: PersistableIdentitySource;
+  nutrient_source_provider: string;
+  nutrient_source_observed_at: string;
+};
+
+type LocalIdentitySource = {
+  type: "manufacturer_official" | "external_database" | "user_entered" | "legacy_unknown";
+  provider: string | null;
+  uri: string | null;
+  observed_at: string | null;
+  confirmed_at: string | null;
 };
 
 type LocalProductItem = {
@@ -39,11 +69,12 @@ type LocalProductItem = {
     manufacturer: string | null;
     package_amount: number | null;
     package_unit: string | null;
-    source_type: "manufacturer_official" | "label_ocr" | "external_database";
-    source_provider: string;
+    source_type: "manufacturer_official" | "label_ocr" | "external_database" | null;
+    source_provider: string | null;
     source_uri: string | null;
-    source_observed_at: string;
+    source_observed_at: string | null;
     confirmed_at: string;
+    identity_source: LocalIdentitySource;
   };
   nutrients: Array<{
     nutrient_code: NutrientCode;
@@ -51,14 +82,16 @@ type LocalProductItem = {
     unit: string;
     provenance: string;
     quality: string;
+    source_uri: string | null;
+    source_observed_at: string | null;
   }>;
 };
 
 type ResolveResponse =
-  | { status: "local"; item: LocalProductItem }
-  | { status: "external"; candidate: ExternalProductCandidate }
-  | { status: "not_found"; fallback: "ocr" }
-  | { status: "external_unavailable"; reason: string; fallback: "ocr" }
+  | { status: "local"; draft_id: string; item: LocalProductItem }
+  | { status: "external"; draft_id: string; candidate: ProductCandidateBundle }
+  | { status: "not_found"; draft_id: string; fallback: "ocr" }
+  | { status: "external_unavailable"; draft_id: string; reason: string; fallback: "ocr" }
   | { error: string };
 
 type OcrResponse = {
@@ -76,16 +109,42 @@ type OcrResponse = {
 
 type NutrientDraft = Record<NutrientCode, string>;
 
-function nutrientDraft(values: CommercialNutrient[]): NutrientDraft {
+type ProductMutation = Extract<PendingMutation, {
+  kind: "product_create" | "product_update";
+}>;
+
+function isProductMutation(mutation: PendingMutation): mutation is ProductMutation {
+  return mutation.kind === "product_create" || mutation.kind === "product_update";
+}
+
+function productMutationLabel(status: PendingMutationStatus) {
+  if (status === "pending") return "端末に保存・未同期";
+  if (status === "in_flight") return "同期中…";
+  if (status === "failed") return "再試行待ち";
+  if (status === "paused_auth") return "ログイン待ち";
+  if (status === "conflict") return "競合・確認が必要";
+  if (status === "expired") return "期限切れ";
+  return "同期停止";
+}
+
+function nutrientDraft(
+  values: Array<{ code: NutrientCode; amount: number | null }>,
+): NutrientDraft {
   return Object.fromEntries(
     NUTRIENT_DEFINITIONS.map(({ code }) => {
       const nutrient = values.find((value) => value.code === code);
-      return [code, nutrient ? String(nutrient.amount) : ""];
+      return [code, nutrient?.amount === null || nutrient?.amount === undefined
+        ? ""
+        : String(nutrient.amount)];
     }),
   ) as NutrientDraft;
 }
 
-function nutrientPayload(values: NutrientDraft): CommercialNutrient[] {
+function ocrNutrientPayload(
+  values: NutrientDraft,
+  provider: string,
+  observedAt: string,
+): ProductNutrientCandidate[] {
   return NUTRIENT_DEFINITIONS.flatMap((definition) => {
     const raw = values[definition.code].trim();
     if (!raw) return [];
@@ -93,23 +152,85 @@ function nutrientPayload(values: NutrientDraft): CommercialNutrient[] {
     if (!Number.isFinite(amount) || amount < 0) {
       throw new Error(`${definition.label}の値を確認してください。`);
     }
-    return [{ code: definition.code, amount, unit: definition.unit }];
+    return [{
+      code: definition.code,
+      amount,
+      unit: definition.unit,
+      provenance: "ocr" as const,
+      quality: "user_verified" as const,
+      source_uri: null,
+      source_observed_at: observedAt,
+    }];
   });
 }
 
-export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) {
+function identitySourceForLocal(
+  item: LocalProductItem,
+  observedAt: string,
+): PersistableIdentitySource {
+  const source = item.product.identity_source;
+  if (
+    source.type !== "legacy_unknown"
+    && source.provider
+    && source.observed_at
+  ) {
+    return {
+      type: source.type,
+      provider: source.provider,
+      uri: source.uri,
+      observed_at: source.observed_at,
+    };
+  }
+
+  // A legacy row has no proven identity provenance. Re-saving from the v2
+  // confirmation form is an explicit user confirmation, so only then may it
+  // acquire user_entered identity provenance.
+  return {
+    type: "user_entered",
+    provider: "user_confirmed",
+    uri: null,
+    observed_at: observedAt,
+  };
+}
+
+function userEnteredIdentitySource(): PersistableIdentitySource {
+  return {
+    type: "user_entered",
+    provider: "user",
+    uri: null,
+    observed_at: new Date().toISOString(),
+  };
+}
+
+function identitySourceLabel(source: LocalIdentitySource) {
+  if (source.type === "legacy_unknown") return "旧データ（identity出典不明）";
+  if (source.type === "user_entered") return "ユーザー入力";
+  if (source.type === "manufacturer_official") return "メーカー公式";
+  return source.provider ? `外部DB: ${source.provider}` : "外部DB";
+}
+
+export function ProductIngestion({
+  onSaved,
+  outboxBinding,
+}: {
+  onSaved: () => Promise<void>;
+  outboxBinding: OutboxBinding;
+}) {
   const [barcode, setBarcode] = useState("");
   const [itemType, setItemType] = useState<ProductItemType>("product");
-  const [externalCandidate, setExternalCandidate] = useState<ExternalProductCandidate | null>(null);
+  const [externalCandidate, setExternalCandidate] = useState<ProductCandidateBundle | null>(null);
   const [localItem, setLocalItem] = useState<LocalProductItem | null>(null);
-  const [ocrCandidate, setOcrCandidate] = useState<DraftCandidate | null>(null);
+  const [ocrCandidate, setOcrCandidate] = useState<OcrDraftCandidate | null>(null);
   const [ocrNutrients, setOcrNutrients] = useState<NutrientDraft>(() => nutrientDraft([]));
   const [scannerOpen, setScannerOpen] = useState(false);
   const [needsOcr, setNeedsOcr] = useState(false);
+  const [pendingProductMutations, setPendingProductMutations] = useState<ProductMutation[]>([]);
   const [busy, setBusy] = useState(false);
   const [ocrPreviewUrl, setOcrPreviewUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const activeDraftRef = useRef<{ draft_id: string; barcode: string } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stopScannerRef = useRef<(() => void) | null>(null);
   const ocrPreviewRef = useRef<string | null>(null);
@@ -124,6 +245,93 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
   useEffect(() => () => {
     if (ocrPreviewRef.current) URL.revokeObjectURL(ocrPreviewRef.current);
   }, []);
+
+  const reloadPendingProducts = useCallback(async () => {
+    const rows = await listOutboxMutations(outboxBinding);
+    const products = rows.filter(isProductMutation);
+    setPendingProductMutations(products);
+    return products;
+  }, [outboxBinding]);
+
+  const loadLocalProduct = useCallback(async (value: string) => {
+    const normalized = normalizeBarcode(value);
+    if (!isValidGtin(normalized)) return null;
+    const draftId = crypto.randomUUID();
+    const response = await fetch(
+      `/api/products/resolve?barcode=${encodeURIComponent(normalized)}&draft_id=${encodeURIComponent(draftId)}`,
+      { cache: "no-store" },
+    );
+    const result = await response.json() as ResolveResponse;
+    if (!response.ok || "error" in result) {
+      throw new Error("現在の商品状態を取得できませんでした。");
+    }
+    return result.status === "local" ? result.item : null;
+  }, []);
+
+  const clearConfirmedDraft = useCallback(() => {
+    activeDraftRef.current = null;
+    setExternalCandidate(null);
+    setLocalItem(null);
+    setOcrCandidate(null);
+    setOcrNutrients(nutrientDraft([]));
+    replaceOcrPreview(null);
+    setNeedsOcr(false);
+  }, [replaceOcrPreview]);
+
+  useEffect(() => {
+    void reloadPendingProducts().catch(() => {
+      setError("端末の未同期商品を確認できませんでした。");
+    });
+  }, [reloadPendingProducts]);
+
+  useEffect(() => {
+    const onState = (event: Event) => {
+      const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
+      if (!detail || (detail.kind !== "product_create" && detail.kind !== "product_update")) {
+        return;
+      }
+
+      if (detail.state === "synced") {
+        setPendingProductMutations((current) => current.filter(
+          (mutation) => mutation.operation_id !== detail.operation_id,
+        ));
+        setMessage("server成功を確認済み");
+        void onSaved().catch(() => {
+          setMessage("server成功を確認済み · Library表示は次回更新時に反映します。");
+        });
+        return;
+      }
+
+      void reloadPendingProducts().then((rows) => {
+        const mutation = rows.find(
+          (candidate) => candidate.operation_id === detail.operation_id,
+        );
+        if (detail.state === "conflict" && mutation) {
+          void loadLocalProduct(mutation.payload.barcode)
+            .then((current) => {
+              setLocalItem(current);
+              if (current) setItemType(current.item_type);
+            })
+            .catch(() => undefined);
+        }
+      });
+
+      if (detail.state === "conflict") {
+        setMessage(null);
+        setError("商品が別の状態に更新されています。サーバー現在値と端末の変更を確認してください。");
+      } else if (detail.state === "failed") {
+        setMessage("商品変更は端末に保存済みです。接続回復後に再試行します。");
+      } else if (detail.state === "paused_auth") {
+        setMessage("商品変更は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+      } else if (detail.state === "blocked" || detail.state === "expired") {
+        setMessage(null);
+        setError("未同期の商品変更は自動適用を停止しました。");
+      }
+    };
+
+    window.addEventListener(OUTBOX_STATE_EVENT, onState);
+    return () => window.removeEventListener(OUTBOX_STATE_EVENT, onState);
+  }, [loadLocalProduct, onSaved, reloadPendingProducts]);
 
   const resetResolution = useCallback(() => {
     setExternalCandidate(null);
@@ -142,16 +350,33 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
     resetResolution();
 
     if (!isValidGtin(normalized)) {
+      activeDraftRef.current = null;
       setError("JAN / EAN / UPC / GTINの番号を確認してください。");
       return;
     }
 
+    const draft = { draft_id: crypto.randomUUID(), barcode: normalized };
+    activeDraftRef.current = draft;
+
     setBusy(true);
     try {
-      const response = await fetch(`/api/products/resolve?barcode=${encodeURIComponent(normalized)}`, { cache: "no-store" });
+      const response = await fetch(
+        `/api/products/resolve?barcode=${encodeURIComponent(normalized)}&draft_id=${encodeURIComponent(draft.draft_id)}`,
+        { cache: "no-store" },
+      );
       const result = await response.json() as ResolveResponse;
       if (!response.ok || "error" in result) {
         throw new Error("error" in result ? result.error : "商品を検索できませんでした。");
+      }
+
+      const current = activeDraftRef.current;
+      if (
+        !current
+        || current.draft_id !== draft.draft_id
+        || current.barcode !== normalized
+        || result.draft_id !== draft.draft_id
+      ) {
+        return;
       }
 
       if (result.status === "local") {
@@ -165,14 +390,19 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
       if (result.status === "external") {
         setExternalCandidate(result.candidate);
-        setMessage("外部商品DBに候補が見つかりました。内容を確認してから保存してください。");
+        if (result.candidate.nutrition) {
+          setMessage("外部商品DBにidentityと栄養候補が見つかりました。内容を確認してから保存してください。");
+        } else {
+          setNeedsOcr(true);
+          setMessage("商品名は外部DBで見つかりました。栄養値・表示基準量は現物ラベルから確認してください。");
+        }
         return;
       }
 
       setNeedsOcr(true);
       setMessage(result.status === "external_unavailable"
-        ? "外部商品DBを利用できません。現物ラベルから登録できます。"
-        : "商品DBに見つかりませんでした。現物ラベルを撮影してください。");
+        ? "外部商品DBを利用できません。商品名を確認し、現物ラベルから登録できます。"
+        : "商品DBで安全に特定できませんでした。商品名を確認し、現物ラベルを撮影してください。");
     } catch (requestError) {
       setNeedsOcr(false);
       setError(requestError instanceof Error ? requestError.message : "商品検索に失敗しました。");
@@ -202,9 +432,9 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
             audio: false,
           },
           videoRef.current,
-          (result, error, scanControls) => {
+          (result, decodeError, scanControls) => {
             if (!result) {
-              void error;
+              void decodeError;
               return;
             }
             scanControls.stop();
@@ -255,7 +485,9 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
 
   async function readLabel(file: File) {
     const normalized = normalizeBarcode(barcode);
-    if (!isValidGtin(normalized)) {
+    const draftAtStart = activeDraftRef.current;
+
+    if (!isValidGtin(normalized) || !draftAtStart || draftAtStart.barcode !== normalized) {
       setError("先に商品バーコードを読み取ってください。");
       return;
     }
@@ -280,20 +512,38 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         throw new Error(parsed.error ?? "Cloud OCRに失敗しました。");
       }
 
-      const draft: DraftCandidate = {
+      const current = activeDraftRef.current;
+      if (
+        !current
+        || current.draft_id !== draftAtStart.draft_id
+        || current.barcode !== draftAtStart.barcode
+        || normalizeBarcode(barcode) !== draftAtStart.barcode
+      ) {
+        return;
+      }
+
+      const externalIdentity = externalCandidate?.identity.draft_id === draftAtStart.draft_id
+        ? externalCandidate.identity
+        : null;
+
+      const identitySource = externalIdentity?.source
+        ?? (localItem
+          ? identitySourceForLocal(localItem, parsed.source_observed_at)
+          : userEnteredIdentitySource());
+
+      const draft: OcrDraftCandidate = {
+        draft_id: draftAtStart.draft_id,
         barcode: normalized,
-        name: externalCandidate?.name ?? localItem?.name ?? "",
-        brand: externalCandidate?.brand ?? localItem?.brand ?? null,
-        manufacturer: externalCandidate?.manufacturer ?? localItem?.product.manufacturer ?? null,
+        name: externalIdentity?.name ?? localItem?.name ?? "",
+        brand: externalIdentity?.brand ?? localItem?.brand ?? null,
+        manufacturer: externalIdentity?.manufacturer ?? localItem?.product.manufacturer ?? null,
         serving_size: parsed.basis.serving_size,
         serving_unit: parsed.basis.serving_unit,
-        package_amount: externalCandidate?.package_amount ?? localItem?.product.package_amount ?? null,
-        package_unit: externalCandidate?.package_unit ?? localItem?.product.package_unit ?? null,
-        source_type: "label_ocr",
-        source_provider: parsed.provider,
-        source_uri: null,
-        source_observed_at: parsed.source_observed_at,
-        nutrients: parsed.nutrients,
+        package_amount: externalIdentity?.package_amount ?? localItem?.product.package_amount ?? null,
+        package_unit: externalIdentity?.package_unit ?? localItem?.product.package_unit ?? null,
+        identity_source: identitySource,
+        nutrient_source_provider: parsed.provider,
+        nutrient_source_observed_at: parsed.source_observed_at,
       };
       setOcrCandidate(draft);
       setOcrNutrients(nutrientDraft(parsed.nutrients));
@@ -302,7 +552,9 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
       const basisMessage = parsed.diagnostics.basis_detected
         ? `基準量: ${parsed.basis.serving_size} ${parsed.basis.serving_unit}`
         : "基準量は読み取れなかったため確認してください";
-      setMessage(`Cloud OCRで${parsed.diagnostics.matched_nutrient_count}項目を抽出しました（${basisMessage}）。画像と照合し、誤りだけ修正して保存してください。`);
+      setMessage(
+        `Cloud OCRで${parsed.diagnostics.matched_nutrient_count}項目を抽出しました（${basisMessage}）。商品identityと栄養表示を確認して保存してください。`,
+      );
     } catch (requestError) {
       setNeedsOcr(true);
       setError(requestError instanceof Error ? requestError.message : "OCRに失敗しました。");
@@ -311,48 +563,66 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
     }
   }
 
-  async function save(candidate: DraftCandidate | ExternalProductCandidate, nutrients: CommercialNutrient[]) {
+  function pendingForBarcode(value: string) {
+    const normalized = normalizeBarcode(value);
+    return pendingProductMutations.find(
+      (mutation) => normalizeBarcode(mutation.payload.barcode) === normalized,
+    ) ?? null;
+  }
+
+  async function queueProductMutation(mutation: ProductMutation) {
+    await putOutboxMutation(mutation);
+    setPendingProductMutations((current) => [...current, mutation]);
+    clearConfirmedDraft();
+    setMessage("端末に保存・未同期");
+    requestOutboxDrain();
+  }
+
+  async function saveExternalCandidate() {
+    if (!externalCandidate?.nutrition) {
+      setError("栄養表示の基準量が未確定です。現物ラベルを確認してください。");
+      return;
+    }
+
+    const { identity, nutrition } = externalCandidate;
+    if (nutrition.serving_size === null || !nutrition.serving_unit) {
+      setError("栄養表示の基準量が未確定です。現物ラベルを確認してください。");
+      return;
+    }
+    if (pendingForBarcode(identity.barcode)) {
+      setError("この商品には未同期の保存操作があります。先に同期または解決してください。");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const common = {
-        name: candidate.name,
-        brand: candidate.brand,
-        serving_size: candidate.serving_size,
-        serving_unit: candidate.serving_unit,
-        manufacturer: candidate.manufacturer,
-        package_amount: candidate.package_amount,
-        package_unit: candidate.package_unit,
-        source_type: candidate.source_type,
-        source_provider: candidate.source_provider,
-        source_uri: candidate.source_uri,
-        source_observed_at: candidate.source_observed_at,
-        nutrients,
-      };
-      const updatingLocal = Boolean(
-        localItem
-        && localItem.product.barcode === candidate.barcode
-        && candidate.source_type === "label_ocr",
-      );
-      const response = await fetch(updatingLocal ? `/api/products/${localItem!.id}` : "/api/products", {
-        method: updatingLocal ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(updatingLocal
-          ? { ...common, expected_revision: localItem!.revision, active: localItem!.active }
-          : { ...common, item_type: itemType, barcode: candidate.barcode, idempotency_key: crypto.randomUUID() }),
+      const operationId = crypto.randomUUID();
+      const mutation = createOutboxMutation(outboxBinding, {
+        operationId,
+        createdAt: new Date().toISOString(),
+        kind: "product_create",
+        entityKey: `product-barcode:${normalizeBarcode(identity.barcode)}`,
+        payload: {
+          item_type: itemType,
+          barcode: identity.barcode,
+          name: identity.name,
+          brand: identity.brand,
+          serving_size: nutrition.serving_size,
+          serving_unit: nutrition.serving_unit,
+          manufacturer: identity.manufacturer,
+          package_amount: identity.package_amount,
+          package_unit: identity.package_unit,
+          identity_source_type: identity.source.type,
+          identity_source_provider: identity.source.provider,
+          identity_source_uri: identity.source.uri,
+          identity_source_observed_at: identity.source.observed_at,
+          nutrients: nutrition.nutrients,
+        },
       });
-      const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "商品を保存できませんでした。");
-
-      await onSaved();
-      setExternalCandidate(null);
-      setLocalItem(null);
-      setOcrCandidate(null);
-      replaceOcrPreview(null);
-      setNeedsOcr(false);
-      setMessage("Libraryに保存しました。次回から同じバーコードは自前DBから解決します。");
+      await queueProductMutation(mutation);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "商品を保存できませんでした。");
+      setError(requestError instanceof Error ? requestError.message : "商品を端末に保存できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -364,13 +634,184 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
       setError("商品名を入力してください。");
       return;
     }
+
+    const current = activeDraftRef.current;
+    if (
+      !current
+      || current.draft_id !== ocrCandidate.draft_id
+      || current.barcode !== ocrCandidate.barcode
+    ) {
+      setError("商品候補が切り替わっています。バーコードからやり直してください。");
+      return;
+    }
+    if (pendingForBarcode(ocrCandidate.barcode)) {
+      setError("この商品には未同期の保存操作があります。先に同期または解決してください。");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
     try {
-      const nutrients = nutrientPayload(ocrNutrients);
-      await save({ ...ocrCandidate, name: ocrCandidate.name.trim() }, nutrients);
-    } catch (validationError) {
-      setError(validationError instanceof Error ? validationError.message : "栄養値を確認してください。");
+      const nutrients = ocrNutrientPayload(
+        ocrNutrients,
+        ocrCandidate.nutrient_source_provider,
+        ocrCandidate.nutrient_source_observed_at,
+      );
+
+      const common = {
+        name: ocrCandidate.name.trim(),
+        brand: ocrCandidate.brand,
+        serving_size: ocrCandidate.serving_size,
+        serving_unit: ocrCandidate.serving_unit,
+        manufacturer: ocrCandidate.manufacturer,
+        package_amount: ocrCandidate.package_amount,
+        package_unit: ocrCandidate.package_unit,
+        identity_source_type: ocrCandidate.identity_source.type,
+        identity_source_provider: ocrCandidate.identity_source.provider,
+        identity_source_uri: ocrCandidate.identity_source.uri,
+        identity_source_observed_at: ocrCandidate.identity_source.observed_at,
+        nutrients,
+      };
+
+      const operationId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
+      const updatingLocal = Boolean(
+        localItem
+        && localItem.product.barcode === ocrCandidate.barcode,
+      );
+
+      if (updatingLocal) {
+        const mutation = createOutboxMutation(outboxBinding, {
+          operationId,
+          createdAt,
+          kind: "product_update",
+          entityKey: `catalog:${localItem!.id}`,
+          payload: {
+            catalog_item_id: localItem!.id,
+            barcode: ocrCandidate.barcode,
+            ...common,
+            active: localItem!.active,
+            replace_all_nutrients: true,
+            confirm_verified_overwrite: true,
+          },
+          expectedRevision: localItem!.revision,
+        });
+        await queueProductMutation(mutation);
+      } else {
+        const mutation = createOutboxMutation(outboxBinding, {
+          operationId,
+          createdAt,
+          kind: "product_create",
+          entityKey: `product-barcode:${normalizeBarcode(ocrCandidate.barcode)}`,
+          payload: {
+            ...common,
+            item_type: itemType,
+            barcode: ocrCandidate.barcode,
+          },
+        });
+        await queueProductMutation(mutation);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "商品を端末に保存できませんでした。");
+    } finally {
+      setBusy(false);
     }
   }
+
+  async function retryProductMutation(operationId: string) {
+    setError(null);
+    try {
+      const changed = await retryOutboxMutation(operationId, outboxBinding);
+      if (!changed) return;
+      await reloadPendingProducts();
+      setMessage("再同期を開始します。");
+      requestOutboxDrain();
+    } catch {
+      setError("再試行状態を端末へ保存できませんでした。");
+    }
+  }
+
+  async function adoptProductServer(mutation: ProductMutation) {
+    setBusy(true);
+    setError(null);
+    try {
+      const current = await loadLocalProduct(mutation.payload.barcode);
+      await deleteOutboxMutation(mutation.operation_id);
+      setPendingProductMutations((rows) => rows.filter(
+        (candidate) => candidate.operation_id !== mutation.operation_id,
+      ));
+      setLocalItem(current);
+      if (current) setItemType(current.item_type);
+      setMessage("サーバーの現在状態を採用しました。");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "競合を解決できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reapplyProductUpdate(mutation: ProductMutation) {
+    if (mutation.kind !== "product_update") return;
+    setBusy(true);
+    setError(null);
+    try {
+      const current = await loadLocalProduct(mutation.payload.barcode);
+      if (
+        !current
+        || current.id !== mutation.payload.catalog_item_id
+        || current.product.barcode !== mutation.payload.barcode
+      ) {
+        throw new Error("現在の商品identityが変わっているため、自動では再適用できません。");
+      }
+
+      const replacement = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "product_update",
+        entityKey: mutation.entity_key,
+        payload: mutation.payload,
+        expectedRevision: current.revision,
+      });
+
+      await deleteOutboxMutation(mutation.operation_id);
+      await putOutboxMutation(replacement);
+      setPendingProductMutations((rows) => [
+        ...rows.filter((candidate) => candidate.operation_id !== mutation.operation_id),
+        replacement,
+      ]);
+      setLocalItem(current);
+      setMessage("現在のrevisionに対して商品変更を再適用しました。");
+      requestOutboxDrain();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "商品変更を再適用できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardProductMutation(mutation: ProductMutation) {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteOutboxMutation(mutation.operation_id);
+      setPendingProductMutations((rows) => rows.filter(
+        (candidate) => candidate.operation_id !== mutation.operation_id,
+      ));
+      setMessage("端末の未同期商品変更を破棄しました。");
+    } catch {
+      setError("端末の未同期商品変更を破棄できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const markIdentityEdited = useCallback((next: Partial<Pick<OcrDraftCandidate, "name" | "brand" | "manufacturer">>) => {
+    setOcrCandidate((current) => current ? {
+      ...current,
+      ...next,
+      identity_source: userEnteredIdentitySource(),
+    } : current);
+  }, []);
 
   return (
     <section className="card stack" aria-labelledby="product-ingestion-title">
@@ -381,10 +822,96 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         </div>
       </div>
 
+      {pendingProductMutations.length > 0 && (
+        <div className="empty-state" aria-live="polite">
+          {pendingProductMutations.map((mutation) => {
+            const serverItem = localItem?.product.barcode === mutation.payload.barcode
+              ? localItem
+              : null;
+            return (
+              <div className="pending-operation" key={mutation.operation_id}>
+                <strong>{mutation.payload.name}</strong>
+                <small className="muted">JAN: {mutation.payload.barcode}</small>
+                <span className="pill pending">{productMutationLabel(mutation.status)}</span>
+
+                {mutation.status === "conflict" && (
+                  <>
+                    <small className="muted">
+                      端末の変更: 「{mutation.payload.name}」
+                      {mutation.kind === "product_update"
+                        ? ` · revision ${mutation.expected_revision ?? "不明"} を基準`
+                        : " · 新規登録"}
+                    </small>
+                    <small className="muted">
+                      サーバー現在値: {serverItem
+                        ? `「${serverItem.name}」 · revision ${serverItem.revision}`
+                        : "同じJANの現在値を安全に確認できません"}
+                    </small>
+                    <div className="form-actions">
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => void adoptProductServer(mutation)}
+                        disabled={busy}
+                      >
+                        サーバー状態を採用
+                      </button>
+                      {mutation.kind === "product_update" && serverItem && (
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={() => void reapplyProductUpdate(mutation)}
+                          disabled={busy}
+                        >
+                          現在revisionへ再適用
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {mutation.status === "failed" && (
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => void retryProductMutation(mutation.operation_id)}
+                    disabled={busy}
+                  >
+                    今すぐ再試行
+                  </button>
+                )}
+
+                {(mutation.status === "blocked" || mutation.status === "expired") && (
+                  <>
+                    <small className="muted">
+                      {mutation.last_error_code === "operation_content_mismatch"
+                        ? "同じoperation IDに異なる内容が検出されたため、自動再適用しません。"
+                        : "自動同期を停止しています。現在状態を確認して必要なら新しい操作を作成してください。"}
+                    </small>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void discardProductMutation(mutation)}
+                      disabled={busy}
+                    >
+                      端末の未同期操作を破棄
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="grid-2">
         <div className="field">
           <label htmlFor="commercial-item-type">種類</label>
-          <select id="commercial-item-type" value={itemType} onChange={(event) => setItemType(event.target.value as ProductItemType)}>
+          <select
+            id="commercial-item-type"
+            value={itemType}
+            onChange={(event) => setItemType(event.target.value as ProductItemType)}
+          >
             <option value="product">市販品</option>
             <option value="supplement">サプリ</option>
           </select>
@@ -396,32 +923,53 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
             inputMode="numeric"
             autoComplete="off"
             value={barcode}
-            onChange={(event) => setBarcode(event.target.value)}
+            onChange={(event) => {
+              setBarcode(event.target.value);
+              activeDraftRef.current = null;
+            }}
             placeholder="バーコードを読み取るか入力"
           />
         </div>
       </div>
 
       <div className="form-actions">
-        <button className="button" type="button" onClick={() => setScannerOpen(true)} disabled={busy || scannerOpen}>ライブカメラで読む</button>
+        <button
+          className="button"
+          type="button"
+          onClick={() => setScannerOpen(true)}
+          disabled={busy || scannerOpen}
+        >
+          ライブカメラで読む
+        </button>
         <label className="button secondary">
           バーコードを撮影
-          <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void readBarcodePhoto(file);
-            event.currentTarget.value = "";
-          }} />
+          <input
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void readBarcodePhoto(file);
+              event.currentTarget.value = "";
+            }}
+          />
         </label>
-        <button className="button secondary" type="button" onClick={() => void resolveBarcode(barcode)} disabled={busy}>番号で検索</button>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() => void resolveBarcode(barcode)}
+          disabled={busy}
+        >
+          番号で検索
+        </button>
       </div>
 
       {scannerOpen && (
         <div className="stack" aria-live="polite">
           <div className="barcode-camera-shell">
             <video ref={videoRef} className="barcode-video" muted playsInline />
-            <div className="barcode-guide" aria-hidden="true">
-              <span />
-            </div>
+            <div className="barcode-guide" aria-hidden="true"><span /></div>
           </div>
           <p className="muted">バーコードを横向きにし、中央の枠いっぱいに入れてください。合わせにくい場合は「バーコードを撮影」の方が確実です。</p>
           <button className="button ghost" type="button" onClick={() => setScannerOpen(false)}>カメラを閉じる</button>
@@ -434,16 +982,22 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
             <div>
               <strong>{localItem.name}</strong>
               <div className="muted">{localItem.brand ?? "ブランド不明"} · 登録済みLibrary</div>
-              <div className="muted">現在のsource: {localItem.product.source_type}</div>
+              <div className="muted">identity: {identitySourceLabel(localItem.product.identity_source)}</div>
             </div>
           </div>
           <label className="button secondary">
             現物ラベルで更新
-            <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void readLabel(file);
-              event.currentTarget.value = "";
-            }} />
+            <input
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readLabel(file);
+                event.currentTarget.value = "";
+              }}
+            />
           </label>
         </div>
       )}
@@ -452,41 +1006,79 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
         <div className="stack">
           <div className="catalog-row">
             <div>
-              <strong>{externalCandidate.name}</strong>
-              <div className="muted">{externalCandidate.brand ?? "ブランド不明"} · 100 {externalCandidate.serving_unit}基準</div>
-              <div className="muted">Open Food Facts · 外部DB（未検証）</div>
+              <strong>{externalCandidate.identity.name}</strong>
+              <div className="muted">
+                {externalCandidate.identity.brand ?? "ブランド不明"} · identity: {externalCandidate.identity.source.provider}
+              </div>
+              <div className="muted">
+                {externalCandidate.nutrition
+                  ? `栄養候補あり · ${externalCandidate.nutrition.serving_size} ${externalCandidate.nutrition.serving_unit}基準`
+                  : "栄養値・表示基準量は未確定"}
+              </div>
             </div>
           </div>
-          <div className="nutrient-grid">
-            {externalCandidate.nutrients.map((nutrient) => {
-              const definition = NUTRIENT_DEFINITIONS.find(({ code }) => code === nutrient.code);
-              return <div key={nutrient.code}><strong>{definition?.label ?? nutrient.code}</strong><div className="muted">{nutrient.amount} {nutrient.unit}</div></div>;
-            })}
-          </div>
+
+          {externalCandidate.nutrition && (
+            <div className="nutrient-grid">
+              {externalCandidate.nutrition.nutrients.map((nutrient) => {
+                const definition = NUTRIENT_DEFINITIONS.find(({ code }) => code === nutrient.code);
+                return (
+                  <div key={nutrient.code}>
+                    <strong>{definition?.label ?? nutrient.code}</strong>
+                    <div className="muted">
+                      {nutrient.amount === null ? "—" : nutrient.amount} {nutrient.unit}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div className="form-actions">
-            <button className="button" type="button" disabled={busy} onClick={() => void save(externalCandidate, externalCandidate.nutrients)}>この候補を保存</button>
+            {externalCandidate.nutrition && (
+              <button
+                className="button"
+                type="button"
+                disabled={busy}
+                onClick={() => void saveExternalCandidate()}
+              >
+                この候補を確認して保存
+              </button>
+            )}
             <label className="button secondary">
-              現物ラベルを優先
-              <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void readLabel(file);
-                event.currentTarget.value = "";
-              }} />
+              栄養成分表示を撮影
+              <input
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void readLabel(file);
+                  event.currentTarget.value = "";
+                }}
+              />
             </label>
           </div>
         </div>
       )}
 
-      {needsOcr && !ocrCandidate && (
+      {needsOcr && !ocrCandidate && !externalCandidate && (
         <div className="stack">
-          <p className="muted">商品DBにない場合は、栄養成分表示が画面の大半を占め、反射が少なくなるよう近づいて撮影してください。</p>
+          <p className="muted">商品DBでは安全に特定できませんでした。商品名を入力するため、まず栄養成分表示を撮影してください。</p>
           <label className="button secondary">
             栄養成分表示を撮影
-            <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void readLabel(file);
-              event.currentTarget.value = "";
-            }} />
+            <input
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readLabel(file);
+                event.currentTarget.value = "";
+              }}
+            />
           </label>
         </div>
       )}
@@ -499,24 +1091,60 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
               <figcaption className="muted">この画像とOCR候補を見比べて確認してください。画像は保存しません。</figcaption>
             </figure>
           )}
+
           <div className="grid-2">
             <div className="field">
               <label htmlFor="ocr-product-name">商品名</label>
-              <input id="ocr-product-name" value={ocrCandidate.name} onChange={(event) => setOcrCandidate((current) => current ? { ...current, name: event.target.value } : current)} />
+              <input
+                id="ocr-product-name"
+                value={ocrCandidate.name}
+                onChange={(event) => markIdentityEdited({ name: event.target.value })}
+              />
             </div>
             <div className="field">
               <label htmlFor="ocr-product-brand">メーカー・ブランド（任意）</label>
-              <input id="ocr-product-brand" value={ocrCandidate.brand ?? ""} onChange={(event) => setOcrCandidate((current) => current ? { ...current, brand: event.target.value || null, manufacturer: event.target.value || null } : current)} />
+              <input
+                id="ocr-product-brand"
+                value={ocrCandidate.brand ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value || null;
+                  markIdentityEdited({ brand: value, manufacturer: value });
+                }}
+              />
             </div>
           </div>
+
+          <div className="nutrition-meta">
+            identity出典: {ocrCandidate.identity_source.type === "user_entered"
+              ? "ユーザー確認・入力"
+              : ocrCandidate.identity_source.provider}
+            <span aria-hidden="true"> · </span>
+            栄養出典: {ocrCandidate.nutrient_source_provider}（現物ラベルOCR）
+          </div>
+
           <div className="grid-2">
             <div className="field">
               <label htmlFor="ocr-serving-size">表示基準量</label>
-              <input id="ocr-serving-size" type="number" min="0.001" step="any" value={ocrCandidate.serving_size} onChange={(event) => setOcrCandidate((current) => current ? { ...current, serving_size: Number(event.target.value) } : current)} />
+              <input
+                id="ocr-serving-size"
+                type="number"
+                min="0.001"
+                step="any"
+                value={ocrCandidate.serving_size}
+                onChange={(event) => setOcrCandidate((current) => current
+                  ? { ...current, serving_size: Number(event.target.value) }
+                  : current)}
+              />
             </div>
             <div className="field">
               <label htmlFor="ocr-serving-unit">表示基準単位</label>
-              <input id="ocr-serving-unit" value={ocrCandidate.serving_unit} onChange={(event) => setOcrCandidate((current) => current ? { ...current, serving_unit: event.target.value } : current)} />
+              <input
+                id="ocr-serving-unit"
+                value={ocrCandidate.serving_unit}
+                onChange={(event) => setOcrCandidate((current) => current
+                  ? { ...current, serving_unit: event.target.value }
+                  : current)}
+              />
             </div>
           </div>
 
@@ -525,14 +1153,19 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
             <div className="nutrient-grid">
               {NUTRIENT_DEFINITIONS.map((definition) => (
                 <div className="field" key={definition.code}>
-                  <label htmlFor={`ocr-${definition.code}`}>{definition.label}（{definition.unit}）</label>
+                  <label htmlFor={`ocr-${definition.code}`}>
+                    {definition.label}（{definition.unit}）
+                  </label>
                   <input
                     id={`ocr-${definition.code}`}
                     type="number"
                     min="0"
                     step="any"
                     value={ocrNutrients[definition.code]}
-                    onChange={(event) => setOcrNutrients((current) => ({ ...current, [definition.code]: event.target.value }))}
+                    onChange={(event) => setOcrNutrients((current) => ({
+                      ...current,
+                      [definition.code]: event.target.value,
+                    }))}
                   />
                 </div>
               ))}
@@ -540,14 +1173,22 @@ export function ProductIngestion({ onSaved }: { onSaved: () => Promise<void> }) 
           </fieldset>
 
           <div className="form-actions">
-            <button className="button" type="button" disabled={busy} onClick={() => void saveOcr()}>現物と確認して保存</button>
+            <button className="button" type="button" disabled={busy} onClick={() => void saveOcr()}>
+              identityと現物ラベルを確認して保存
+            </button>
             <label className="button secondary">
               撮り直す
-              <input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void readLabel(file);
-                event.currentTarget.value = "";
-              }} />
+              <input
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void readLabel(file);
+                  event.currentTarget.value = "";
+                }}
+              />
             </label>
           </div>
         </div>

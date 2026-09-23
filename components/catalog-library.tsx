@@ -365,21 +365,6 @@ export function CatalogLibrary({
     setMessage(null);
     setError(null);
     try {
-      if (item.item_type === "product" || item.item_type === "supplement") {
-        const response = await fetch(`/api/catalog/${item.id}/active`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ expected_revision: item.revision, active }),
-        });
-        const result = (await response.json()) as { error?: string };
-        if (!response.ok) {
-          throw new Error(result.error ?? "状態を更新できませんでした。");
-        }
-        await load();
-        setMessage(active ? "再有効化しました。" : "無効化しました。過去の履歴は保持されています。");
-        return;
-      }
-
       const entityKey = entityKeyForCatalog(item.id);
       if (hasPendingEntity(entityKey)) {
         throw new Error("この項目には未同期の変更があります。");
@@ -547,7 +532,7 @@ export function CatalogLibrary({
         const item = current.items.find(
           (candidate) => candidate.id === mutation.payload.catalog_item_id,
         );
-        if (!item || item.item_type === "product" || item.item_type === "supplement") {
+        if (!item) {
           throw new Error("現在の項目状態では再適用できません。");
         }
         replacement = createOutboxMutation(binding, {
@@ -625,7 +610,10 @@ export function CatalogLibrary({
 
   return (
     <div className="stack">
-      <ProductIngestion onSaved={async () => { await load(); }} />
+      <ProductIngestion
+        onSaved={async () => { await load(); }}
+        outboxBinding={binding}
+      />
       <section className="card">
         <div className="section-heading">
           <div>
