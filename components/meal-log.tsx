@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import {
   applyMealEntryWrite,
-  applyMealStateWrite,
   type MealEntryWriteResult,
-  type MealStateWriteResult,
 } from "@/lib/nutrition/meal-optimistic";
 import {
   createMealEntryMutation,
+  createOutboxMutation,
   type OutboxBinding,
+  type PendingMutation,
   type PendingMutationStatus,
 } from "@/lib/offline/outbox-contract";
 import {
@@ -49,6 +49,8 @@ type LocalMealOperation = {
   status: PendingMutationStatus;
   lastErrorCode: string | null;
 };
+
+type FixedMealStateMutation = Extract<PendingMutation, { kind: "fixed_meal_state" }>;
 
 type OutboxUiState = PendingMutationStatus | "synced" | "discarded";
 
@@ -108,6 +110,7 @@ export function MealLog({
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [localOperations, setLocalOperations] = useState<LocalMealOperation[]>([]);
+  const [fixedStateOperations, setFixedStateOperations] = useState<FixedMealStateMutation[]>([]);
   const [composer, setComposer] = useState<MealType | null>(null);
   const [itemId, setItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -143,6 +146,9 @@ export function MealLog({
               status: row.status,
               lastErrorCode: row.last_error_code,
             })),
+        );
+        setFixedStateOperations(
+          rows.filter((row): row is FixedMealStateMutation => row.kind === "fixed_meal_state"),
         );
       })
       .catch(() => {
