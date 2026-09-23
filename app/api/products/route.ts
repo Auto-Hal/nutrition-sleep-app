@@ -103,23 +103,7 @@ export async function GET() {
   const client = createUserClient(session.accessToken);
   const productsResult = await client
     .from("products")
-    .select([
-      "catalog_item_id",
-      "barcode",
-      "manufacturer",
-      "package_amount",
-      "package_unit",
-      "source_type",
-      "source_provider",
-      "source_uri",
-      "source_observed_at",
-      "confirmed_at",
-      "identity_source_type",
-      "identity_source_provider",
-      "identity_source_uri",
-      "identity_source_observed_at",
-      "identity_confirmed_at",
-    ].join(","))
+    .select("catalog_item_id,barcode,manufacturer,package_amount,package_unit,source_type,source_provider,source_uri,source_observed_at,confirmed_at,identity_source_type,identity_source_provider,identity_source_uri,identity_source_observed_at,identity_confirmed_at")
     .order("updated_at", { ascending: false });
 
   if (productsResult.error) {
