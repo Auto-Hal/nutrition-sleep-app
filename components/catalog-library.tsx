@@ -532,7 +532,7 @@ export function CatalogLibrary({
         const item = current.items.find(
           (candidate) => candidate.id === mutation.payload.catalog_item_id,
         );
-        if (!item || item.item_type === "product" || item.item_type === "supplement") {
+        if (!item) {
           throw new Error("現在の項目状態では再適用できません。");
         }
         replacement = createOutboxMutation(binding, {
