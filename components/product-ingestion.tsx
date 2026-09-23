@@ -563,36 +563,19 @@ export function ProductIngestion({
     }
   }
 
-  async function postProduct(payload: Record<string, unknown>) {
-    const response = await fetch("/api/products", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json() as { error?: string };
-    if (!response.ok) throw new Error(result.error ?? "商品を保存できませんでした。");
+  function pendingForBarcode(value: string) {
+    const normalized = normalizeBarcode(value);
+    return pendingProductMutations.find(
+      (mutation) => normalizeBarcode(mutation.payload.barcode) === normalized,
+    ) ?? null;
   }
 
-  async function patchProduct(id: string, payload: Record<string, unknown>) {
-    const response = await fetch(`/api/products/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json() as { error?: string };
-    if (!response.ok) throw new Error(result.error ?? "商品を更新できませんでした。");
-  }
-
-  async function finishSave() {
-    await onSaved();
-    activeDraftRef.current = null;
-    setExternalCandidate(null);
-    setLocalItem(null);
-    setOcrCandidate(null);
-    setOcrNutrients(nutrientDraft([]));
-    replaceOcrPreview(null);
-    setNeedsOcr(false);
-    setMessage("Libraryに保存しました。次回から同じバーコードは自前DBから解決します。");
+  async function queueProductMutation(mutation: ProductMutation) {
+    await putOutboxMutation(mutation);
+    setPendingProductMutations((current) => [...current, mutation]);
+    clearConfirmedDraft();
+    setMessage("端末に保存・未同期");
+    requestOutboxDrain();
   }
 
   async function saveExternalCandidate() {
@@ -606,30 +589,40 @@ export function ProductIngestion({
       setError("栄養表示の基準量が未確定です。現物ラベルを確認してください。");
       return;
     }
+    if (pendingForBarcode(identity.barcode)) {
+      setError("この商品には未同期の保存操作があります。先に同期または解決してください。");
+      return;
+    }
 
     setBusy(true);
     setError(null);
     try {
-      await postProduct({
-        item_type: itemType,
-        barcode: identity.barcode,
-        name: identity.name,
-        brand: identity.brand,
-        serving_size: nutrition.serving_size,
-        serving_unit: nutrition.serving_unit,
-        manufacturer: identity.manufacturer,
-        package_amount: identity.package_amount,
-        package_unit: identity.package_unit,
-        identity_source_type: identity.source.type,
-        identity_source_provider: identity.source.provider,
-        identity_source_uri: identity.source.uri,
-        identity_source_observed_at: identity.source.observed_at,
-        nutrients: nutrition.nutrients,
-        idempotency_key: crypto.randomUUID(),
+      const operationId = crypto.randomUUID();
+      const mutation = createOutboxMutation(outboxBinding, {
+        operationId,
+        createdAt: new Date().toISOString(),
+        kind: "product_create",
+        entityKey: `product-barcode:${normalizeBarcode(identity.barcode)}`,
+        payload: {
+          item_type: itemType,
+          barcode: identity.barcode,
+          name: identity.name,
+          brand: identity.brand,
+          serving_size: nutrition.serving_size,
+          serving_unit: nutrition.serving_unit,
+          manufacturer: identity.manufacturer,
+          package_amount: identity.package_amount,
+          package_unit: identity.package_unit,
+          identity_source_type: identity.source.type,
+          identity_source_provider: identity.source.provider,
+          identity_source_uri: identity.source.uri,
+          identity_source_observed_at: identity.source.observed_at,
+          nutrients: nutrition.nutrients,
+        },
       });
-      await finishSave();
+      await queueProductMutation(mutation);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "商品を保存できませんでした。");
+      setError(requestError instanceof Error ? requestError.message : "商品を端末に保存できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -649,6 +642,10 @@ export function ProductIngestion({
       || current.barcode !== ocrCandidate.barcode
     ) {
       setError("商品候補が切り替わっています。バーコードからやり直してください。");
+      return;
+    }
+    if (pendingForBarcode(ocrCandidate.barcode)) {
+      setError("この商品には未同期の保存操作があります。先に同期または解決してください。");
       return;
     }
 
@@ -676,31 +673,133 @@ export function ProductIngestion({
         nutrients,
       };
 
+      const operationId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
       const updatingLocal = Boolean(
         localItem
         && localItem.product.barcode === ocrCandidate.barcode,
       );
 
       if (updatingLocal) {
-        await patchProduct(localItem!.id, {
-          ...common,
-          expected_revision: localItem!.revision,
-          active: localItem!.active,
-          replace_all_nutrients: true,
-          confirm_verified_overwrite: true,
+        const mutation = createOutboxMutation(outboxBinding, {
+          operationId,
+          createdAt,
+          kind: "product_update",
+          entityKey: `product-barcode:${normalizeBarcode(ocrCandidate.barcode)}`,
+          payload: {
+            catalog_item_id: localItem!.id,
+            barcode: ocrCandidate.barcode,
+            ...common,
+            active: localItem!.active,
+            replace_all_nutrients: true,
+            confirm_verified_overwrite: true,
+          },
+          expectedRevision: localItem!.revision,
         });
+        await queueProductMutation(mutation);
       } else {
-        await postProduct({
-          ...common,
-          item_type: itemType,
-          barcode: ocrCandidate.barcode,
-          idempotency_key: crypto.randomUUID(),
+        const mutation = createOutboxMutation(outboxBinding, {
+          operationId,
+          createdAt,
+          kind: "product_create",
+          entityKey: `product-barcode:${normalizeBarcode(ocrCandidate.barcode)}`,
+          payload: {
+            ...common,
+            item_type: itemType,
+            barcode: ocrCandidate.barcode,
+          },
         });
+        await queueProductMutation(mutation);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "商品を端末に保存できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryProductMutation(operationId: string) {
+    setError(null);
+    try {
+      const changed = await retryOutboxMutation(operationId, outboxBinding);
+      if (!changed) return;
+      await reloadPendingProducts();
+      setMessage("再同期を開始します。");
+      requestOutboxDrain();
+    } catch {
+      setError("再試行状態を端末へ保存できませんでした。");
+    }
+  }
+
+  async function adoptProductServer(mutation: ProductMutation) {
+    setBusy(true);
+    setError(null);
+    try {
+      const current = await loadLocalProduct(mutation.payload.barcode);
+      await deleteOutboxMutation(mutation.operation_id);
+      setPendingProductMutations((rows) => rows.filter(
+        (candidate) => candidate.operation_id !== mutation.operation_id,
+      ));
+      setLocalItem(current);
+      if (current) setItemType(current.item_type);
+      setMessage("サーバーの現在状態を採用しました。");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "競合を解決できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reapplyProductUpdate(mutation: ProductMutation) {
+    if (mutation.kind !== "product_update") return;
+    setBusy(true);
+    setError(null);
+    try {
+      const current = await loadLocalProduct(mutation.payload.barcode);
+      if (
+        !current
+        || current.id !== mutation.payload.catalog_item_id
+        || current.product.barcode !== mutation.payload.barcode
+      ) {
+        throw new Error("現在の商品identityが変わっているため、自動では再適用できません。");
       }
 
-      await finishSave();
+      const replacement = createOutboxMutation(outboxBinding, {
+        operationId: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        kind: "product_update",
+        entityKey: mutation.entity_key,
+        payload: mutation.payload,
+        expectedRevision: current.revision,
+      });
+
+      await deleteOutboxMutation(mutation.operation_id);
+      await putOutboxMutation(replacement);
+      setPendingProductMutations((rows) => [
+        ...rows.filter((candidate) => candidate.operation_id !== mutation.operation_id),
+        replacement,
+      ]);
+      setLocalItem(current);
+      setMessage("現在のrevisionに対して商品変更を再適用しました。");
+      requestOutboxDrain();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "商品を保存できませんでした。");
+      setError(requestError instanceof Error ? requestError.message : "商品変更を再適用できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discardProductMutation(mutation: ProductMutation) {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteOutboxMutation(mutation.operation_id);
+      setPendingProductMutations((rows) => rows.filter(
+        (candidate) => candidate.operation_id !== mutation.operation_id,
+      ));
+      setMessage("端末の未同期商品変更を破棄しました。");
+    } catch {
+      setError("端末の未同期商品変更を破棄できませんでした。");
     } finally {
       setBusy(false);
     }
