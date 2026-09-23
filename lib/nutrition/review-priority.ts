@@ -381,6 +381,7 @@ function makePercentEnergySignals(
     target_distance_percent: distance === null ? null : roundOne(distance),
     concern_days: null,
     concern_day_ratio: null,
+    concern_evaluable_dates: null,
     summary: state === "below_dg"
       ? "記録平均のエネルギー比がDG範囲より低い"
       : state === "above_dg"
