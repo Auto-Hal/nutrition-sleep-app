@@ -328,3 +328,92 @@ comment on function public.update_product_item_reliable_v2(
   text, numeric, text, public.product_identity_source_type, text, text, timestamptz,
   jsonb, boolean, boolean
 ) is 'Phase 6.4 receipt-aware Product/Supplement update with explicit revision/reference conflicts.';
+
+
+-- Batch 6.4 completes the Catalog active-state path for Product/Supplement.
+-- Active/inactive is Catalog state only; it does not rewrite Product identity or nutrient provenance.
+create or replace function public.set_catalog_item_active_v2(
+  p_operation_id uuid,
+  p_contract_version integer,
+  p_intent_created_at timestamptz,
+  p_catalog_item_id uuid,
+  p_expected_revision integer,
+  p_active boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  owner_id uuid := (select auth.uid());
+  request_fingerprint text;
+  replay_result jsonb;
+  item public.catalog_items;
+  result_payload jsonb;
+begin
+  if owner_id is null then
+    raise exception using errcode = '42501', message = 'authentication required';
+  end if;
+
+  request_fingerprint := private.phase6_sha256_jsonb(
+    pg_catalog.jsonb_build_object(
+      'contract_version', p_contract_version,
+      'mutation_kind', 'catalog_active',
+      'intent_created_at', private.phase6_timestamp_text(p_intent_created_at),
+      'catalog_item_id', p_catalog_item_id,
+      'expected_revision', p_expected_revision,
+      'active', p_active
+    )
+  );
+
+  replay_result := private.phase6_prepare_mutation(
+    owner_id, p_operation_id, 'catalog_active',
+    request_fingerprint, p_intent_created_at
+  );
+  if replay_result is not null then return replay_result; end if;
+
+  if p_contract_version is distinct from 1
+     or p_catalog_item_id is null
+     or p_expected_revision is null
+     or p_expected_revision <= 0 then
+    perform private.phase6_raise_http(422, 'invalid_mutation_payload');
+  end if;
+
+  select c.*
+  into item
+  from public.catalog_items c
+  where c.id = p_catalog_item_id
+    and c.user_id = owner_id
+  for update;
+
+  if item.id is null then
+    perform private.phase6_raise_http(404, 'catalog_not_found');
+  end if;
+  if item.revision <> p_expected_revision then
+    perform private.phase6_raise_http(409, 'revision_conflict');
+  end if;
+
+  update public.catalog_items
+  set active = p_active
+  where id = item.id
+    and user_id = owner_id
+  returning * into item;
+
+  result_payload := pg_catalog.jsonb_build_object(
+    'item_id', item.id,
+    'revision', item.revision,
+    'active', item.active
+  );
+
+  perform private.phase6_store_mutation_receipt(
+    owner_id, p_operation_id, 'catalog_active',
+    request_fingerprint, item.id, item.revision, result_payload
+  );
+  return result_payload;
+end;
+$$;
+
+comment on function public.set_catalog_item_active_v2(
+  uuid, integer, timestamptz, uuid, integer, boolean
+) is 'Phase 6.4 receipt-aware Catalog active-state mutation, including Product/Supplement.';
