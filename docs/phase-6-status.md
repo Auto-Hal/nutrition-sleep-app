@@ -5,8 +5,8 @@ Updated: 2026-09-23
 ## Current state
 
 - Phase 6 implementation: **NOT STARTED**
-- Phase 6 design: **ASTRA REVIEWED — REQUIRED CORRECTIONS APPLIED**
-- current gate: **AWAITING SUPERVISOR/USER ACCEPTANCE**
+- Phase 6 design: **APPROVED — ASTRA CORRECTIONS APPLIED + SUPERVISOR/USER ACCEPTED**
+- current gate: **IMPLEMENTATION AUTHORIZED**
 - design branch: `phase/6-design`
 - design PR: #10
 - PR base: `phase/5-sleep-foundation`
@@ -78,11 +78,13 @@ All blocking corrections from A1–A7, B1–B6, C1–C7, D1–D7 and X1–X5 hav
 - `deletion_outcome_unknown` supported;
 - short-lived deletion status is separate from user-cascaded rows.
 
-## Current gate
+## Design gate closed
 
-No Phase 6 code implementation starts until Supervisor/user accepts the corrected design.
+Supervisor/user accepted the corrected Phase 6 design on 2026-09-23.
 
-After acceptance, safe Sol-first parallel starts are:
+Implementation is authorized under the reviewed contracts.
+
+Safe Sol-first parallel starts:
 
 1. 6.1 reliability server primitives;
 2. 6.4 Product provenance v2;
