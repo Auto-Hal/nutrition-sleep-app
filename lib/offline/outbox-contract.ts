@@ -136,6 +136,14 @@ export function createMealEntryMutation(
   return mutation;
 }
 
+export function matchesOutboxBinding(
+  mutation: Pick<PendingMutation, "owner_user_id" | "environment_id">,
+  binding: OutboxBinding,
+) {
+  return mutation.owner_user_id === binding.ownerUserId
+    && mutation.environment_id === binding.environmentId;
+}
+
 export function mutationAgeMs(
   mutation: Pick<PendingMutation, "created_at">,
   nowMs: number,
