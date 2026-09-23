@@ -707,7 +707,10 @@ begin
   into has_active_entries;
 
   update public.meals
-  set state = case when has_active_entries then 'recorded' else 'not_recorded' end,
+  set state = case
+        when has_active_entries then 'recorded'::public.meal_state
+        else 'not_recorded'::public.meal_state
+      end,
       eaten_at = case
         when not has_active_entries and meal_type <> 'custom' then null
         else eaten_at
