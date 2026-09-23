@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(25);
 
 select has_function(
   'public',
@@ -437,6 +437,27 @@ select is(
   ),
   3,
   'each successful Product logical mutation stores one receipt'
+);
+
+
+select lives_ok(
+  $test$
+    select public.set_catalog_item_active_v2(
+      '61000000-0000-4000-8000-000000000008',
+      1,
+      now(),
+      (select id from phase64_product),
+      4,
+      false
+    )
+  $test$,
+  'Product active-state change uses reliable Catalog mutation'
+);
+
+select is(
+  (select active from public.catalog_items where id=(select id from phase64_product)),
+  false,
+  'Product active-state change is applied'
 );
 
 select ok(
