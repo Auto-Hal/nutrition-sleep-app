@@ -3,7 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { OutboxRuntime } from "@/components/outbox-runtime";
 import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 import { countUnsyncedOutbox, pauseOutboxForBinding } from "@/lib/offline/outbox-idb";
@@ -30,9 +30,6 @@ export function AppShell({
   const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isNavigating, startNavigation] = useTransition();
-  const refreshAfterSync = useCallback(() => {
-    router.refresh();
-  }, [router]);
   const binding = useMemo<OutboxBinding>(
     () => ({ ownerUserId, environmentId }),
     [ownerUserId, environmentId],
@@ -88,7 +85,6 @@ export function AppShell({
 
   return (
     <div className="app-frame" aria-busy={isNavigating || undefined}>
-      <OutboxRuntime binding={binding} onServerSync={refreshAfterSync} />
       <div className="app-main" style={{ paddingBottom: 0 }}>
         <div className="topbar" style={{ marginBottom: 0 }}>
           <span className="eyebrow">{email ?? "アカウント"}</span>
@@ -96,6 +92,7 @@ export function AppShell({
         </div>
       </div>
       {children}
+      <OutboxRuntime binding={binding} />
       <nav className="bottom-nav" aria-label="メインナビゲーション">
         {tabs.map((tab) => {
           const active = pathname === tab.href || (tab.href === "/settings" && pathname.startsWith("/settings"));
