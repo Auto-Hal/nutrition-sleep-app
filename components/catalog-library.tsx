@@ -37,6 +37,8 @@ const typeLabels: Record<CatalogItemType, string> = {
 const blankNutrients = () =>
   Object.fromEntries(NUTRIENT_DEFINITIONS.map(({ code }) => [code, ""]));
 
+type EditableCatalogItemType = "ingredient" | "estimated_dish";
+
 type BatchComponent = {
   catalog_item_id: string;
   quantity: string;
@@ -104,7 +106,7 @@ export function CatalogLibrary({
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [editingBatch, setEditingBatch] = useState<BatchRecord | null>(null);
   const [form, setForm] = useState({
-    item_type: "ingredient" as Exclude<CatalogItemType, "batch">,
+    item_type: "ingredient" as EditableCatalogItemType,
     name: "",
     brand: "",
     serving_size: "1",
@@ -226,6 +228,10 @@ export function CatalogLibrary({
   function startEdit(item: CatalogItem) {
     if (hasPendingEntity(entityKeyForCatalog(item.id))) {
       setError("この項目には未同期の変更があります。先に解決してください。");
+      return;
+    }
+    if (item.item_type === "product" || item.item_type === "supplement") {
+      setError("市販品・サプリの編集はProduct v2経路から行ってください。");
       return;
     }
     if (item.item_type === "batch") {
@@ -603,7 +609,7 @@ export function CatalogLibrary({
 
   return (
     <div className="stack">
-      <ProductIngestion onSaved={load} />
+      <ProductIngestion onSaved={async () => { await load(); }} />
       <section className="card">
         <div className="section-heading">
           <div>
@@ -686,7 +692,7 @@ export function CatalogLibrary({
                   value={form.item_type}
                   onChange={(event) => setForm((current) => ({
                     ...current,
-                    item_type: event.target.value as Exclude<CatalogItemType, "batch">,
+                    item_type: event.target.value as EditableCatalogItemType,
                   }))}
                 >
                   {(["ingredient", "estimated_dish"] as const).map((type) => (
