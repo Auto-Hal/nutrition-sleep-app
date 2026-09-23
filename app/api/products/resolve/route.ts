@@ -54,23 +54,7 @@ export async function GET(request: Request) {
   const client = createUserClient(session.accessToken);
   const productResult = await client
     .from("products")
-    .select([
-      "catalog_item_id",
-      "barcode",
-      "manufacturer",
-      "package_amount",
-      "package_unit",
-      "source_type",
-      "source_provider",
-      "source_uri",
-      "source_observed_at",
-      "confirmed_at",
-      "identity_source_type",
-      "identity_source_provider",
-      "identity_source_uri",
-      "identity_source_observed_at",
-      "identity_confirmed_at",
-    ].join(","))
+    .select("catalog_item_id,barcode,manufacturer,package_amount,package_unit,source_type,source_provider,source_uri,source_observed_at,confirmed_at,identity_source_type,identity_source_provider,identity_source_uri,identity_source_observed_at,identity_confirmed_at")
     .eq("barcode", barcode)
     .maybeSingle();
 
