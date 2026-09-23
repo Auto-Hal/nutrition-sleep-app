@@ -1,4 +1,5 @@
 import { TodayInteractive } from "@/components/today-interactive";
+import { appEnvironmentId } from "@/lib/app-environment";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getTodayNutritionSummary, localDateInTimeZone } from "@/lib/nutrition/analytics";
 import { getMealLogCatalogItems, getMealsForDate } from "@/lib/nutrition/today-data";
@@ -40,6 +41,8 @@ export default async function TodayPage() {
           initialItems={initialItems}
           initialMeals={initialMeals}
           initialSummary={summary}
+          ownerUserId={session?.userId ?? ""}
+          environmentId={appEnvironmentId()}
         />
 
         <section className="notice" aria-label="データ状態">

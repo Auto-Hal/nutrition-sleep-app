@@ -3,7 +3,10 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type MouseEvent, type ReactNode, useEffect, useState, useTransition } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
+import { OutboxRuntime } from "@/components/outbox-runtime";
+import type { OutboxBinding } from "@/lib/offline/outbox-contract";
+import { countUnsyncedOutbox, pauseOutboxForBinding } from "@/lib/offline/outbox-idb";
 
 const tabs = [
   { href: "/today", label: "Today", icon: "◷" },
@@ -12,11 +15,25 @@ const tabs = [
   { href: "/settings", label: "Settings", icon: "⚙" },
 ] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: string }>;
 
-export function AppShell({ children, email }: { children: ReactNode; email?: string }) {
+export function AppShell({
+  children,
+  email,
+  ownerUserId,
+  environmentId,
+}: {
+  children: ReactNode;
+  email?: string;
+  ownerUserId: string;
+  environmentId: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isNavigating, startNavigation] = useTransition();
+  const binding = useMemo<OutboxBinding>(
+    () => ({ ownerUserId, environmentId }),
+    [ownerUserId, environmentId],
+  );
 
   useEffect(() => {
     for (const tab of tabs) router.prefetch(tab.href);
@@ -45,6 +62,22 @@ export function AppShell({ children, email }: { children: ReactNode; email?: str
   }
 
   async function logout() {
+    try {
+      const unsynced = await countUnsyncedOutbox(binding);
+      if (unsynced > 0) {
+        const accepted = window.confirm(
+          `未同期の記録が${unsynced}件あります。端末に保持したままログアウトし、同じアカウントで再ログイン後に同期します。続けますか？`,
+        );
+        if (!accepted) return;
+      }
+      await pauseOutboxForBinding(binding);
+    } catch {
+      const accepted = window.confirm(
+        "端末の未同期状態を確認できませんでした。ローカル記録は削除せずにログアウトします。続けますか？",
+      );
+      if (!accepted) return;
+    }
+
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
@@ -59,6 +92,7 @@ export function AppShell({ children, email }: { children: ReactNode; email?: str
         </div>
       </div>
       {children}
+      <OutboxRuntime binding={binding} />
       <nav className="bottom-nav" aria-label="メインナビゲーション">
         {tabs.map((tab) => {
           const active = pathname === tab.href || (tab.href === "/settings" && pathname.startsWith("/settings"));

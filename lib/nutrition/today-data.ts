@@ -3,7 +3,7 @@ import { createUserClient } from "@/lib/supabase/user";
 
 export async function getMealLogCatalogItems(accessToken: string): Promise<CatalogItem[]> {
   const client = createUserClient(accessToken);
-  const [itemsResult, energyResult] = await Promise.all([
+  const [itemsResult, energyResult, fingerprintResult] = await Promise.all([
     client
       .from("catalog_items")
       .select("id,user_id,item_type,name,brand,serving_size,serving_unit,active,revision")
@@ -13,10 +13,19 @@ export async function getMealLogCatalogItems(accessToken: string): Promise<Catal
       .from("item_nutrients")
       .select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at")
       .eq("nutrient_code", "energy"),
+    client.rpc("list_catalog_reference_fingerprints"),
   ]);
 
   if (itemsResult.error) throw new Error(itemsResult.error.message);
   if (energyResult.error) throw new Error(energyResult.error.message);
+  if (fingerprintResult.error) throw new Error(fingerprintResult.error.message);
+
+  const fingerprintByItem = new Map(
+    ((fingerprintResult.data ?? []) as Array<{
+      catalog_item_id: string;
+      reference_fingerprint: string;
+    }>).map((row) => [row.catalog_item_id, row.reference_fingerprint]),
+  );
 
   return (itemsResult.data ?? []).map((item) => ({
     id: item.id,
@@ -28,6 +37,7 @@ export async function getMealLogCatalogItems(accessToken: string): Promise<Catal
     serving_unit: item.serving_unit,
     active: item.active,
     revision: item.revision,
+    reference_fingerprint: fingerprintByItem.get(item.id) ?? null,
     nutrients: (energyResult.data ?? [])
       .filter((nutrient) => nutrient.catalog_item_id === item.id)
       .map((nutrient) => ({
