@@ -1,6 +1,7 @@
 import {
   isAutomaticReplayEligible,
   isRetryableHttpStatus,
+  matchesOutboxBinding,
   receiptAbsenceDisposition,
   retryDelayMs,
   type OutboxBinding,
@@ -441,6 +442,26 @@ export async function drainOutbox(
     const nowMs = now();
     const mutation = await store.claimNext(binding, workerId, nowMs);
     if (!mutation) break;
+
+    if (!matchesOutboxBinding(mutation, binding)) {
+      await store.transition(
+        mutation.operation_id,
+        {
+          status: "blocked",
+          next_retry_at: null,
+          last_error_code: "binding_mismatch",
+        },
+        workerId,
+      );
+      events.push({
+        operation_id: mutation.operation_id,
+        kind: mutation.kind,
+        payload: mutation.payload,
+        state: "blocked",
+        error_code: "binding_mismatch",
+      });
+      continue;
+    }
 
     const outcome = isAutomaticReplayEligible(mutation, nowMs)
       ? await sendMutation(
