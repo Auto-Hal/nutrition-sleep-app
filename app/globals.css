@@ -129,3 +129,22 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
 .nav-link[data-pending="true"] .nav-icon { animation: nav-pending-pulse 650ms ease-in-out infinite alternate; }
 @keyframes nav-pending-pulse { from { opacity: 0.35; transform: scale(0.8); } to { opacity: 1; transform: scale(1.15); } }
 @media (prefers-reduced-motion: reduce) { .nav-link[data-pending="true"] .nav-icon { animation: none; } }
+
+
+/* Phase 6.7 nutrition review-priority UX */
+.nutrition-review-intro { border-color: #c9ddd3; }
+.nutrition-review-section { display: grid; gap: 10px; }
+.nutrition-review-warning { border-color: #ead0b2; }
+.nutrition-review-list { display: grid; }
+.nutrition-review-item { display: grid; gap: 6px; padding: 14px 0; border-top: 1px solid var(--line); }
+.nutrition-review-item:first-child { border-top: 0; padding-top: 6px; }
+.nutrition-review-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.nutrition-review-summary { margin: 0; font-weight: 720; line-height: 1.45; }
+.nutrition-review-axes { margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+.nutrition-review-axes summary,
+.nutrition-review-within > summary { cursor: pointer; font-weight: 700; }
+.nutrition-review-within { display: grid; gap: 10px; }
+@media (max-width: 520px) {
+  .nutrition-review-item-head { flex-direction: column; }
+  .nutrition-review-item-head .button { align-self: flex-start; }
+}
