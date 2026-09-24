@@ -1035,6 +1035,38 @@ export function ProductIngestion({
         </div>
       )}
 
+      {externalIdentityCandidates.length > 0 && !externalCandidate && !ocrCandidate && (
+        <div className="stack">
+          <p className="muted">
+            Yahoo!ショッピングでexact JANが一致する候補が複数見つかりました。現物の商品名・ブランドと一致するものだけを選んでください。
+          </p>
+          {externalIdentityCandidates.map((candidate) => (
+            <div
+              className="catalog-row"
+              key={candidate.source.uri ?? `${candidate.name}:${candidate.brand ?? ""}`}
+            >
+              <div>
+                <strong>{candidate.name}</strong>
+                <div className="muted">{candidate.brand ?? "ブランド不明"} · Yahoo!ショッピング</div>
+                {candidate.source.uri && (
+                  <a href={candidate.source.uri} target="_blank" rel="noreferrer">
+                    Yahoo!ショッピングの商品ページで確認
+                  </a>
+                )}
+              </div>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => selectExternalIdentity(candidate)}
+              >
+                このidentityを選択
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {externalCandidate && !ocrCandidate && (
         <div className="stack">
           <div className="catalog-row">
