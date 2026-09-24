@@ -343,6 +343,7 @@ export function ProductIngestion({
 
   const resetResolution = useCallback(() => {
     setExternalCandidate(null);
+    setExternalIdentityCandidates([]);
     setLocalItem(null);
     setOcrCandidate(null);
     setOcrNutrients(nutrientDraft([]));
