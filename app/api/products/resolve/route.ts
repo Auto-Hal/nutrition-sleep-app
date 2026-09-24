@@ -4,6 +4,7 @@ import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
 import { isValidGtin, normalizeBarcode } from "@/lib/products/barcode";
 import { fetchOpenFoodFactsProduct } from "@/lib/products/open-food-facts";
+import { fetchYahooShoppingIdentity } from "@/lib/products/yahoo-shopping";
 
 export const dynamic = "force-dynamic";
 
@@ -101,14 +102,33 @@ export async function GET(request: Request) {
       candidate: external.candidate,
     });
   }
-  if (external.status === "not_found") {
+  const yahoo = await fetchYahooShoppingIdentity(barcode, draftId);
+  if (yahoo.status === "found") {
+    return NextResponse.json({
+      status: "external",
+      draft_id: draftId,
+      candidate: {
+        identity: yahoo.candidate,
+        nutrition: null,
+      },
+    });
+  }
+  if (yahoo.status === "ambiguous") {
+    return NextResponse.json({
+      status: "external_candidates",
+      draft_id: draftId,
+      provider: "yahoo_shopping",
+      candidates: yahoo.candidates,
+    });
+  }
+  if (yahoo.status === "not_found") {
     return NextResponse.json({ status: "not_found", fallback: "ocr", draft_id: draftId });
   }
 
   return NextResponse.json({
     status: "external_unavailable",
     draft_id: draftId,
-    reason: external.reason,
+    reason: `yahoo_${yahoo.reason}`,
     fallback: "ocr",
   });
 }

@@ -90,6 +90,12 @@ type LocalProductItem = {
 type ResolveResponse =
   | { status: "local"; draft_id: string; item: LocalProductItem }
   | { status: "external"; draft_id: string; candidate: ProductCandidateBundle }
+  | {
+      status: "external_candidates";
+      draft_id: string;
+      provider: "yahoo_shopping";
+      candidates: ProductIdentityCandidate[];
+    }
   | { status: "not_found"; draft_id: string; fallback: "ocr" }
   | { status: "external_unavailable"; draft_id: string; reason: string; fallback: "ocr" }
   | { error: string };
@@ -219,6 +225,7 @@ export function ProductIngestion({
   const [barcode, setBarcode] = useState("");
   const [itemType, setItemType] = useState<ProductItemType>("product");
   const [externalCandidate, setExternalCandidate] = useState<ProductCandidateBundle | null>(null);
+  const [externalIdentityCandidates, setExternalIdentityCandidates] = useState<ProductIdentityCandidate[]>([]);
   const [localItem, setLocalItem] = useState<LocalProductItem | null>(null);
   const [ocrCandidate, setOcrCandidate] = useState<OcrDraftCandidate | null>(null);
   const [ocrNutrients, setOcrNutrients] = useState<NutrientDraft>(() => nutrientDraft([]));
@@ -271,6 +278,7 @@ export function ProductIngestion({
   const clearConfirmedDraft = useCallback(() => {
     activeDraftRef.current = null;
     setExternalCandidate(null);
+    setExternalIdentityCandidates([]);
     setLocalItem(null);
     setOcrCandidate(null);
     setOcrNutrients(nutrientDraft([]));
@@ -335,6 +343,7 @@ export function ProductIngestion({
 
   const resetResolution = useCallback(() => {
     setExternalCandidate(null);
+    setExternalIdentityCandidates([]);
     setLocalItem(null);
     setOcrCandidate(null);
     setOcrNutrients(nutrientDraft([]));
@@ -396,6 +405,13 @@ export function ProductIngestion({
           setNeedsOcr(true);
           setMessage("商品名は外部DBで見つかりました。栄養値・表示基準量は現物ラベルから確認してください。");
         }
+        return;
+      }
+
+      if (result.status === "external_candidates") {
+        setExternalIdentityCandidates(result.candidates);
+        setNeedsOcr(false);
+        setMessage("同じJANに複数の商品identity候補があります。現物と一致する候補を選んでください。");
         return;
       }
 
@@ -805,6 +821,24 @@ export function ProductIngestion({
     }
   }
 
+  function selectExternalIdentity(candidate: ProductIdentityCandidate) {
+    const current = activeDraftRef.current;
+    if (
+      !current
+      || candidate.draft_id !== current.draft_id
+      || candidate.barcode !== current.barcode
+    ) {
+      setError("商品候補が切り替わっています。バーコードからやり直してください。");
+      return;
+    }
+
+    setExternalCandidate({ identity: candidate, nutrition: null });
+    setExternalIdentityCandidates([]);
+    setNeedsOcr(true);
+    setError(null);
+    setMessage("商品identityを選択しました。栄養成分表示を撮影して確定してください。");
+  }
+
   const markIdentityEdited = useCallback((next: Partial<Pick<OcrDraftCandidate, "name" | "brand" | "manufacturer">>) => {
     setOcrCandidate((current) => current ? {
       ...current,
@@ -999,6 +1033,38 @@ export function ProductIngestion({
               }}
             />
           </label>
+        </div>
+      )}
+
+      {externalIdentityCandidates.length > 0 && !externalCandidate && !ocrCandidate && (
+        <div className="stack">
+          <p className="muted">
+            Yahoo!ショッピングでexact JANが一致する候補が複数見つかりました。現物の商品名・ブランドと一致するものだけを選んでください。
+          </p>
+          {externalIdentityCandidates.map((candidate) => (
+            <div
+              className="catalog-row"
+              key={candidate.source.uri ?? `${candidate.name}:${candidate.brand ?? ""}`}
+            >
+              <div>
+                <strong>{candidate.name}</strong>
+                <div className="muted">{candidate.brand ?? "ブランド不明"} · Yahoo!ショッピング</div>
+                {candidate.source.uri && (
+                  <a href={candidate.source.uri} target="_blank" rel="noreferrer">
+                    Yahoo!ショッピングの商品ページで確認
+                  </a>
+                )}
+              </div>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => selectExternalIdentity(candidate)}
+              >
+                このidentityを選択
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
