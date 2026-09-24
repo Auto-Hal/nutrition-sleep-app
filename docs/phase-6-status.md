@@ -13,8 +13,10 @@ Updated: 2026-09-24
   - 6.4 Product provenance v2 + reliable Product writes
   - 6.5 Yahoo exact-JAN identity fallback
   - 6.6 Nutrition review-priority derivation
-- current batch: **6.7 Nutrition review-priority UX**
-- next batch: **6.8 consistent export**
+- completed / review-ready:
+  - 6.7 Nutrition review-priority UX
+  - 6.8 consistent export
+- next batch: **6.9 account deletion / lifecycle guard**
 - Production: untouched
 
 ## Phase 6.7
@@ -39,17 +41,26 @@ Application checks and Preview are green. A previous DB job failed before startu
 
 ## Phase 6.8
 
-Planned next from the verified 6.7 stack:
+Implemented on `phase/6.8-consistent-export` / PR #20:
 
-- versioned JSON;
-- one owner-scoped consistent DB snapshot;
+- versioned JSON v1;
+- one owner-scoped PostgreSQL statement snapshot;
 - explicit export allowlist;
-- Product v2 state;
+- Profile, Catalog, Product v2, Batch, Meal and immutable nutrient snapshots;
 - stored active/superseded normalized Sleep rows and stored child intervals;
-- provider connection metadata allowlist only;
-- secrets/internal provider identifiers excluded;
-- no partial-success export;
-- Settings download UI.
+- safe provider connection metadata only;
+- credentials, provider internal IDs, payload hashes, idempotency keys and mutation receipts excluded;
+- server-authoritative export; unsynced IndexedDB mutations explicitly excluded/warned;
+- Settings download UI;
+- owner-isolation / allowlist pgTAP;
+- route and UX contract tests.
+
+Automated acceptance:
+- lint / typecheck / unit / verify-env / build: PASS;
+- fresh DB replay / pgTAP: PASS;
+- Preview workflow: PASS.
+
+Real-wearable Sleep export acceptance remains deferred until Phase 5 device validation.
 
 ## Phase 5 relationship
 
