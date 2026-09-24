@@ -6,6 +6,8 @@ import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
 import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 import { dailyDisplayAmount } from "@/lib/nutrition/presentation";
+import { deriveNutritionReview } from "@/lib/nutrition/review-priority";
+import { NutritionReview } from "@/components/nutrition-review";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +100,11 @@ export default async function NutritionPage({
     range,
   );
 
+  const review = deriveNutritionReview({
+    range,
+    nutrients: analytics.nutrients,
+  });
+
   const selected = selectedCode
     ? analytics.nutrients.find((nutrient) => nutrient.code === selectedCode) ?? null
     : null;
@@ -132,6 +139,8 @@ export default async function NutritionPage({
       </nav>
 
       <div className="stack">
+        <NutritionReview review={review} />
+
         <section className="card">
           <div className="section-heading">
             <div>
