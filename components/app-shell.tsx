@@ -93,6 +93,11 @@ export function AppShell({
       </div>
       {children}
       <OutboxRuntime binding={binding} />
+      <div
+        dangerouslySetInnerHTML={{
+          __html: '<!-- Begin Yahoo! JAPAN Web Services Attribution Snippet --><span style="margin:15px 15px 15px 15px"><a href="https://developer.yahoo.co.jp/sitemap/">Webサービス by Yahoo! JAPAN</a></span><!-- End Yahoo! JAPAN Web Services Attribution Snippet -->',
+        }}
+      />
       <nav className="bottom-nav" aria-label="メインナビゲーション">
         {tabs.map((tab) => {
           const active = pathname === tab.href || (tab.href === "/settings" && pathname.startsWith("/settings"));
