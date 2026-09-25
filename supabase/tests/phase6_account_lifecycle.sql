@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(27);
 
 select has_table(
   'private',
@@ -46,16 +46,16 @@ select function_privs_are(
   'create_catalog_item',
   array['public.catalog_item_type','text','text','numeric','text','jsonb','text'],
   'authenticated',
-  array[]::text[],
-  'legacy Catalog create is no longer browser-callable'
+  array['EXECUTE'],
+  'legacy Catalog privilege remains compatible'
 );
 select function_privs_are(
   'public',
   'create_meal_entry',
   array['date','public.meal_type','timestamp with time zone','uuid','numeric','text','text'],
   'authenticated',
-  array[]::text[],
-  'legacy MealEntry create is no longer browser-callable'
+  array['EXECUTE'],
+  'legacy MealEntry privilege remains compatible'
 );
 select function_privs_are(
   'public',
@@ -66,8 +66,8 @@ select function_privs_are(
     'jsonb','text'
   ],
   'authenticated',
-  array[]::text[],
-  'legacy Product v2 helper is no longer browser-callable'
+  array['EXECUTE'],
+  'legacy Product v2 helper privilege remains compatible'
 );
 
 insert into auth.users (id, email)
@@ -95,6 +95,7 @@ insert into public.item_nutrients (
   '11111111-1111-4111-8111-111111111191',
   'energy',
   100,
+  'kcal',
   'user_entered',
   'user_verified'
 );
@@ -226,6 +227,23 @@ select throws_ok(
 
 select throws_ok(
   $test$
+    select public.create_catalog_item(
+      'ingredient'::public.catalog_item_type,
+      'Legacy blocked after deletion',
+      null,
+      1,
+      'serving',
+      '[]'::jsonb,
+      'phase69-legacy-after-guard'
+    )
+  $test$,
+  'PT409',
+  'account_deletion_in_progress',
+  'legacy mutation is blocked by the table lifecycle trigger'
+);
+
+select throws_ok(
+  $test$
     select public.create_meal_entry_v2(
       '69100000-0000-4000-8000-000000000021',
       1,
@@ -246,6 +264,8 @@ select throws_ok(
   'account_deletion_in_progress',
   'Phase 6.1 MealEntry mutation is also blocked'
 );
+
+select set_config('request.jwt.claim.sub', '', true);
 
 delete from auth.users
 where id='11111111-1111-4111-8111-111111111191';
