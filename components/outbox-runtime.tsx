@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   OUTBOX_DRAIN_EVENT,
   emitOutboxState,
 } from "@/lib/offline/outbox-events";
-import { resumePausedOutboxForBinding } from "@/lib/offline/outbox-idb";
+import {
+  listOutboxMutations,
+  resumePausedOutboxForBinding,
+} from "@/lib/offline/outbox-idb";
 import { drainOutbox } from "@/lib/offline/outbox-runtime";
 import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 
@@ -13,6 +16,18 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
   const running = useRef(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
+  const [incompatibleCount, setIncompatibleCount] = useState(0);
+
+  const refreshCompatibility = useCallback(async () => {
+    const rows = await listOutboxMutations(binding);
+    if (!mounted.current) return;
+    setIncompatibleCount(
+      rows.filter(
+        (row) => row.status === "blocked"
+          && row.last_error_code === "unsupported_contract_version",
+      ).length,
+    );
+  }, [binding]);
 
   const scheduleRetry = useCallback((nextRetryAt: number | null, run: () => void) => {
     if (retryTimer.current) clearTimeout(retryTimer.current);
@@ -28,6 +43,7 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
     try {
       const result = await drainOutbox(binding);
       for (const event of result.events) emitOutboxState(event);
+      await refreshCompatibility();
       if (!result.pausedAuth) {
         scheduleRetry(result.nextRetryAt, () => {
           void run();
@@ -41,11 +57,12 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
     } finally {
       running.current = false;
     }
-  }, [binding, scheduleRetry]);
+  }, [binding, refreshCompatibility, scheduleRetry]);
 
   useEffect(() => {
     mounted.current = true;
     void resumePausedOutboxForBinding(binding)
+      .then(() => refreshCompatibility())
       .then(() => run())
       .catch((error) => {
         console.warn(
@@ -72,7 +89,19 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
       window.removeEventListener(OUTBOX_DRAIN_EVENT, onDrain);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [binding, run]);
+  }, [binding, refreshCompatibility, run]);
 
-  return null;
+  if (incompatibleCount === 0) return null;
+
+  return (
+    <div className="pwa-update-banner" role="alert">
+      <div>
+        <strong>確認が必要な未同期記録があります</strong>
+        <p>
+          古いアプリ形式の未同期操作が{incompatibleCount}件あります。
+          自動変換や削除はせず、この端末に保持しています。
+        </p>
+      </div>
+    </div>
+  );
 }

@@ -17,7 +17,8 @@ Updated: 2026-09-25
   - 6.7 Nutrition review-priority UX
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
-- next batch: **6.10 PWA shell / version recovery**
+  - 6.10 PWA shell / version recovery
+- next batch: **6.11 full MVP acceptance**
 - Production: untouched
 
 ## Phase 6.7
@@ -113,6 +114,34 @@ as a 6.9 implementation blocker.
 Destructive acceptance against the real Preview user was intentionally **not** performed.
 The deletion Admin environment remains fail-closed unless its complete server-only configuration
 is present. Production remains untouched.
+
+## Phase 6.10
+
+Implemented on `phase/6.10-pwa-version-recovery` / PR #22:
+
+- static-shell-only Service Worker;
+- cold-start offline fallback page;
+- authenticated HTML/RSC/API responses are never cached/replayed as current health state;
+- `/api/*` and `/auth/*` excluded from Service Worker interception;
+- deployment version + outbox contract no-store endpoint;
+- update banner with explicit reload;
+- static update never clears IndexedDB;
+- incompatible outbox contract remains `blocked` and visible instead of being dropped or guessed;
+- live connectivity boundary hides previously rendered protected health UI while offline;
+- offline shell inspects only local unresolved-operation counts/statuses, not payload contents;
+- service-worker cache rotation deletes only app shell caches;
+- iOS standalone metadata and explicit Service Worker revalidation headers.
+
+Automated acceptance:
+
+- lint / typecheck / unit / verify-env / build: PASS;
+- fresh DB replay / pgTAP regression: PASS;
+- Preview workflow / deployment: PASS;
+- Vercel Preview deployment: READY;
+- no Phase 6.10 DB migration was required;
+- Production remains untouched.
+
+Device-specific PWA acceptance (Home Screen install, cold-start offline, update/reload with pending intent) remains part of Phase 6.11 full MVP acceptance.
 
 ## Phase 5 relationship
 
