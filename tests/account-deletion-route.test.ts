@@ -117,7 +117,7 @@ describe("POST /api/account/delete", () => {
     mocks.signOut.mockResolvedValue({ error: null });
     mocks.verifyAdmin.mockResolvedValue(undefined);
     mocks.query.mockResolvedValue({ rows: [{ count: 0 }], rowCount: 1 });
-    mocks.currentOp.mockResolvedValue(null);
+    mocks.currentOp.mockResolvedValue("69000000-0000-4000-8000-000000000001");
     mocks.getOp.mockResolvedValue(null);
     mocks.beginGuard.mockResolvedValue(undefined);
     mocks.setCookie.mockResolvedValue(undefined);
@@ -167,6 +167,15 @@ describe("POST /api/account/delete", () => {
     });
     const result = await POST(request({ password: "wrong", confirmation: "削除" }));
     expect(result.status).toBe(401);
+    expect(mocks.beginGuard).not.toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("requires a recovery operation cookie before creating the deletion guard", async () => {
+    mocks.currentOp.mockResolvedValueOnce(null);
+    const result = await POST(request({ password: "p", confirmation: "削除" }));
+    expect(result.status).toBe(409);
+    expect(await result.json()).toMatchObject({ error_code: "deletion_prepare_required" });
     expect(mocks.beginGuard).not.toHaveBeenCalled();
     expect(mocks.deleteUser).not.toHaveBeenCalled();
   });
