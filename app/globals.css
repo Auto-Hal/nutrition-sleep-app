@@ -148,3 +148,35 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
   .nutrition-review-item-head { flex-direction: column; }
   .nutrition-review-item-head .button { align-self: flex-start; }
 }
+
+
+/* Phase 6.10 PWA/version recovery */
+.pwa-update-banner {
+  position: fixed;
+  z-index: 1000;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  top: max(12px, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 10px 32px rgb(0 0 0 / 12%);
+}
+.pwa-update-banner p {
+  margin: 4px 0 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+@media (max-width: 520px) {
+  .pwa-update-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
