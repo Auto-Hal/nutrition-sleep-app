@@ -1,7 +1,7 @@
 # Phase 6 product-provider research
 
-Status: PRELIMINARY RESEARCH
-Updated: 2026-09-21
+Status: HISTORICAL RESEARCH — CANONICAL DECISIONS MOVED TO REVIEWED DESIGN
+Updated: 2026-09-23
 
 ## Goal
 
@@ -246,7 +246,7 @@ Phase 6 therefore needs a provider-neutral split between:
 
 This prevents an identity provider from being forced to fabricate serving basis or nutrients.
 
-Astra must approve this provider-contract/type split and the provenance transition before implementation.
+Astra subsequently approved the provider split with required corrections. The binding contract is now `docs/phase-6-product-provider-design.md`; this research text is retained only as decision history.
 
 ### Acceptance gate
 
@@ -273,6 +273,6 @@ Regardless of provider:
 - existing MealEntry nutrient snapshots remain immutable;
 - fallback to Cloud Vision OCR remains available.
 
-## Current next step
+## Current status
 
-Submit the selected layered provider architecture to Astra for contract/provenance review before implementation. After approval, implement the Yahoo identity adapter and run a real Japanese JAN acceptance set before adding any further provider.
+Astra review is complete. Binding corrections include additive Product provenance migration, draft/barcode binding, returned-JAN equality validation, and zero false automatic identity matches in the real acceptance set. See `docs/phase-6-product-provider-design.md`.

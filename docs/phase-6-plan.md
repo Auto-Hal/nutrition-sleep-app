@@ -1,7 +1,7 @@
 # Phase 6 plan — MVP Completion / Reliability
 
-Status: PLANNED  
-Updated: 2026-09-21
+Status: DESIGN APPROVED / IMPLEMENTATION AUTHORIZED  
+Updated: 2026-09-23
 
 ## Goal
 
@@ -12,17 +12,34 @@ Make Nutrition + Sleep dependable for daily use and complete the MVP with two pr
 
 Phase 6 is the earliest phase that may declare the overall MVP COMPLETE.
 
+## Design package
+
+Canonical Phase 6 design documents:
+- `docs/phase-6-architecture.md`
+- `docs/phase-6-reliability-design.md`
+- `docs/phase-6-product-provider-design.md`
+- `docs/phase-6-nutrition-priority-design.md`
+- `docs/phase-6-account-lifecycle-design.md`
+- `docs/phase-6-ux-design.md`
+- `docs/phase-6-acceptance-plan.md`
+- `docs/phase-6-implementation-plan.md`
+
+Astra review:
+- request: `docs/phase-6-astra-review-request.md`
+- result: `docs/phase-6-astra-review-result.md`
+
+Astra returned `PHASE 6 DESIGN APPROVED WITH REQUIRED CORRECTIONS`. The blocking corrections are applied, and Supervisor/user accepted the corrected design on 2026-09-23. Implementation is authorized subject to the per-batch dependency gates.
+
 ## Entry gate
 
-Phase 6 implementation starts after the Phase 5 merge boundary is clear. Work that changes high-risk semantics must receive Astra design review before implementation.
+Astra high-risk design review is complete and the required corrections are reflected in the canonical documents.
 
-Required Astra review topics:
-- offline queue / retry / conflict / idempotency;
-- account deletion and external-provider credential cleanup;
-- concrete Japanese product-provider contracts and source priority;
-- Nutrition Improvement Priority scoring / ranking semantics.
+Implementation is authorized. Each Phase 6 batch must:
+- follow `docs/phase-6-implementation-plan.md`;
+- pass its own acceptance gates;
+- keep Phase 5 merge/Production boundaries independently enforced.
 
-Normal UI, CRUD, tests, adapter implementation, and approved-design implementation remain Sol-first.
+Normal implementation remains Sol-first. Astra is not re-entered for approved routine implementation unless a new high-risk semantic change appears.
 
 ## Workstream A — Reliability / lifecycle
 
@@ -69,7 +86,7 @@ A candidate provider must be evaluated for:
 
 GS1 Japan services are a candidate, not an assumed implementation choice.
 
-Provider research and the current selected MVP strategy are tracked in `docs/phase-6-product-provider-research.md`. The selected direction is local Library → Open Food Facts nutrition candidate → Yahoo! Shopping exact-JAN identity fallback → Cloud Vision label OCR → user confirmation, pending Astra review.
+Provider research is tracked in `docs/phase-6-product-provider-research.md`. Astra accepted the layered direction with required safeguards: draft binding, additive provenance migration, returned-JAN equality validation, and zero false automatic identity matches in the acceptance set.
 
 ### Source / provenance rules
 
@@ -110,8 +127,8 @@ The model must remain compatible with 7 / 30 / 90-day analytics.
 ### Outputs
 
 At minimum:
-- nutrient-level adequacy / goal-attainment value where scientifically interpretable;
-- improvement-priority ordering;
+- factual DRI comparison values where scientifically interpretable;
+- record-review ordering rather than health-severity ranking;
 - direction of improvement when relevant: increase / reduce / target-range;
 - evidence coverage: evaluable days / selected period;
 - data quality/confidence shown separately from adequacy;
@@ -122,7 +139,7 @@ An optional overall nutrition-balance summary may exist, but it is secondary to 
 ### Binding DRI semantics
 
 #### EAR + RDA
-- continuous adequacy may be expressed toward RDA;
+- a capped display ratio may be expressed as `記録平均：RDAのX%` for stable comparable EAR/RDA;
 - EAR remains a distinct threshold and must not disappear inside a generic percentage;
 - values below EAR may rank as stronger improvement candidates than values between EAR and RDA;
 - do not call the score a deficiency probability.
@@ -151,7 +168,7 @@ An optional overall nutrition-balance summary may exist, but it is secondary to 
 - incomplete days must not lower an adequacy score as though no nutrient was consumed;
 - ranking must use only eligible/evaluable evidence;
 - always expose evaluable-day coverage separately;
-- low evidence coverage must reduce confidence or suppress ranking according to the approved design.
+- low evidence coverage follows the approved display thresholds: 3/7, 7/30, 14/90 evaluable days for 7/30/90-day review lists.
 
 ### Overall score constraints
 
