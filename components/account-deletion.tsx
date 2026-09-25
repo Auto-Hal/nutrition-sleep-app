@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { clearThisDeviceAfterAccountDeletion } from "@/lib/account/local-cleanup";
 
 type DeleteResult = {
@@ -21,7 +21,35 @@ export function AccountDeletion({ available }: { available: boolean }) {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
+  const [prepared, setPrepared] = useState(false);
   const [result, setResult] = useState<DeleteResult | null>(null);
+
+  useEffect(() => {
+    if (!available) return;
+    let active = true;
+    void fetch("/api/account/delete/prepare", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+      cache: "no-store",
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("prepare_failed");
+        if (active) setPrepared(true);
+      })
+      .catch(() => {
+        if (active) {
+          setPrepared(false);
+          setResult({
+            error: "削除準備を確認できませんでした。画面を再読み込みしてください。",
+            error_code: "deletion_prepare_failed",
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [available]);
 
   async function checkStatus() {
     setBusy(true);
@@ -125,12 +153,15 @@ export function AccountDeletion({ available }: { available: boolean }) {
             この環境ではサーバー側の削除用Admin設定がまだ有効化されていません。
           </p>
         )}
+        {available && !prepared && !result?.error && (
+          <p className="muted">削除結果を安全に再確認できるよう準備しています。</p>
+        )}
 
         <div className="form-actions">
           <button
             className="button"
             type="submit"
-            disabled={!available || busy || !password || confirmation !== "削除"}
+            disabled={!available || !prepared || busy || !password || confirmation !== "削除"}
           >
             {busy ? "処理中…" : "アカウントを削除"}
           </button>
