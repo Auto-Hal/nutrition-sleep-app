@@ -106,6 +106,7 @@ describe("POST /api/account/delete", () => {
       retryAfterSeconds: 900,
       limited: false,
     });
+    mocks.clearRate.mockReset().mockResolvedValue(undefined);
     mocks.signIn.mockResolvedValue({
       data: {
         user: { id: userId },
