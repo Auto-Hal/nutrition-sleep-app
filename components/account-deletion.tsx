@@ -17,7 +17,7 @@ function providerWarning(status: string | null | undefined) {
   return null;
 }
 
-export function AccountDeletion() {
+export function AccountDeletion({ available }: { available: boolean }) {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,11 +120,17 @@ export function AccountDeletion() {
           />
         </label>
 
+        {!available && (
+          <p className="muted">
+            この環境ではサーバー側の削除用Admin設定がまだ有効化されていません。
+          </p>
+        )}
+
         <div className="form-actions">
           <button
             className="button"
             type="submit"
-            disabled={busy || !password || confirmation !== "削除"}
+            disabled={!available || busy || !password || confirmation !== "削除"}
           >
             {busy ? "処理中…" : "アカウントを削除"}
           </button>
