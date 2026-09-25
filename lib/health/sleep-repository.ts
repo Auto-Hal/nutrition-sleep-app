@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 
-import { query, withTransaction } from "@/lib/db";
+import { query } from "@/lib/db";
+import { withAccountLifecycleWriteGuard } from "@/lib/account/lifecycle";
 import { requiredServerEnv } from "@/lib/env";
 import type { NormalizedSleepSession } from "@/lib/health/google-health-types";
 
@@ -164,7 +165,7 @@ export async function replaceGoogleHealthSleepWindow(options: {
 }) {
   assertAllowedUser(options.userId);
 
-  return withTransaction(async (client) => {
+  return withAccountLifecycleWriteGuard(options.userId, async (client) => {
     const providerNames = [...new Set(options.sessions.map((session) => session.providerResourceName))];
     let changedSessions = 0;
 
@@ -209,7 +210,8 @@ export async function replaceGoogleHealthSleepWindow(options: {
 
 export async function recordGoogleHealthSyncFailure(userId: string, errorCode: string) {
   assertAllowedUser(userId);
-  await query(
+  await withAccountLifecycleWriteGuard(userId, async (client) => {
+    await client.query(
     `update public.health_provider_connections
         set last_sync_attempt_at = now(),
             last_sync_error_code = left($2, 128),
@@ -219,5 +221,6 @@ export async function recordGoogleHealthSyncFailure(userId: string, errorCode: s
             end)::public.health_connection_status
       where user_id = $1 and provider = 'google_health'`,
     [userId, errorCode],
-  );
+    );
+  });
 }
