@@ -75,13 +75,13 @@ const userId = "00000000-0000-4000-8000-000000000001";
 
 function request(
   body: unknown,
-  origin: string | undefined = "https://preview.example",
+  origin: string | null = "https://preview.example",
 ) {
   const headers = new Headers({
     "content-type": "application/json",
     "x-forwarded-for": "203.0.113.22",
   });
-  if (origin !== undefined) headers.set("origin", origin);
+  if (origin !== null) headers.set("origin", origin);
   return new Request("https://preview.example/api/account/delete", {
     method: "POST",
     headers,
@@ -122,6 +122,7 @@ describe("POST /api/account/delete", () => {
     mocks.beginGuard.mockResolvedValue(undefined);
     mocks.setCookie.mockResolvedValue(undefined);
     mocks.loadCreds.mockResolvedValue({ refreshToken: "google-refresh" });
+    mocks.disconnectAfterRevoke.mockResolvedValue(undefined);
     mocks.revokeGoogle.mockResolvedValue("success");
     mocks.updateOp.mockResolvedValue(undefined);
     mocks.deleteUser.mockResolvedValue(undefined);
@@ -130,7 +131,7 @@ describe("POST /api/account/delete", () => {
   });
 
   it("fails closed on missing or mismatched Origin before destructive work", async () => {
-    const absent = await POST(request({ password: "p", confirmation: "削除" }, undefined));
+    const absent = await POST(request({ password: "p", confirmation: "削除" }, null));
     const bad = await POST(request({ password: "p", confirmation: "削除" }, "https://attacker.example"));
     expect(absent.status).toBe(403);
     expect(bad.status).toBe(403);
