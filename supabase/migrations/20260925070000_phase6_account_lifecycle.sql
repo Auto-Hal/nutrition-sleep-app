@@ -783,55 +783,92 @@ begin
 end;
 $$;
 
--- Legacy write RPCs are no longer browser-callable. Reliable Phase 6 wrappers
--- execute their underlying helpers as function owner where required.
-revoke execute on function public.upsert_user_profile(
-  integer, date, text, numeric, numeric, date, text, text, text
-) from authenticated;
-revoke execute on function public.create_catalog_item(
-  public.catalog_item_type, text, text, numeric, text, jsonb, text
-) from authenticated;
-revoke execute on function public.update_catalog_item(
-  uuid, integer, text, text, numeric, text, boolean, jsonb
-) from authenticated;
-revoke execute on function public.set_catalog_item_active(
-  uuid, integer, boolean
-) from authenticated;
-revoke execute on function public.create_batch(
-  text, text, numeric, text, jsonb, text
-) from authenticated;
-revoke execute on function public.update_batch(
-  uuid, integer, text, text, numeric, text, jsonb
-) from authenticated;
-revoke execute on function public.recalculate_batch_nutrients(uuid)
-  from authenticated;
-revoke execute on function public.create_meal_entry(
-  date, public.meal_type, timestamptz, uuid, numeric, text, text
-) from authenticated;
-revoke execute on function public.set_meal_state(
-  uuid, integer, public.meal_state, timestamptz
-) from authenticated;
-revoke execute on function public.void_meal_entry(uuid)
-  from authenticated;
-revoke execute on function public.create_skipped_meal(
-  date, public.meal_type
-) from authenticated;
-revoke execute on function public.create_product_item(
-  public.catalog_item_type, text, text, text, numeric, text, text, numeric,
-  text, public.product_source_type, text, text, timestamptz, jsonb, text
-) from authenticated;
-revoke execute on function public.update_product_item(
-  uuid, integer, text, text, numeric, text, boolean, text, numeric, text,
-  public.product_source_type, text, text, timestamptz, jsonb
-) from authenticated;
-revoke execute on function public.create_product_item_v2(
-  public.catalog_item_type, text, text, text, numeric, text, text, numeric,
-  text, public.product_identity_source_type, text, text, timestamptz, jsonb, text
-) from authenticated;
-revoke execute on function public.update_product_item_v2(
-  uuid, integer, text, text, numeric, text, boolean, text, numeric, text,
-  public.product_identity_source_type, text, text, timestamptz, jsonb, boolean, boolean
-) from authenticated;
+-- Preserve the established legacy RPC privilege contract for older clients, but
+-- force every authenticated write to a user-owned public table through the same
+-- lifecycle shared lock. auth.uid() stays available even when an RPC itself is
+-- SECURITY DEFINER; Auth-admin/cascade work has no end-user JWT and is not blocked.
+create or replace function private.phase6_guard_authenticated_user_write()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  request_user_id uuid := (select auth.uid());
+  row_user_id uuid;
+begin
+  if request_user_id is null then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
+  row_user_id := case
+    when tg_op = 'DELETE' then nullif(pg_catalog.to_jsonb(old)->>'user_id', '')::uuid
+    else nullif(pg_catalog.to_jsonb(new)->>'user_id', '')::uuid
+  end;
+
+  if row_user_id is null then
+    perform private.phase6_raise_http(422, 'invalid_user_id');
+  end if;
+
+  perform private.phase6_acquire_write_guard(row_user_id);
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+
+revoke all on function private.phase6_guard_authenticated_user_write()
+  from public, anon, authenticated;
+
+create trigger phase6_lifecycle_guard_user_profiles
+before insert or update or delete on public.user_profiles
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_catalog_items
+before insert or update or delete on public.catalog_items
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_item_nutrients
+before insert or update or delete on public.item_nutrients
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_batches
+before insert or update or delete on public.batches
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_batch_components
+before insert or update or delete on public.batch_components
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_meals
+before insert or update or delete on public.meals
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_meal_entries
+before insert or update or delete on public.meal_entries
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_meal_entry_nutrient_snapshots
+before insert or update or delete on public.meal_entry_nutrient_snapshots
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_products
+before insert or update or delete on public.products
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_health_provider_connections
+before insert or update or delete on public.health_provider_connections
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_sleep_sessions
+before insert or update or delete on public.sleep_sessions
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_sleep_stage_intervals
+before insert or update or delete on public.sleep_stage_intervals
+for each row execute function private.phase6_guard_authenticated_user_write();
+
+create trigger phase6_lifecycle_guard_sleep_out_of_bed_segments
+before insert or update or delete on public.sleep_out_of_bed_segments
+for each row execute function private.phase6_guard_authenticated_user_write();
 
 comment on function private.phase6_acquire_write_guard(uuid) is
   'Acquire the Phase 6.9 shared user lifecycle transaction lock and reject writes after deletion guard activation.';
