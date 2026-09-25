@@ -10,12 +10,12 @@ type RuntimeVersion = {
 
 export function PwaRuntime({ initialBuildVersion }: { initialBuildVersion: string }) {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const checkingRef = useRef(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [checking, setChecking] = useState(false);
 
   const checkVersion = useCallback(async () => {
-    if (!navigator.onLine || checking) return;
-    setChecking(true);
+    if (!navigator.onLine || checkingRef.current) return;
+    checkingRef.current = true;
     try {
       const response = await fetch("/api/app-version", {
         cache: "no-store",
@@ -32,9 +32,9 @@ export function PwaRuntime({ initialBuildVersion }: { initialBuildVersion: strin
     } catch {
       // Offline/temporary version-check failure must not affect the outbox.
     } finally {
-      setChecking(false);
+      checkingRef.current = false;
     }
-  }, [checking, initialBuildVersion]);
+  }, [initialBuildVersion]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
