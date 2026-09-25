@@ -4,7 +4,7 @@
 
 - Phase 1–4.5 COMPLETE
 - CR-001 APPROVED — 2026-09-16
-- **Phase 5 IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE**
+- **Phase 5 REAL-WEARABLE PREVIEW ACCEPTANCE COMPLETE / READY FOR REVIEW**
 - implementation branch: `phase/5-sleep-foundation`
 
 ## Binding provider contract
@@ -163,11 +163,31 @@ Real-runtime defects found and corrected during acceptance:
 - provider failure status persistence explicitly casts the CASE result to `public.health_connection_status` so PostgreSQL does not reject text assignment to the enum column;
 - regression coverage protects all three real-runtime fixes.
 
-Current transient observation:
-- one protected-page request emitted `JWT issued at future` and then recovered without intervention;
+Historical transient observation:
+- one protected-page request emitted `JWT issued at future` during earlier acceptance and then recovered without intervention;
+- it did not recur during the 2026-09-25 real-wearable acceptance window;
 - no auth semantics were changed; investigate only if it recurs.
 
-## OAuth / retry contract hardening
+## Real wearable acceptance — 2026-09-25
+
+Completed in the latest Phase 6.8 Preview using a real wearable observation. Public project records intentionally omit personal sleep measurements.
+
+Verified:
+- a real Google Health STAGES session was ingested into Preview;
+- stage intervals were persisted across awake / light / deep / REM categories;
+- interval ordering is valid, sequential, non-overlapping, and covers the stored session span;
+- stage-duration totals are internally consistent with the normalized sleep summary;
+- opening Sleep triggered the stale-on-open sync path, followed by a successful manual recent sync;
+- repeated reconciliation did not create a duplicate session or rewrite an unchanged observation;
+- provider connection remained connected with the exact sleep-readonly scope and no sync error;
+- 7 / 30 / 90-day analytics preserve unobserved civil dates as missing rather than zero;
+- no runtime errors occurred during the real-data sync;
+- the earlier transient `JWT issued at future` observation did not recur during this acceptance window;
+- the user successfully initiated the real Preview sync from the Sleep UI.
+
+Phase 6.8 subsequently verified that this real normalized Sleep observation and its stage intervals are included in the versioned owner export while provider-internal identifiers, token material, payload hashes, and mutation receipts remain excluded.
+
+
 
 CR-001 re-review corrections now implemented:
 - normal first authorization uses offline access without forcing `prompt=consent`;
