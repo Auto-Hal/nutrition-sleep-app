@@ -1,6 +1,6 @@
 # Nutrition / Sleep App Roadmap
 
-Updated: 2026-09-15
+Updated: 2026-09-21
 
 This document is the implementation roadmap after Phase 3 completion. It does not replace the MVP requirements; it records the delivery order, phase boundaries, and acceptance gates.
 
@@ -23,8 +23,8 @@ This document is the implementation roadmap after Phase 3 completion. It does no
 | Phase 3 | COMPLETE | Product ingestion, barcode, Open Food Facts, Google Cloud Vision OCR, Product Library, source priority |
 | Phase 4 | COMPLETE | Nutrition analytics and Japanese DRIs 2025 |
 | Phase 4.5 | COMPLETE | Interaction performance and UX hardening before Sleep/provider complexity |
-| Phase 5 | READY TO START / CR-001 APPROVED | Sleep domain and current official health-provider integration |
-| Phase 6 | PLANNED | Offline/reliability/export/account lifecycle and full MVP acceptance |
+| Phase 5 | IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE | Sleep domain and Google Health integration (CR-001 approved) |
+| Phase 6 | PLANNED | Reliability, Japanese product coverage, nutrition improvement priorities, export/account lifecycle, and full MVP acceptance |
 
 ## Phase 4 — Nutrition Analytics
 
@@ -98,50 +98,93 @@ Final Production verification completed after quota recovery:
 - `/login` HTTP 200;
 - relevant runtime errors: 0.
 
-Phase 5 is now the next phase, with CR-001 still mandatory before implementation.
+Phase 5 implementation is active under the approved CR-001 contract.
 
 Visual redesign (colors, card layout, typography and full design-system polish) remains Phase 6.
 
 ## Phase 5 — Sleep / Health Provider
 
-Goal: import Fitbit-origin sleep through the current supported official API path and visualize duration, regularity, continuity, and stages.
+**Status: IN PROGRESS / REAL-DATA & DEVICE ACCEPTANCE GATE**
+
+Goal: import sleep through Google Health API v4 and visualize duration, regularity, continuity, and stages without converting missing data into zero.
 
 CR-001 was approved on 2026-09-16. The binding provider contract is documented in `docs/cr-001-google-health-provider.md`. The old Fitbit Web API Sleep v1.2 requirement is superseded and must not be implemented.
 
-Before implementation:
-- verify current official Google/Fitbit health API availability;
-- scopes, app registration, user-account requirements and review requirements;
-- sleep session/stage schema and corrections;
-- OAuth return flow on iPhone Safari/PWA;
-- quota/pagination and recent-history access.
-
-Planned capabilities:
-
+Implemented:
 - provider-neutral connection model and adapter boundary;
-- OAuth consent/callback/revoke/expiry/re-consent;
+- Google Authorization Code OAuth with sleep-readonly scope only;
 - server-side encrypted provider credentials/tokens;
-- idempotent SleepSession upsert;
-- sleep start/end, total sleep, time in bed;
-- awake/light/deep/REM intervals when officially available;
-- daily hypnogram;
-- morning refresh of recent 3 days;
+- Google Health identity capture;
+- connect / disconnect / forced reauthorization lifecycle;
+- authoritative `reconcile` ingestion with pagination and bounded retry;
+- normalized sleep sessions, stages, and out-of-bed segments;
+- correction-aware updates and authoritative-window supersession;
+- recent 3-day correction sync;
+- initial 14-day sync plus resumable 90-day backfill;
+- stale-on-open refresh after 6 hours;
+- server-only morning-sync endpoint protected by `CRON_SECRET`;
 - 7 / 30 / 90 day analytics;
-- duration / regularity / continuity as top-level views;
-- missing sync is unknown, never zero sleep;
-- no custom 100-point sleep score.
+- missing sync remains unknown, never zero sleep;
+- no custom sleep score or diagnostic language.
+
+Real Preview acceptance completed:
+- real OAuth connection and exact sleep-readonly scope;
+- encrypted credential persistence;
+- initial sync and resumable 90-day backfill;
+- completed-backfill no-restart behavior;
+- disconnect → reconnect;
+- stale-on-open automatic sync;
+- Google grant revocation → `REAUTH_REQUIRED` → forced consent → connected recovery;
+- forced-reauth recovery backfill completed again to the 90-day target without sync errors;
+- regression coverage for real-runtime PostgreSQL civil-date handling, Google OAuth revoked-grant error shapes, and provider-status enum persistence.
+
+Remaining Phase 5 gates:
+- real wearable Sleep/STAGES observations and iPhone/iPad acceptance;
+- latest-head fresh-from-zero migration replay / pgTAP PASS after GitHub Actions runner recovery;
+- PR Ready → merge;
+- Production Phase 5 migrations, dedicated Production Google OAuth configuration, provider secrets and `CRON_SECRET`;
+- Production deploy/runtime/morning-sync verification.
+
+Production Sleep remains untouched until these gates are satisfied.
 
 ## Phase 6 — MVP Completion / Reliability
 
-Goal: make the complete Nutrition + Sleep app dependable for daily use.
+Goal: make the complete Nutrition + Sleep app dependable for daily use and make the core Nutrition workflow actionable enough to support daily decisions.
 
 Planned capabilities:
 
+### Reliability / lifecycle
 - offline-aware writes and explicit pending/failed/synced states;
 - idempotent retry and conflict handling;
 - PWA recovery after network loss / stale client / version change;
 - export of user-owned nutrition and sleep data;
 - account/data deletion design and execution;
-- token/provider cleanup on deletion;
+- token/provider cleanup on deletion.
+
+### Japanese product database coverage
+- expand barcode product resolution beyond Open Food Facts so barcode entry is practically useful for Japanese commercial products;
+- preserve the provider-adapter boundary and local-first resolution;
+- candidate providers include GS1 Japan services and other sources only after API terms, pricing, nutrition-field coverage, and commercial-use conditions are verified;
+- external provider data remains unverified until user confirmation;
+- user-verified label data must outrank lower-priority external sources;
+- unknown nutrient values remain unknown and are never filled with zero;
+- acceptance must measure real barcode hit rate / fallback behavior on representative Japanese products, not only scanner decoding.
+
+### Nutrition Improvement Priority
+- add nutrient-level adequacy / goal-attainment values that make improvement opportunities visible at a glance;
+- provide a ranked improvement-priority view, defaulting to the 30-day period while remaining compatible with 7 / 30 / 90-day analytics;
+- preserve EAR / RDA / AI / DG / UL semantics rather than reducing every reference to simple intake ÷ target;
+- EAR/RDA nutrients may expose continuous adequacy toward RDA while retaining the EAR threshold as a distinct risk-relevant boundary;
+- AI-only nutrients must not translate AI-under-target into a numeric deficiency claim;
+- DG nutrients must support distance from the target range in both low and high directions;
+- UL exceedance must be presented separately as an excess/safety warning, not blended into an adequacy score;
+- energy remains contextual/reference-only and is not folded into a simplistic deficiency score;
+- show data confidence / evaluable-day coverage separately from adequacy so missing records never depress a nutrition score as if they were zero intake;
+- allow each priority item to drill into the existing nutrient → day → meal → item evidence path;
+- an optional overall nutrition-balance summary may be shown, but the primary UX must answer “what should I improve first?” rather than center a single score;
+- no score may be described as a medical diagnosis, deficiency probability, or disease-risk estimate.
+
+### Final acceptance
 - full Production E2E;
 - final security/advisor review;
 - final iPhone/iPad acceptance;
@@ -149,23 +192,14 @@ Planned capabilities:
 
 Phase 6 is the earliest phase that may declare the overall MVP COMPLETE.
 
+Before Phase 6 implementation, Astra design review is required for:
+- offline / retry / conflict / account-deletion semantics;
+- product-provider contract and source-priority changes when a concrete Japanese database provider is selected;
+- Nutrition Improvement Priority scoring semantics, especially EAR/RDA/AI/DG/UL mapping, confidence handling, and any overall-score aggregation.
+
 ## Post-MVP / independent backlog
 
 These items are valuable but do not block the next phase unless promoted by a separate decision.
-
-### External product database coverage
-
-Current standard path:
-local Library → Open Food Facts → Cloud Vision OCR → user confirmation.
-
-Open Food Facts coverage for Japanese products is limited. Candidate future providers include GS1 Japan services and any other provider whose API terms, pricing, nutrition coverage, and commercial-use conditions are acceptable.
-
-Provider expansion must preserve:
-- local-first resolution;
-- provider adapters;
-- external values remain unverified;
-- user-verified label data outranks lower-priority external data;
-- unknown remains unknown.
 
 ### Native iOS path
 
@@ -177,3 +211,14 @@ If the product later becomes native/hybrid iOS:
 ### Body measurement history
 
 Profile currently stores reference weight, not a measurement history. BodyMeasurement/trend support is outside the current MVP roadmap unless explicitly promoted.
+
+
+## Phase 5 current gate — Real data / device acceptance
+
+Dedicated Preview Google Cloud OAuth and Preview provider secrets are configured and have passed real OAuth, sync, disconnect/reconnect, stale-on-open, and forced-reauth acceptance.
+
+The remaining external dependency is real Google Health Sleep data from supported hardware so STAGES and observed-sleep presentation can be accepted on iPhone/iPad.
+
+GitHub Actions runner execution is restored after the repository visibility change. Latest-head application checks and the formal fresh-from-zero Supabase replay / pgTAP have passed. The remaining external dependency is real wearable Sleep/STAGES data and device acceptance.
+
+Production remains untouched.

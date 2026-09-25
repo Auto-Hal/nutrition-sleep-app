@@ -1,0 +1,69 @@
+{
+  "dataPointName": "users/test-user/dataTypes/sleep/dataPoints/test-night",
+  "sleep": {
+    "interval": {
+      "startTime": "2026-09-15T14:30:00Z",
+      "startUtcOffset": "32400s",
+      "endTime": "2026-09-15T22:15:00Z",
+      "endUtcOffset": "32400s",
+      "civilEndTime": {
+        "date": { "year": 2026, "month": 9, "day": 16 }
+      }
+    },
+    "type": "STAGES",
+    "stages": [
+      {
+        "startTime": "2026-09-15T14:30:00Z",
+        "startUtcOffset": "32400s",
+        "endTime": "2026-09-15T15:00:00Z",
+        "endUtcOffset": "32400s",
+        "type": "AWAKE"
+      },
+      {
+        "startTime": "2026-09-15T15:00:00Z",
+        "startUtcOffset": "32400s",
+        "endTime": "2026-09-15T17:00:00Z",
+        "endUtcOffset": "32400s",
+        "type": "LIGHT"
+      },
+      {
+        "startTime": "2026-09-15T17:00:00Z",
+        "startUtcOffset": "32400s",
+        "endTime": "2026-09-15T18:30:00Z",
+        "endUtcOffset": "32400s",
+        "type": "DEEP"
+      },
+      {
+        "startTime": "2026-09-15T18:30:00Z",
+        "startUtcOffset": "32400s",
+        "endTime": "2026-09-15T22:15:00Z",
+        "endUtcOffset": "32400s",
+        "type": "REM"
+      }
+    ],
+    "outOfBedSegments": [
+      {
+        "startTime": "2026-09-15T19:10:00Z",
+        "startUtcOffset": "32400s",
+        "endTime": "2026-09-15T19:13:00Z",
+        "endUtcOffset": "32400s"
+      }
+    ],
+    "metadata": {
+      "stagesStatus": "SUCCEEDED",
+      "processed": true,
+      "nap": false,
+      "manuallyEdited": false,
+      "externalId": "fixture-night"
+    },
+    "summary": {
+      "minutesInSleepPeriod": "465",
+      "minutesAfterWakeUp": "0",
+      "minutesToFallAsleep": "12",
+      "minutesAsleep": "423",
+      "minutesAwake": "42"
+    },
+    "createTime": "2026-09-15T22:20:00Z",
+    "updateTime": "2026-09-15T22:21:00Z"
+  }
+}
