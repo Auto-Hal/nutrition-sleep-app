@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import { withAccountLifecycleWriteGuard } from "@/lib/account/lifecycle";
 import { requiredServerEnv } from "@/lib/env";
 
 type BackfillRow = {
@@ -17,12 +18,12 @@ function assertAllowedUser(userId: string) {
 
 export async function markInitialRecentSleepSyncComplete(userId: string) {
   assertAllowedUser(userId);
-  const result = await query(
+  const result = await withAccountLifecycleWriteGuard(userId, (client) => client.query(
     `update public.health_provider_connections
         set initial_recent_sync_completed_at = coalesce(initial_recent_sync_completed_at, now())
       where user_id = $1 and provider = 'google_health'`,
     [userId],
-  );
+  ));
   if (result.rowCount !== 1) throw new Error("Google Health connection is not initialized");
 }
 
@@ -32,7 +33,7 @@ export async function initializeGoogleHealthBackfill(
   cursorEndDate: string,
 ) {
   assertAllowedUser(userId);
-  const initialized = await query<BackfillRow>(
+  const initialized = await withAccountLifecycleWriteGuard(userId, (client) => client.query<BackfillRow>(
     `update public.health_provider_connections
         set backfill_target_start_date = $2::date,
             backfill_cursor_end_date = $3::date,
@@ -46,7 +47,7 @@ export async function initializeGoogleHealthBackfill(
                 backfill_cursor_end_date::text as backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, targetStartDate, cursorEndDate],
-  );
+  ));
   if (initialized.rows[0]) return initialized.rows[0];
 
   const existing = await query<BackfillRow>(
@@ -91,7 +92,7 @@ export async function advanceGoogleHealthBackfill(
   targetStartDate: string,
 ) {
   assertAllowedUser(userId);
-  const result = await query<BackfillRow>(
+  const result = await withAccountLifecycleWriteGuard(userId, (client) => client.query<BackfillRow>(
     `update public.health_provider_connections
         set backfill_cursor_end_date = $3::date,
             backfill_completed_at = case
@@ -108,7 +109,7 @@ export async function advanceGoogleHealthBackfill(
                 backfill_cursor_end_date::text as backfill_cursor_end_date,
                 backfill_started_at, backfill_completed_at`,
     [userId, expectedCursorEndDate, newCursorEndDate, targetStartDate],
-  );
+  ));
   const row = result.rows[0];
   if (!row) throw new Error("Google Health backfill cursor changed concurrently");
   return row;
