@@ -145,6 +145,15 @@ begin
 
   if existing_guard.user_id is not null then
     if existing_guard.deletion_operation_id = p_operation_id then
+      update private.account_deletion_operations
+      set expires_at = pg_catalog.now() + interval '24 hours',
+          updated_at = pg_catalog.now()
+      where operation_id = p_operation_id
+        and user_fingerprint = p_user_fingerprint
+        and environment_id = pg_catalog.btrim(p_environment_id);
+      if not found then
+        perform private.phase6_raise_http(409, 'deletion_operation_mismatch');
+      end if;
       return;
     end if;
     perform private.phase6_raise_http(409, 'account_deletion_in_progress');
