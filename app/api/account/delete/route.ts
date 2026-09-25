@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -26,7 +25,6 @@ import {
   beginAccountDeletionGuard,
   currentDeletionOperationId,
   getAccountDeletionOperation,
-  setDeletionOperationCookie,
   updateAccountDeletionOperation,
 } from "@/lib/account/lifecycle";
 import {
@@ -198,19 +196,30 @@ export async function POST(request: Request) {
     );
   }
 
-  let operationId = await currentDeletionOperationId();
-  let previous = operationId
-    ? await getAccountDeletionOperation(operationId).catch(() => null)
-    : null;
+  const operationId = await currentDeletionOperationId();
+  if (!operationId) {
+    return response(
+      {
+        error: "削除準備を確認できませんでした。画面を再読み込みして再試行してください。",
+        error_code: "deletion_prepare_required",
+      },
+      409,
+    );
+  }
 
-  if (!operationId || !previous || previous.status === "deleted") {
-    operationId = randomUUID();
-    previous = null;
+  const previous = await getAccountDeletionOperation(operationId).catch(() => null);
+  if (previous?.status === "deleted") {
+    return response(
+      {
+        status: "deleted",
+        provider_revoke_status: previous.provider_revoke_status,
+      },
+      200,
+    );
   }
 
   try {
     await beginAccountDeletionGuard(session.userId, operationId);
-    await setDeletionOperationCookie(operationId);
   } catch {
     return response(
       {
