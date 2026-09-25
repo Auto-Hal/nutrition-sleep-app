@@ -60,7 +60,19 @@ Automated acceptance:
 - fresh DB replay / pgTAP: PASS;
 - Preview workflow: PASS.
 
-Real-wearable Sleep export acceptance remains deferred until Phase 5 device validation.
+Real-wearable Sleep export acceptance passed on 2026-09-25 after Phase 5 device validation. Public status records intentionally omit personal sleep measurements.
+
+## Phase 6.8 real-wearable export acceptance
+
+Completed on 2026-09-25 in Hosted Preview:
+
+- real normalized STAGES Sleep data is present;
+- stored stage intervals are included in the export;
+- exported Sleep/session counts match the persisted owner-scoped rows;
+- stored normalized summary fields match the persisted observation;
+- provider resource/external IDs, payload hashes, health-user identifiers, OAuth token material and mutation receipts remain absent;
+- `sleep_history_scope` correctly states that the export contains stored normalized rows, not complete provider revision history;
+- Production remains untouched.
 
 ## Phase 5 relationship
 
