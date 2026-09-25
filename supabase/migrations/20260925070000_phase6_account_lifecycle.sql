@@ -846,10 +846,6 @@ create trigger phase6_lifecycle_guard_meal_entries
 before insert or update or delete on public.meal_entries
 for each row execute function private.phase6_guard_authenticated_user_write();
 
-create trigger phase6_lifecycle_guard_meal_entry_nutrient_snapshots
-before insert or update or delete on public.meal_entry_nutrient_snapshots
-for each row execute function private.phase6_guard_authenticated_user_write();
-
 create trigger phase6_lifecycle_guard_products
 before insert or update or delete on public.products
 for each row execute function private.phase6_guard_authenticated_user_write();
