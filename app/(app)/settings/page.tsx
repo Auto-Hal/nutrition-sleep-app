@@ -3,6 +3,8 @@ import { ProfileForm } from "@/components/profile-form";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { DataExport } from "@/components/data-export";
+import { AccountDeletion } from "@/components/account-deletion";
+import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 
@@ -37,6 +39,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             ownerUserId={session?.userId ?? ""}
             environmentId={appEnvironmentId()}
           />
+          <AccountDeletion available={Boolean(accountDeletionAdminEnv())} />
         </div>
       )}
     </main>

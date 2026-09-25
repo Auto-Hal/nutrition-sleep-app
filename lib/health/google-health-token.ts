@@ -163,3 +163,60 @@ export async function revokeGoogleHealthGrantBestEffort(refreshToken: string | n
     // Local credential deletion remains authoritative for this app.
   }
 }
+
+
+export type GoogleHealthDeletionRevokeStatus =
+  | "not_connected"
+  | "success"
+  | "already_invalid"
+  | "timeout"
+  | "failed";
+
+export async function revokeGoogleHealthGrantForDeletion(
+  refreshToken: string | null,
+  options: {
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<GoogleHealthDeletionRevokeStatus> {
+  if (!refreshToken) return "not_connected";
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? 5_000,
+  );
+
+  try {
+    const response = await (options.fetchImpl ?? fetch)(
+      "https://oauth2.googleapis.com/revoke",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          accept: "application/json",
+        },
+        body: new URLSearchParams({ token: refreshToken }).toString(),
+        signal: controller.signal,
+        cache: "no-store",
+      },
+    );
+
+    if (response.ok) return "success";
+    if (response.status === 400) {
+      const body = (await response.text().catch(() => "")).slice(0, 256);
+      if (/invalid_(token|grant)/i.test(body)) return "already_invalid";
+    }
+    return "failed";
+  } catch (error) {
+    if (
+      error instanceof DOMException
+      && error.name === "AbortError"
+    ) {
+      return "timeout";
+    }
+    return "failed";
+  } finally {
+    clearTimeout(timeout);
+  }
+}

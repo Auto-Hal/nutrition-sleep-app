@@ -1,6 +1,6 @@
 # Phase 6 status
 
-Updated: 2026-09-24
+Updated: 2026-09-25
 
 ## Current state
 
@@ -16,7 +16,8 @@ Updated: 2026-09-24
 - completed / review-ready:
   - 6.7 Nutrition review-priority UX
   - 6.8 consistent export
-- next batch: **6.9 account deletion / lifecycle guard**
+  - 6.9 account deletion / lifecycle guard
+- next batch: **6.10 PWA shell / version recovery**
 - Production: untouched
 
 ## Phase 6.7
@@ -74,12 +75,51 @@ Completed on 2026-09-25 in Hosted Preview:
 - `sleep_history_scope` correctly states that the export contains stored normalized rows, not complete provider revision history;
 - Production remains untouched.
 
+## Phase 6.9
+
+Implemented on `phase/6.9-account-lifecycle` / PR #21:
+
+- deliberate Settings danger-zone flow with current-password reauthentication and literal `削除` confirmation;
+- dedicated DB-backed reauthentication rate-limit namespace;
+- server-only Supabase Admin boundary bound to the expected deployment environment and Supabase project;
+- pre-destructive, same-origin HttpOnly recovery-operation cookie;
+- short-lived private deletion status with explicit `deletion_outcome_unknown`;
+- user-scoped shared writer lock / exclusive deletion-start advisory lock;
+- Phase 6 reliable mutations and Google Health credential/sync/backfill writes participate in the lifecycle guard;
+- legacy RPC compatibility retained while authenticated writes are forced through lifecycle table triggers;
+- bounded Google authorization revocation that does not block local deletion on provider failure;
+- Storage ownership preflight before Auth hard deletion;
+- authoritative Auth deletion outcome re-check before success is reported;
+- current-device IndexedDB / local storage / session storage / Cache Storage cleanup only after confirmed deletion;
+- explicit wording that provider source data, downloaded exports, other devices and backups are outside this operation.
+
+Automated acceptance:
+
+- lint / typecheck / unit / verify-env / build: PASS;
+- fresh DB replay / pgTAP including guard, legacy-write, cascade and status-recovery fixtures: PASS;
+- Preview workflow / deployment: PASS;
+- Hosted Preview migration applied and schema verified;
+- existing normalized Sleep and Nutrition data remained intact after the migration;
+- Hosted Preview deletion guard/status rows remain empty because the real user was intentionally not deleted;
+- lifecycle private tables are not readable by `authenticated`;
+- established legacy RPC privileges remain compatible while lifecycle triggers are active.
+
+Security advisor review after the Hosted Preview migration reports the expected information-level
+"RLS enabled with no policy" findings for private server-only tables. It also continues to report
+the established public SECURITY DEFINER RPC warnings and the project-level leaked-password
+protection setting; these are not introduced by the Phase 6.9 lifecycle tables and are not treated
+as a 6.9 implementation blocker.
+
+Destructive acceptance against the real Preview user was intentionally **not** performed.
+The deletion Admin environment remains fail-closed unless its complete server-only configuration
+is present. Production remains untouched.
+
 ## Phase 5 relationship
 
-Phase 5 real wearable/STAGES/device and Production completion remain separate gates.
+Phase 5 real wearable/STAGES/device acceptance is complete in Preview.
 
-6.8 implementation can proceed before real-device acceptance, but Sleep export acceptance with
-actual wearable data remains deferred until Phase 5 device validation.
+Phase 5 Production rollout remains a separate gate and is intentionally deferred until the
+Phase 6 integration/rollout sequence is approved.
 
 ## Production rule
 

@@ -30,8 +30,16 @@ function forwardedSource(request: Request) {
   return value || "missing-forwarded-for";
 }
 
+export function authRateLimitKey(
+  request: Request,
+  secret: string,
+  namespace: "login" | "account-deletion",
+) {
+  return hmacSha256(`${namespace}:${forwardedSource(request)}`, secret);
+}
+
 export function loginRateLimitKey(request: Request, secret: string) {
-  return hmacSha256(`login:${forwardedSource(request)}`, secret);
+  return authRateLimitKey(request, secret, "login");
 }
 
 export function createDbRateLimitStore(queryRunner: typeof query = query): RateLimitStore {
@@ -90,6 +98,38 @@ export async function consumeLoginAttempt(request: Request, store: RateLimitStor
 export async function clearLoginRateLimit(request: Request, store: RateLimitStore = createDbRateLimitStore()) {
   const env = requiredServerEnv();
   const keyHash = loginRateLimitKey(request, env.loginRateLimitKey);
+  try {
+    await store.clear(keyHash);
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) throw error;
+    throw new RateLimitUnavailableError();
+  }
+}
+
+export async function consumeAccountDeletionReauthAttempt(
+  request: Request,
+  store: RateLimitStore = createDbRateLimitStore(),
+) {
+  const env = requiredServerEnv();
+  const keyHash = authRateLimitKey(request, env.loginRateLimitKey, "account-deletion");
+  try {
+    const result = await store.consume(keyHash);
+    return {
+      ...result,
+      limited: result.attemptCount > LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
+    };
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) throw error;
+    throw new RateLimitUnavailableError();
+  }
+}
+
+export async function clearAccountDeletionReauthLimit(
+  request: Request,
+  store: RateLimitStore = createDbRateLimitStore(),
+) {
+  const env = requiredServerEnv();
+  const keyHash = authRateLimitKey(request, env.loginRateLimitKey, "account-deletion");
   try {
     await store.clear(keyHash);
   } catch (error) {

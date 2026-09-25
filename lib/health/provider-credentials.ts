@@ -1,4 +1,5 @@
 import { query, withTransaction } from "@/lib/db";
+import { withAccountLifecycleWriteGuard } from "@/lib/account/lifecycle";
 import { requiredProviderTokenEncryptionKey, requiredServerEnv } from "@/lib/env";
 import { decryptSecret, encryptSecret } from "@/lib/security/crypto";
 
@@ -31,7 +32,8 @@ export async function saveGoogleHealthCredentials(userId: string, input: Provide
   if (!input.refreshToken) throw new Error("Google Health refresh token is required");
   const key = providerEncryptionKey();
 
-  await query(
+  await withAccountLifecycleWriteGuard(userId, async (client) => {
+    await client.query(
     `insert into private.health_provider_credentials (
        user_id, provider, refresh_token_ciphertext, access_token_ciphertext,
        access_token_expires_at, key_version, credential_revision, updated_at
@@ -50,7 +52,8 @@ export async function saveGoogleHealthCredentials(userId: string, input: Provide
       input.accessToken ? encryptSecret(input.accessToken, key) : null,
       input.accessTokenExpiresAt ?? null,
     ],
-  );
+    );
+  });
 }
 
 export async function loadGoogleHealthCredentials(userId: string) {
@@ -76,10 +79,12 @@ export async function loadGoogleHealthCredentials(userId: string) {
 
 export async function deleteGoogleHealthCredentials(userId: string) {
   assertAllowedUser(userId);
-  await query(
-    "delete from private.health_provider_credentials where user_id = $1 and provider = $2",
-    [userId, GOOGLE_HEALTH_PROVIDER],
-  );
+  await withAccountLifecycleWriteGuard(userId, async (client) => {
+    await client.query(
+      "delete from private.health_provider_credentials where user_id = $1 and provider = $2",
+      [userId, GOOGLE_HEALTH_PROVIDER],
+    );
+  });
 }
 
 export type GoogleHealthConnectionMetadata = {
@@ -98,7 +103,7 @@ export async function connectGoogleHealthAccount(
   const key = providerEncryptionKey();
   const scopes = [...new Set(metadata.grantedScopes)].sort();
 
-  await withTransaction(async (client) => {
+  await withAccountLifecycleWriteGuard(userId, async (client) => {
     await client.query(
       `insert into public.health_provider_connections (
          user_id, provider, status, health_user_id, legacy_fitbit_user_id,
@@ -151,7 +156,7 @@ export async function connectGoogleHealthAccount(
 
 export async function disconnectGoogleHealthAccount(userId: string) {
   assertAllowedUser(userId);
-  await withTransaction(async (client) => {
+  await withAccountLifecycleWriteGuard(userId, async (client) => {
     await client.query(
       "delete from private.health_provider_credentials where user_id = $1 and provider = $2",
       [userId, GOOGLE_HEALTH_PROVIDER],
@@ -170,12 +175,33 @@ export async function disconnectGoogleHealthAccount(userId: string) {
 
 export async function markGoogleHealthReauthorizationRequired(userId: string) {
   assertAllowedUser(userId);
-  await query(
-    `update public.health_provider_connections
-        set status = 'reauth_required',
-            last_sync_error_code = 'REAUTH_REQUIRED',
-            last_sync_attempt_at = now()
-      where user_id = $1 and provider = $2`,
-    [userId, GOOGLE_HEALTH_PROVIDER],
-  );
+  await withAccountLifecycleWriteGuard(userId, async (client) => {
+    await client.query(
+      `update public.health_provider_connections
+          set status = 'reauth_required',
+              last_sync_error_code = 'REAUTH_REQUIRED',
+              last_sync_attempt_at = now()
+        where user_id = $1 and provider = $2`,
+      [userId, GOOGLE_HEALTH_PROVIDER],
+    );
+  });
+}
+
+export async function disconnectGoogleHealthAfterDeletionRevocation(userId: string) {
+  assertAllowedUser(userId);
+  await withTransaction(async (client) => {
+    await client.query(
+      "delete from private.health_provider_credentials where user_id = $1 and provider = $2",
+      [userId, GOOGLE_HEALTH_PROVIDER],
+    );
+    await client.query(
+      `update public.health_provider_connections
+          set status = 'disconnected',
+              disconnected_at = now(),
+              granted_scopes = '{}'::text[],
+              last_sync_error_code = 'ACCOUNT_DELETION_REVOKED'
+        where user_id = $1 and provider = $2`,
+      [userId, GOOGLE_HEALTH_PROVIDER],
+    );
+  });
 }

@@ -6,7 +6,7 @@ const source = readFileSync(resolve(process.cwd(), "lib/health/sleep-repository.
 
 describe("Google Health sleep persistence contract", () => {
   it("uses a single transaction for session and child-interval replacement", () => {
-    expect(source).toContain("withTransaction(async (client)");
+    expect(source).toMatch(/with(?:Transaction|AccountLifecycleWriteGuard)\([^\n]*async \(client\)/);
     expect(source).toContain("delete from public.sleep_stage_intervals");
     expect(source).toContain("delete from public.sleep_out_of_bed_segments");
   });

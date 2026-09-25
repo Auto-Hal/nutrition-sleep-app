@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
-vi.mock("@/lib/db", () => ({ query: queryMock }));
+vi.mock("@/lib/db", () => ({
+  query: queryMock,
+  withTransaction: vi.fn(),
+}));
+vi.mock("@/lib/account/lifecycle", () => ({
+  withAccountLifecycleWriteGuard: async (
+    _userId: string,
+    work: (client: { query: typeof queryMock }) => Promise<unknown>,
+  ) => work({ query: queryMock }),
+}));
 
 import {
   advanceGoogleHealthBackfill,

@@ -87,6 +87,7 @@ export function DataExport({
           エクスポートはサーバー上の1つの一貫したsnapshotです。端末に未同期の変更は含まれません。
         </p>
         <p className="muted">
+          このJSONには健康・栄養の機微な情報が含まれるため、安全な場所に保管してください。
           OAuth token、provider内部ID、raw payload、mutation receiptなどの内部情報は含めません。
           Sleepはアプリが実際に保持している正規化済み履歴のみです。
         </p>
