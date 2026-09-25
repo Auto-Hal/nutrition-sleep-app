@@ -40,6 +40,7 @@ describe("Phase 6.9 account lifecycle contract", () => {
     expect(migration).toContain("create trigger phase6_lifecycle_guard_catalog_items");
     expect(migration).toContain("create trigger phase6_lifecycle_guard_meal_entries");
     expect(migration).toContain("create trigger phase6_lifecycle_guard_products");
+    expect(migration).not.toContain("phase6_lifecycle_guard_meal_entry_nutrient_snapshots");
     expect(migration).not.toContain("revoke execute on function public.create_catalog_item(");
   });
 
