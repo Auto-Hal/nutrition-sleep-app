@@ -89,7 +89,7 @@ insert into public.catalog_items (
   ('69200000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111192', 'ingredient', 'Other item', 1, 'serving', true);
 
 insert into public.item_nutrients (
-  catalog_item_id, user_id, nutrient_code, amount, provenance, quality
+  catalog_item_id, user_id, nutrient_code, amount, unit, provenance, quality
 ) values (
   '69100000-0000-4000-8000-000000000001',
   '11111111-1111-4111-8111-111111111191',
