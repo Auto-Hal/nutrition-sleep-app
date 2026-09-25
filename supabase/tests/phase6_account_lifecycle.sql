@@ -201,7 +201,9 @@ select is(
 );
 
 update private.account_deletion_operations
-set expires_at = now() - interval '1 second'
+set created_at = now() - interval '2 days',
+    updated_at = now() - interval '2 days',
+    expires_at = now() - interval '1 second'
 where operation_id='69100000-0000-4000-8000-000000000099';
 
 select lives_ok(
