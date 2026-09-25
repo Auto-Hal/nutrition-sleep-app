@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { PoolClient, QueryResultRow } from "pg";
 import { cookies } from "next/headers";
 import { query, withTransaction } from "@/lib/db";
