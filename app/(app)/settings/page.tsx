@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ProfileForm } from "@/components/profile-form";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
+import { DataExport } from "@/components/data-export";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 
@@ -26,11 +27,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           environmentId={appEnvironmentId()}
         />
       ) : (
-        <ProfileForm
-          initialProfile={profile}
-          ownerUserId={session?.userId ?? ""}
-          environmentId={appEnvironmentId()}
-        />
+        <div className="stack">
+          <ProfileForm
+            initialProfile={profile}
+            ownerUserId={session?.userId ?? ""}
+            environmentId={appEnvironmentId()}
+          />
+          <DataExport
+            ownerUserId={session?.userId ?? ""}
+            environmentId={appEnvironmentId()}
+          />
+        </div>
       )}
     </main>
   );
