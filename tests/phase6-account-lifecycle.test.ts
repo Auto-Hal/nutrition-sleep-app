@@ -7,6 +7,7 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
 const migration = read("supabase/migrations/20260925070000_phase6_account_lifecycle.sql");
 const route = read("app/api/account/delete/route.ts");
+const prepareRoute = read("app/api/account/delete/prepare/route.ts");
 const status = read("app/api/account/delete/status/route.ts");
 const admin = read("lib/account/admin.ts");
 const lifecycle = read("lib/account/lifecycle.ts");
@@ -62,6 +63,14 @@ describe("Phase 6.9 account lifecycle contract", () => {
     expect(route).toContain("signInWithPassword");
     expect(route).toContain('signOut({ scope: "local" })');
     expect(route).not.toContain("persistAuthSession");
+  });
+
+  it("establishes recovery status before the destructive request can start", () => {
+    expect(prepareRoute).toContain("setDeletionOperationCookie(randomUUID())");
+    expect(component).toContain('fetch("/api/account/delete/prepare"');
+    expect(component).toContain("!prepared");
+    expect(route).toContain("deletion_prepare_required");
+    expect(route).not.toContain("randomUUID()");
   });
 
   it("keeps provider revocation best-effort and auth outcome explicit", () => {
