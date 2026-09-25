@@ -33,11 +33,14 @@ describe("Phase 6.9 account lifecycle contract", () => {
     expect(backfill).toContain("withAccountLifecycleWriteGuard");
   });
 
-  it("removes authenticated access to legacy mutation RPC bypasses", () => {
-    expect(migration).toContain("revoke execute on function public.create_catalog_item(");
-    expect(migration).toContain("revoke execute on function public.create_meal_entry(");
-    expect(migration).toContain("revoke execute on function public.create_product_item_v2(");
-    expect(migration).toContain("from authenticated");
+  it("keeps legacy RPC compatibility but forces authenticated writes through lifecycle triggers", () => {
+    expect(migration).toContain("create or replace function private.phase6_guard_authenticated_user_write()");
+    expect(migration).toContain("request_user_id uuid := (select auth.uid())");
+    expect(migration).toContain("perform private.phase6_acquire_write_guard(row_user_id)");
+    expect(migration).toContain("create trigger phase6_lifecycle_guard_catalog_items");
+    expect(migration).toContain("create trigger phase6_lifecycle_guard_meal_entries");
+    expect(migration).toContain("create trigger phase6_lifecycle_guard_products");
+    expect(migration).not.toContain("revoke execute on function public.create_catalog_item(");
   });
 
   it("isolates service-role use to server-only deletion code", () => {
