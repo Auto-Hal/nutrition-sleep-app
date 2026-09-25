@@ -387,3 +387,16 @@ export async function nextOutboxRetryAt(binding: OutboxBinding) {
     .filter(Number.isFinite);
   return values.length > 0 ? Math.min(...values) : null;
 }
+
+
+export async function clearOutboxStorage() {
+  if (typeof indexedDB === "undefined") return;
+  const db = await openOutboxDb();
+  try {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    transaction.objectStore(STORE_NAME).clear();
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
+}
