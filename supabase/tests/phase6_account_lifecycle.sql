@@ -1,6 +1,6 @@
 begin;
 
-select plan(27);
+select plan(28);
 
 select has_table(
   'private',
@@ -198,6 +198,22 @@ select is(
   ),
   'guarded',
   'deletion operation begins in guarded state'
+);
+
+update private.account_deletion_operations
+set expires_at = now() - interval '1 second'
+where operation_id='69100000-0000-4000-8000-000000000099';
+
+select lives_ok(
+  $test$
+    select private.phase6_begin_account_deletion(
+      '11111111-1111-4111-8111-111111111191',
+      '69100000-0000-4000-8000-000000000099',
+      repeat('b',64),
+      'preview:supabase:test-project'
+    )
+  $test$,
+  'same deletion operation can refresh its expired recovery TTL'
 );
 
 select set_config(
