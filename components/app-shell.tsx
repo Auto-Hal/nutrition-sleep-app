@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { OutboxRuntime } from "@/components/outbox-runtime";
+import { ConnectivityBoundary } from "@/components/connectivity-boundary";
 import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 import { countUnsyncedOutbox, pauseOutboxForBinding } from "@/lib/offline/outbox-idb";
 
@@ -91,7 +92,9 @@ export function AppShell({
           <button className="button ghost" type="button" onClick={logout}>ログアウト</button>
         </div>
       </div>
-      {children}
+      <ConnectivityBoundary binding={binding}>
+        {children}
+      </ConnectivityBoundary>
       <OutboxRuntime binding={binding} />
       <div
         dangerouslySetInnerHTML={{
