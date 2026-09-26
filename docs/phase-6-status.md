@@ -18,7 +18,7 @@ Updated: 2026-09-26
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- current batch: **6.11 full MVP acceptance**
+- current batch: **6.11 full MVP acceptance — 6.11-A PASS; 6.11-B functional regression next**
 - Production: untouched
 
 ## Phase 6.7
@@ -159,6 +159,12 @@ Current integrated findings:
 - anon has no SELECT/INSERT access to public user-data tables;
 - public SECURITY DEFINER RPCs are not anon-executable, reference `auth.uid()`, and set explicit `search_path`;
 - existing Security Advisor warnings are documented in the 6.11 acceptance matrix.
+
+Checkpoint status:
+
+- 6.11-A security / logs / stack integrity: PASS;
+- leaked-password protection: deferred as required Production Auth configuration check, not an implementation blocker;
+- next: 6.11-B Full Preview functional regression.
 
 Remaining final acceptance:
 
