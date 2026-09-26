@@ -4,6 +4,7 @@ import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { DataExport } from "@/components/data-export";
 import { AccountDeletion } from "@/components/account-deletion";
+import { AcceptanceOutboxControl } from "@/components/acceptance-outbox-control";
 import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
@@ -39,6 +40,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             ownerUserId={session?.userId ?? ""}
             environmentId={appEnvironmentId()}
           />
+          {process.env.VERCEL_ENV === "preview" ? (
+            <AcceptanceOutboxControl
+              ownerUserId={session?.userId ?? ""}
+              environmentId={appEnvironmentId()}
+            />
+          ) : null}
           <AccountDeletion available={Boolean(accountDeletionAdminEnv())} />
         </div>
       )}
