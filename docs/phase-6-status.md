@@ -18,7 +18,7 @@ Updated: 2026-09-26
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- current batch: **6.11 full MVP acceptance — 6.11-A/B PASS; 6.11-C blocked only by missing Preview Yahoo Client ID**
+- current batch: **6.11 full MVP acceptance — 6.11-A/B/C PASS; 6.11-D device acceptance not started**
 - Production: untouched
 
 ## Phase 6.7
@@ -165,13 +165,12 @@ Checkpoint status:
 - 6.11-A security / logs / stack integrity: PASS;
 - leaked-password protection: deferred as required Production Auth configuration check, not an implementation blocker;
 - 6.11-B automated + Hosted Preview functional regression: PASS after fixing reload-time provisional Today nutrition hydration;
-- 6.11-C Yahoo/JAN external acceptance: BLOCKED only by missing Preview `YAHOO_SHOPPING_CLIENT_ID`; live 20-JAN acceptance harness is committed and auto-runs once configured.
-- do not start 6.11-D until C live run is PASS.
+- 6.11-C Yahoo/JAN external acceptance: PASS — 20/20 samples produced exact-JAN candidates; 1 single candidate, 19 ambiguous/manual-selection cases, 0 not-found, 0 unavailable; identity-only/no-nutrition/raw-payload invariants held.
+- next: 6.11-D iPhone/iPad/PWA device acceptance.
 
 Remaining final acceptance:
 
-- real Japanese JAN set (20–50 representative packaged products);
-- iPhone device E2E including PWA offline/update recovery;
+- iPhone device E2E including Product/OCR and PWA offline/update recovery;
 - iPad device E2E;
 - final Preview regression after device/external acceptance;
 - approved Production rollout;
