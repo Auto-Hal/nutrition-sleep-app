@@ -114,6 +114,9 @@ function labelMatches(phrase: string, label: string) {
     if (["g", "mg", "ug", "kcal", "kj"].includes(suffix)) return true;
   }
 
+  const vitaminFamily = normalizedLabel.startsWith("ビタミン") || normalizedLabel.startsWith("vitamin");
+  if (vitaminFamily) return false;
+
   // Fuzzy matching is intentionally limited to longer known nutrition labels.
   // It repairs one-character OCR noise without making short labels such as 鉄 ambiguous.
   return normalizedLabel.length >= 4
@@ -252,6 +255,64 @@ function parseNumber(value: string) {
   return Number.isFinite(amount) ? amount : null;
 }
 
+function structuralUnitRowCenters(document: OcrDocument) {
+  const numericWords = document.words.filter((word) => parseNumber(word.text) !== null);
+  if (numericWords.length === 0) return [];
+
+  const numericXs = numericWords
+    .map((word) => word.box.minX)
+    .sort((a, b) => a - b);
+  const numericColumnX = numericXs[Math.floor(numericXs.length / 2)];
+
+  const centers = document.words
+    .filter((word) =>
+      parseNumber(word.text) === null
+      && normalizeUnit(word.text) !== null
+      && word.box.maxX < numericColumnX
+    )
+    .map((word) => centerY(word.box))
+    .sort((a, b) => a - b);
+
+  const deduped: number[] = [];
+  for (const value of centers) {
+    const previous = deduped[deduped.length - 1];
+    if (previous === undefined || Math.abs(value - previous) > 6) {
+      deduped.push(value);
+    } else {
+      deduped[deduped.length - 1] = (previous + value) / 2;
+    }
+  }
+  return deduped;
+}
+
+function structuralBoundsForAnchor(
+  anchor: LabelAnchor,
+  rowCenters: number[],
+) {
+  if (rowCenters.length === 0) return null;
+  const anchorY = centerY(anchor.box);
+  let rowIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < rowCenters.length; index += 1) {
+    const distance = Math.abs(rowCenters[index] - anchorY);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      rowIndex = index;
+    }
+  }
+
+  const current = rowCenters[rowIndex];
+  const previous = rowIndex > 0 ? rowCenters[rowIndex - 1] : null;
+  const next = rowIndex + 1 < rowCenters.length ? rowCenters[rowIndex + 1] : null;
+  const fallback = Math.max(16, boxHeight(anchor.box) * 0.85);
+
+  return {
+    center: current,
+    top: previous === null ? current - fallback : (previous + current) / 2,
+    bottom: next === null ? current + fallback : (current + next) / 2,
+  };
+}
+
 function findValueCandidates(document: OcrDocument): ValueCandidate[] {
   const words = [...document.words].sort((a, b) => {
     const y = centerY(a.box) - centerY(b.box);
@@ -352,21 +413,18 @@ function geometryMatches(document: OcrDocument) {
     const maxVerticalDistance = Math.max(10, boxHeight(anchor.box) * 0.8);
 
     const anchorUnit = anchor.unit;
-    const anchorLine = document.lines
-      .filter((line) =>
-        centerY(anchor.box) >= line.box.minY - 2
-        && centerY(anchor.box) <= line.box.maxY + 2
-      )
-      .sort((a, b) => Math.abs(centerY(a.box) - currentY) - Math.abs(centerY(b.box) - currentY))[0] ?? null;
+    const structuralRows = structuralUnitRowCenters(document);
+    const structuralBounds = anchorUnit ? structuralBoundsForAnchor(anchor, structuralRows) : null;
 
-    const directCandidates = anchorUnit && anchorLine
-      ? anchorLine.words
+    const directCandidates = anchorUnit && structuralBounds
+      ? document.words
         .map((word) => {
           const amount = parseNumber(word.text);
           if (amount === null) return null;
           const valueY = centerY(word.box);
           if (
-            Math.abs(valueY - currentY) > maxVerticalDistance
+            valueY < structuralBounds.top
+            || valueY >= structuralBounds.bottom
             || word.box.minX < anchor.box.maxX - 8
           ) return null;
 
@@ -383,7 +441,7 @@ function geometryMatches(document: OcrDocument) {
           return {
             candidate,
             nutrient,
-            distance: Math.abs(valueY - currentY),
+            distance: Math.abs(valueY - structuralBounds.center),
           };
         })
         .filter((entry): entry is { candidate: ValueCandidate; nutrient: CommercialNutrient; distance: number } =>
