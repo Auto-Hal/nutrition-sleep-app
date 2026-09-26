@@ -276,16 +276,22 @@ Confirmed by physical iPhone acceptance on 2026-09-26:
 - normal Safari reload returned to a usable state;
 - no red error state, blank page, or infinite-loading failure was observed.
 
-### D2 — iPhone Today / Product / OCR
+### D2 — iPhone Today / Product / OCR — PARTIAL PASS
 
-- add an ordinary meal entry;
-- add a snack/custom meal path;
-- verify skip/unskip and void paths;
-- scan a real barcode;
-- observe local → OFF → Yahoo → OCR/manual behavior as applicable;
-- if Yahoo returns multiple exact-JAN identities, verify no automatic identity selection occurs;
-- verify save and repeat local-hit behavior;
-- verify pending/retry presentation remains understandable.
+Confirmed by physical iPhone acceptance on 2026-09-26:
+
+- ordinary Today meal entry: PASS;
+- snack/custom meal path: PASS;
+- skip/unskip: PASS;
+- MealEntry void: PASS;
+- real barcode capture: PASS;
+- Yahoo exact-JAN fallback reached successfully;
+- Yahoo returned multiple exact-JAN identity candidates and **did not auto-select**; explicit user selection was required as designed.
+
+Open D2 issue:
+
+- nutrition-label OCR is functional but recognition quality was judged insufficient on the physical-device acceptance sample;
+- D2 remains open until the OCR quality issue is reproduced against a representative failed label image and the image-prep / Cloud Vision / parser path is corrected or bounded as acceptable.
 
 ### D3 — iPhone Nutrition / Sleep / Settings / export
 
