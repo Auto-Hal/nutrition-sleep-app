@@ -209,6 +209,16 @@ function normalizeUnit(value: string) {
   for (const expected of ["kcal", "kj", "mg", "ug"] as const) {
     if (unit === expected) return expected;
     if (unit.length >= 2 && editDistanceAtMostOne(unit, expected)) return expected;
+
+    if (unit.endsWith(expected)) {
+      const prefix = unit.slice(0, -expected.length);
+      if (/[a-z]/.test(prefix)) return expected;
+    }
+  }
+
+  if (unit.endsWith("g")) {
+    const prefix = unit.slice(0, -1);
+    if (/[a-z]/.test(prefix)) return "g";
   }
 
   return null;
