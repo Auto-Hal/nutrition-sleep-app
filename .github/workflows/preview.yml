@@ -63,9 +63,8 @@ jobs:
         run: |
           set +x
           for batch in 0 1 2 3; do
-            pnpm dlx vercel@latest curl "/api/acceptance/yahoo-real-jan?batch=$batch" \
+            pnpm dlx vercel@latest --token="$VERCEL_TOKEN" curl "/api/acceptance/yahoo-real-jan?batch=$batch" \
               --deployment "$PREVIEW_URL" \
-              --token="$VERCEL_TOKEN" \
               > "$RUNNER_TEMP/yahoo-batch-$batch.json"
             if [ "$batch" -lt 3 ]; then sleep 2; fi
           done
