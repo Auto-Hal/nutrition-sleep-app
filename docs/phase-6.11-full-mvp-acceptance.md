@@ -93,6 +93,28 @@ ever generalized to public multi-user use.
 Leaked-password protection remains a Production rollout configuration item rather than a Phase 6
 data-integrity implementation defect.
 
+## 6.11-A checkpoint — security / logs / stack integrity
+
+Status: **PASS — Production Auth hardening item carried to rollout gate**
+
+Verified on the current `phase/6.11-full-mvp-acceptance` head:
+
+- branch is based on the final Phase 6.10 head and contains acceptance-documentation changes only;
+- latest CI and Preview workflow are green;
+- Phase 5 status documentation is byte-identical to the Phase 5 branch copy, so no Phase 5 code or documentation port is required;
+- Hosted Preview migration chain ends at `phase6_account_lifecycle`; Phase 6.10/6.11 add no database migration;
+- all 14 public tables have RLS enabled;
+- `anon` has no public table DML grants;
+- 28 public SECURITY DEFINER RPCs are authenticated-only, all reference `auth.uid()`, and all define an explicit `search_path`;
+- six `private` tables have no `authenticated` table grants;
+- recent Preview runtime errors are empty;
+- targeted Preview log searches found no occurrences of access/refresh token labels, service-role labels, password/Authorization/Bearer material, or raw health/payload logging;
+- inspected Google Health, export, Yahoo and account-deletion server paths log only bounded status/stage metadata and do not log token values, passwords, raw health payloads, export bodies or admin secrets.
+
+Supabase Auth leaked-password protection remains disabled. Supabase documents this as a project-level Auth hardening feature that rejects passwords known from breach corpora. It is therefore **not a Phase 6 implementation/data-integrity blocker**, but enabling/verifying it is a **required Production rollout configuration check** before Gate 13 is accepted.
+
+Performance Advisor still reports unused-index INFO items only; no index is removed during acceptance.
+
 ## Phase 5 / Sleep
 
 PASS in Preview:
