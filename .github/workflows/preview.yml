@@ -55,14 +55,42 @@ jobs:
             echo '::warning::YAHOO_SHOPPING_CLIENT_ID is not configured for the Vercel Preview environment.'
           fi
       - run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --git-branch=phase/6.11-full-mvp-acceptance --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Load Yahoo Preview credential for live acceptance
+        if: steps.yahoo-config.outputs.present == 'true'
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set +x
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v10/projects/prj_WiPB989mXurOuIgVm8asfmfdPA6W/env?gitBranch=phase%2F6.11-full-mvp-acceptance&decrypt=true&source=vercel-cli%3Apull&teamId=team_aTOsma3gZ9xkcFkGJ53dUCCO" \
+            --output "$RUNNER_TEMP/vercel-preview-env.json"
+          node <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/vercel-preview-env.json", "utf8"));
+          const row = (payload.envs ?? []).find((item) =>
+            item.key === "YAHOO_SHOPPING_CLIENT_ID"
+            && Array.isArray(item.target)
+            && item.target.includes("preview")
+          );
+          if (!row || typeof row.value !== "string" || row.value.length === 0) {
+            console.error("Yahoo Preview credential could not be decrypted for acceptance.");
+            process.exit(2);
+          }
+          console.log("::add-mask::" + row.value);
+          fs.appendFileSync(
+            process.env.GITHUB_ENV,
+            "YAHOO_SHOPPING_CLIENT_ID<<YAHOO_EOF\n" + row.value + "\nYAHOO_EOF\n",
+          );
+          console.log("Yahoo Shopping Preview credential: DECRYPTED_FOR_ACCEPTANCE");
+          NODE
+          rm -f "$RUNNER_TEMP/vercel-preview-env.json"
       - name: Run Yahoo real-JAN acceptance
         if: steps.yahoo-config.outputs.present == 'true'
         shell: bash
         run: |
           set +x
-          set -a
-          source .vercel/.env.preview.local
-          set +a
           node scripts/yahoo-real-jan-acceptance.mjs
       - run: pnpm dlx vercel@48.2.0 build --target=preview --yes --token=${{ secrets.VERCEL_TOKEN }}
       - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --target=preview --token=${{ secrets.VERCEL_TOKEN }}
