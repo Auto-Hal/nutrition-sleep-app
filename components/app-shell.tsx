@@ -21,11 +21,13 @@ export function AppShell({
   email,
   ownerUserId,
   environmentId,
+  allowAcceptanceOutboxPause = false,
 }: {
   children: ReactNode;
   email?: string;
   ownerUserId: string;
   environmentId: string;
+  allowAcceptanceOutboxPause?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -95,7 +97,7 @@ export function AppShell({
       <ConnectivityBoundary binding={binding}>
         {children}
       </ConnectivityBoundary>
-      <OutboxRuntime binding={binding} />
+      <OutboxRuntime binding={binding} allowAcceptancePause={allowAcceptanceOutboxPause} />
       <div
         dangerouslySetInnerHTML={{
           __html: '<!-- Begin Yahoo! JAPAN Web Services Attribution Snippet --><span style="margin:15px 15px 15px 15px"><a href="https://developer.yahoo.co.jp/sitemap/">Webサービス by Yahoo! JAPAN</a></span><!-- End Yahoo! JAPAN Web Services Attribution Snippet -->',
