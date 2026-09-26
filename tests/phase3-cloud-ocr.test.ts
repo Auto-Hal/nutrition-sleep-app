@@ -323,4 +323,62 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     expect(parsed.nutrients.some((nutrient) => nutrient.code === "vitamin_d")).toBe(false);
   });
 
+
+  it("keeps skewed Japanese table values inside structural unit rows", () => {
+    const words: OcrWord[] = [
+      word("たんぱく質(g)", 20, 100, 220),
+      word("2.6", 360, 108, 55),
+      word("脂質(g)", 20, 140, 160),
+      word("5.0", 360, 149, 55),
+      word("コレステロール(mg)", 20, 180, 260),
+      word("0", 360, 188, 25),
+      word("炭水化物(g)", 20, 220, 200),
+      word("30.2", 360, 229, 65),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "たんぱく質(g) 2.6\n脂質(g) 5.0\nコレステロール(mg) 0\n炭水化物(g) 30.2",
+      width: 520,
+      height: 320,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "protein", amount: 2.6, unit: "g" },
+      { code: "fat", amount: 5, unit: "g" },
+      { code: "carbohydrate", amount: 30.2, unit: "g" },
+    ]));
+  });
+
+  it("does not fuzzy-cross-match neighboring vitamin labels", () => {
+    const words: OcrWord[] = [
+      word("ビタミンB6(mg)", 20, 100, 220), word("0.36", 360, 105, 65),
+      word("ビタミンB12(μg)", 20, 140, 230), word("0.32", 360, 145, 65),
+      word("ビタミンC(mg)", 20, 180, 200), word("24", 360, 185, 45),
+      word("ビタミンD(μg)", 20, 220, 200), word("2.6", 360, 225, 55),
+      word("葉酸(μg)", 20, 260, 160), word("80", 360, 265, 45),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "ビタミンB6(mg) 0.36\nビタミンB12(μg) 0.32\nビタミンC(mg) 24\nビタミンD(μg) 2.6\n葉酸(μg) 80",
+      width: 520,
+      height: 340,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "vitamin_b6", amount: 0.36, unit: "mg" },
+      { code: "vitamin_b12", amount: 0.32, unit: "ug" },
+      { code: "vitamin_c", amount: 24, unit: "mg" },
+      { code: "vitamin_d", amount: 2.6, unit: "ug" },
+    ]));
+    expect(parsed.nutrients.some((nutrient) => nutrient.code === "vitamin_e")).toBe(false);
+  });
+
 });
