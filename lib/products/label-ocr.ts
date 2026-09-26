@@ -88,7 +88,7 @@ function convertValue(value: number, sourceUnit: string, targetUnit: CommercialN
 }
 
 function findBasis(text: string): LabelBasis {
-  const natural = text.match(/([0-9]+(?:\.[0-9]+)?)\s*(個|本|枚|袋|錠|粒|食|杯)(?:\s*\([^)]*\))?\s*(?:当たり|あたり)/);
+  const natural = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*(個|本|枚|袋|錠|粒|食|杯)(?:\\s*分)?(?:\\s*\\([^)]*\\))?\\s*(?:当たり|あたり)/);
   if (natural) {
     return { serving_size: Number(natural[1]), serving_unit: natural[2] };
   }
