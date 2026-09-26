@@ -272,4 +272,32 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     expect(parsed.diagnostics.basis_detected).toBe(true);
   });
 
+
+  it("does not let a missing OCR row make the previous unit-attached anchor borrow the next row value", () => {
+    const words: OcrWord[] = [
+      word("エネルギー(kcal)", 20, 70, 220),
+      // Simulate unreadable/missing energy amount on the right side.
+      word("2.6", 360, 110, 55),
+      word("g", 435, 110, 20),
+      word("炭水化物(g)", 20, 190, 200),
+      word("30.2", 360, 190, 65),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "エネルギー(kcal)\n2.6 g\n炭水化物(g) 30.2",
+      width: 520,
+      height: 260,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.nutrients.some((nutrient) => nutrient.code === "energy")).toBe(false);
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "carbohydrate", amount: 30.2, unit: "g" },
+    ]));
+  });
+
 });
