@@ -228,6 +228,31 @@ Still required for final Gate 11:
 
 This external-data acceptance is not replaced by unit tests.
 
+## 6.11-C checkpoint — Yahoo/JAN external acceptance
+
+Status: **BLOCKED — external Preview credential missing; acceptance harness complete**
+
+Verified:
+
+- Vercel Preview environment was queried through the authenticated Preview workflow without exposing values;
+- `YAHOO_SHOPPING_CLIENT_ID` is currently **not configured** in Preview;
+- current application behavior therefore takes the intended `yahoo_not_configured → OCR` fallback path rather than failing Product ingestion;
+- existing automated contracts continue to verify exact returned-JAN matching, mismatch rejection, ambiguous candidate handling, identity-only semantics, nutrition non-adoption, and OCR fallback.
+
+Live acceptance harness added:
+
+- `scripts/yahoo-real-jan-acceptance.mjs`;
+- 20 structurally valid, publicly observable Japanese JAN samples spanning beverages, instant noodles, snacks, cereal, chocolate, protein bar, soup and soy drinks;
+- requests are paced above one second apart;
+- the harness never prints the Client ID or raw provider response;
+- returned JAN values are normalized and non-exact values are rejected before candidate classification;
+- found / ambiguous / not-found outcomes are summarized;
+- the Preview workflow automatically runs the live harness whenever the Preview credential is present.
+
+**Only remaining C blocker:** provision a Yahoo Shopping Client ID into the Vercel Preview environment as server-only `YAHOO_SHOPPING_CLIENT_ID`, then rerun the Preview workflow.
+
+C must not be marked PASS until that live run succeeds. No application code, DB migration, Production change, or user-data mutation is required.
+
 ## Export
 
 PASS:
