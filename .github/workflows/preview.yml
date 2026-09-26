@@ -64,7 +64,7 @@ jobs:
           set +x
           curl --fail --silent --show-error \
             --header "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v10/projects/prj_WiPB989mXurOuIgVm8asfmfdPA6W/env?gitBranch=phase%2F6.11-full-mvp-acceptance&decrypt=true&source=vercel-cli%3Apull&teamId=team_aTOsma3gZ9xkcFkGJ53dUCCO" \
+            "https://api.vercel.com/v10/projects/prj_WiPB989mXurOuIgVm8asfmfdPA6W/env?gitBranch=phase%2F6.11-full-mvp-acceptance&teamId=team_aTOsma3gZ9xkcFkGJ53dUCCO" \
             --output "$RUNNER_TEMP/vercel-preview-env.json"
           node <<'NODE'
           const fs = require("fs");
@@ -74,18 +74,41 @@ jobs:
             && Array.isArray(item.target)
             && item.target.includes("preview")
           );
-          if (!row || typeof row.value !== "string" || row.value.length === 0) {
-            console.error("Yahoo Preview credential could not be decrypted for acceptance.");
+          if (!row?.id) {
+            console.error("Yahoo Preview credential metadata is unavailable.");
             process.exit(2);
           }
-          console.log("::add-mask::" + row.value);
+          console.log(
+            "Yahoo Preview credential metadata: PRESENT"
+            + " type=" + String(row.type ?? "unknown")
+            + " branch=" + String(row.gitBranch ?? "all-preview")
+          );
+          fs.writeFileSync(process.env.RUNNER_TEMP + "/yahoo-env-id", row.id, "utf8");
+          NODE
+          ENV_ID="$(cat "$RUNNER_TEMP/yahoo-env-id")"
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v1/projects/prj_WiPB989mXurOuIgVm8asfmfdPA6W/env/$ENV_ID?teamId=team_aTOsma3gZ9xkcFkGJ53dUCCO" \
+            --output "$RUNNER_TEMP/yahoo-env-detail.json"
+          node <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/yahoo-env-detail.json", "utf8"));
+          if (payload.key !== "YAHOO_SHOPPING_CLIENT_ID" || typeof payload.value !== "string" || payload.value.length === 0) {
+            console.error(
+              "Yahoo Preview credential detail could not be decrypted for acceptance."
+              + " decrypted=" + String(payload.decrypted ?? false)
+              + " type=" + String(payload.type ?? "unknown")
+            );
+            process.exit(2);
+          }
+          console.log("::add-mask::" + payload.value);
           fs.appendFileSync(
             process.env.GITHUB_ENV,
-            "YAHOO_SHOPPING_CLIENT_ID<<YAHOO_EOF\n" + row.value + "\nYAHOO_EOF\n",
+            "YAHOO_SHOPPING_CLIENT_ID<<YAHOO_EOF\n" + payload.value + "\nYAHOO_EOF\n",
           );
           console.log("Yahoo Shopping Preview credential: DECRYPTED_FOR_ACCEPTANCE");
           NODE
-          rm -f "$RUNNER_TEMP/vercel-preview-env.json"
+          rm -f "$RUNNER_TEMP/vercel-preview-env.json" "$RUNNER_TEMP/yahoo-env-id" "$RUNNER_TEMP/yahoo-env-detail.json"
       - name: Run Yahoo real-JAN acceptance
         if: steps.yahoo-config.outputs.present == 'true'
         shell: bash
