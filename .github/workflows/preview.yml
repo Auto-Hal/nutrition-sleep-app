@@ -54,10 +54,6 @@ jobs:
             echo 'present=false' >> "$GITHUB_OUTPUT"
             echo '::warning::YAHOO_SHOPPING_CLIENT_ID is not configured for the Vercel Preview environment.'
           fi
-      - name: Inspect Vercel curl compatibility
-        if: steps.yahoo-config.outputs.present == 'true'
-        shell: bash
-        run: pnpm dlx vercel@48.2.0 curl --help
       - name: Run Yahoo real-JAN acceptance against protected Preview runtime
         if: steps.yahoo-config.outputs.present == 'true'
         shell: bash
@@ -67,7 +63,7 @@ jobs:
         run: |
           set +x
           for batch in 0 1 2 3; do
-            pnpm dlx vercel@48.2.0 curl "/api/acceptance/yahoo-real-jan?batch=$batch" \
+            pnpm dlx vercel@latest curl "/api/acceptance/yahoo-real-jan?batch=$batch" \
               --deployment "$PREVIEW_URL" \
               --token="$VERCEL_TOKEN" \
               > "$RUNNER_TEMP/yahoo-batch-$batch.json"
