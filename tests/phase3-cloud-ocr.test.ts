@@ -300,4 +300,27 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     ]));
   });
 
+
+  it("does not map the next unsupported folate row into vitamin D when the D value is unreadable", () => {
+    const words: OcrWord[] = [
+      word("ビタミンD(μg)", 20, 70, 220),
+      // Vitamin D amount intentionally missing.
+      word("葉酸(μg)", 20, 110, 160),
+      word("80", 360, 110, 45),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: "ビタミンD(μg)\n葉酸(μg) 80",
+      width: 520,
+      height: 180,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.nutrients.some((nutrient) => nutrient.code === "vitamin_d")).toBe(false);
+  });
+
 });
