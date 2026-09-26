@@ -290,8 +290,14 @@ Confirmed by physical iPhone acceptance on 2026-09-26:
 
 Open D2 issue:
 
-- nutrition-label OCR is functional but recognition quality was judged insufficient on the physical-device acceptance sample;
-- D2 remains open until the OCR quality issue is reproduced against a representative failed label image and the image-prep / Cloud Vision / parser path is corrected or bounded as acceptable.
+- nutrition-label OCR is functional but physical-device retests exposed parser row-alignment defects on a Japanese table label;
+- first defect: serving basis `1食分(40g)当たり` was misread and `40g` could be assigned as a nutrient value;
+- later retests improved substantially, but residual row shifts remained (for example protein/fat and vitamin B12/C/D/E);
+- the UI mapping was audited and confirmed code-keyed rather than index-keyed, so the remaining defect is parser-side;
+- parser hardening now uses structural unit rows (kcal/g/mg/ug) as row boundaries, rejects conflicting inline units, and disables fuzzy cross-matching within the vitamin family;
+- regression coverage includes skewed table rows, unsupported intervening rows such as folate/cholesterol, and vitamin-family separation;
+- latest application lint/typecheck/test/build all pass; Preview deployment is READY;
+- D2 remains open pending one final physical-device OCR retest on the same representative label.
 
 ### D3 — iPhone Nutrition / Sleep / Settings / export
 
