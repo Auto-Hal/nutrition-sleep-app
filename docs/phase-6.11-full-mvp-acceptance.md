@@ -312,10 +312,19 @@ Confirmed by physical iPhone acceptance on 2026-09-26:
 - account-deletion UI was exercised through the safe pre-destructive boundary only;
 - no real account deletion was performed.
 
-### D4 — iPhone Home Screen PWA / offline / version recovery
+### D4 — iPhone Home Screen PWA / offline / version recovery — IN PROGRESS
 
-- add to Home Screen and launch standalone;
-- cold-start while offline;
+D4a first physical-device attempt exposed an iOS PWA blocker:
+
+- Home Screen standalone launch while offline failed with Safari/WebKit error:
+  `Response served by service worker has redirections`;
+- root cause: the cached `offline.html` Response could retain a redirect chain (notably relevant on protected Preview deployments), and iOS rejects redirected Service Worker navigation responses;
+- fix: Service Worker now reconstructs cached shell responses as fresh final Responses, strips redirect/transport-only headers, sends same-origin credentials when priming the static shell, and validates that the final shell response remains same-origin;
+- a dedicated regression test covers redirect stripping for iOS offline navigation;
+- D4a remains open pending physical-device retest after the corrected Preview reaches READY.
+
+Still pending after D4a:
+
 - online → offline transition while protected health UI is visible;
 - offline → online recovery;
 - create or retain a pending outbox intent, then exercise update/reload;
