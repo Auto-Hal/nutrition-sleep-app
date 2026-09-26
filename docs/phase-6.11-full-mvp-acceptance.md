@@ -322,7 +322,8 @@ D4a first physical-device attempt exposed an iOS PWA blocker:
 - fix: Service Worker now reconstructs cached shell responses as fresh final Responses, strips redirect/transport-only headers, sends same-origin credentials when priming the static shell, and validates that the final shell response remains same-origin;
 - a dedicated regression test covers redirect stripping for iOS offline navigation;
 - corrected Preview reached READY and the physical-device cold-start offline retest passed: the app displayed the dedicated offline shell instead of the WebKit redirect error;
-- D4a remains open only for online → offline transition and offline → online recovery confirmation.
+- physical-device online → offline transition and offline → online recovery also passed;
+- **D4a PASS**.
 
 Still pending after D4a:
 
