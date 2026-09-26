@@ -154,6 +154,58 @@ Covered by current automated integration/contract suite:
 
 Hosted Preview retains existing Nutrition rows after Phase 6.9 migration.
 
+## 6.11-B checkpoint — Full Preview functional regression
+
+Status: **PASS for automated + Hosted Preview regression; external Yahoo and physical-device interactions remain in 6.11-C/D**
+
+Current acceptance head after regression fix:
+
+- application / unit / contract CI: PASS;
+- fresh DB replay / pgTAP: PASS through the CI workflow;
+- Preview workflow: PASS;
+- Vercel Preview deployment: READY;
+- no error/fatal runtime log entries observed for the latest Preview deployment in the inspected window.
+
+Regression coverage includes:
+
+- Today fixed/custom meal entry and skip/unskip behavior;
+- authoritative success refresh and optimistic/provisional Today nutrition;
+- Catalog / Batch / Product write contracts;
+- barcode normalization, OFF resolution, OCR fallback contracts, and Yahoo exact-JAN semantics;
+- reliable outbox owner/environment binding, auth pause, retry, receipt recovery, expiration and conflict subtypes;
+- same-entity serialization without unsafe auto-rebase;
+- Nutrition 7/30/90 thresholds, EAR/RDA/AI/DG/UL semantics, mixed axes and no overall score;
+- Sleep missing-day semantics, normalization/reconciliation and existing real-wearable Hosted state;
+- versioned export allowlist and owner scoping;
+- account deletion lifecycle / guard / fail-closed Admin boundary;
+- PWA static-shell/version-recovery contracts.
+
+One real acceptance defect was found and corrected in this checkpoint:
+
+- before the fix, reloading Today restored the persisted IndexedDB MealEntry operation itself but did **not** reconstruct the provisional nutrition delta, so the temporary energy display could disappear after reload;
+- Today now rehydrates current-date MealEntry provisional nutrition from owner/environment-bound IndexedDB records in `pending`, `in_flight`, `failed`, and `paused_auth` states;
+- terminal `conflict` / `expired` / `blocked` states remain excluded from provisional nutrition;
+- if the referenced active Catalog item is unavailable during rehydration, the pending entry is retained as nutrition-unknown rather than inventing a value;
+- regression coverage was added and the full CI/Preview workflow passed after the fix.
+
+Hosted Preview state remained intact after this application-only correction:
+
+- meals: 6;
+- meal entries: 14 active / 14 total;
+- Catalog items: 2;
+- Products: 1;
+- normalized Sleep sessions: 1 active / 1 total;
+- Sleep stage intervals: 22;
+- invalid stage intervals: 0;
+- stage overlaps: 0;
+- Google Health connections: 1 connected / 1 total;
+- deletion guards / operations: 0 / 0.
+
+Remaining interactive checks are intentionally separated:
+
+- real Japanese JAN/provider observations → 6.11-C;
+- iPhone/iPad, camera/OCR, export share/save, deletion safe boundary, offline/update/pending recovery → 6.11-D.
+
 ## Product / JAN / OCR
 
 Implementation acceptance is green:
