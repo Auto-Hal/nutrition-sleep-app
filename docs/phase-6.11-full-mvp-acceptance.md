@@ -299,13 +299,18 @@ OCR defect resolution:
 - final physical-device retest on the same representative label was confirmed correct by the user;
 - latest application lint/typecheck/test/build passed and the corrected Preview deployment reached READY.
 
-### D3 — iPhone Nutrition / Sleep / Settings / export
+### D3 — iPhone Nutrition / Sleep / Settings / export — PASS
 
-- Nutrition default 30-day hierarchy and drilldown;
-- Sleep summary/history and missing-day presentation;
-- Settings / Library navigation;
-- JSON export save/share;
-- account-deletion UI through the safe boundary only, stopping before the final destructive request.
+Confirmed by physical iPhone acceptance on 2026-09-26:
+
+- Nutrition default 30-day hierarchy opened and the review sections/drilldown remained usable;
+- no obvious Nutrition layout overflow or blocked interaction was observed;
+- Sleep summary/history displayed the real wearable record and stage breakdown;
+- missing sleep days remained missing rather than being represented as zero-duration sleep;
+- Settings → Library remained usable and existing records were visible;
+- JSON export completed to the iPhone share/save flow;
+- account-deletion UI was exercised through the safe pre-destructive boundary only;
+- no real account deletion was performed.
 
 ### D4 — iPhone Home Screen PWA / offline / version recovery
 
