@@ -251,7 +251,9 @@ Live acceptance harness added:
 
 **C live rerun requested:** the Yahoo Shopping Client ID has now been provisioned by the user in the Vercel Preview environment as server-only `YAHOO_SHOPPING_CLIENT_ID`. A fresh Preview workflow run must confirm credential presence and execute the 20-JAN live acceptance before C is marked PASS.
 
-C must not be marked PASS until that live run succeeds. No application code, DB migration, Production change, or user-data mutation is required.
+C must not be marked PASS until that live run succeeds.
+
+Branch-scoped Preview Yahoo credential was updated by the user; fresh live acceptance rerun requested. No application code, DB migration, Production change, or user-data mutation is required.
 
 ## Export
 
