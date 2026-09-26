@@ -352,16 +352,21 @@ function geometryMatches(document: OcrDocument) {
     const maxVerticalDistance = Math.max(10, boxHeight(anchor.box) * 0.8);
 
     const anchorUnit = anchor.unit;
-    const directCandidates = anchorUnit
-      ? document.words
+    const anchorLine = document.lines
+      .filter((line) =>
+        centerY(anchor.box) >= line.box.minY - 2
+        && centerY(anchor.box) <= line.box.maxY + 2
+      )
+      .sort((a, b) => Math.abs(centerY(a.box) - currentY) - Math.abs(centerY(b.box) - currentY))[0] ?? null;
+
+    const directCandidates = anchorUnit && anchorLine
+      ? anchorLine.words
         .map((word) => {
           const amount = parseNumber(word.text);
           if (amount === null) return null;
           const valueY = centerY(word.box);
           if (
-            valueY < rowTop
-            || valueY >= rowBottom
-            || Math.abs(valueY - currentY) > maxVerticalDistance
+            Math.abs(valueY - currentY) > maxVerticalDistance
             || word.box.minX < anchor.box.maxX - 8
           ) return null;
 
@@ -386,7 +391,7 @@ function geometryMatches(document: OcrDocument) {
         )
       : [];
 
-    const genericCandidates = values
+    const genericCandidates = anchorUnit ? [] : values
       .filter((candidate) => {
         const valueY = centerY(candidate.amountBox);
         return valueY >= rowTop
