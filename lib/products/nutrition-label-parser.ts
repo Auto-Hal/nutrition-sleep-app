@@ -31,6 +31,7 @@ type LabelAnchor = {
   code: CommercialNutrient["code"];
   parserLabel: string;
   text: string;
+  unit: string | null;
   box: OcrBox;
   confidence: number | null;
 };
@@ -170,6 +171,7 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
             code: definition.code,
             parserLabel: definition.parserLabel,
             text: phrase,
+            unit: normalizeUnit(phrase),
             box: unionBox(phraseWords.map((word) => word.box)),
             confidence: averageConfidence(phraseWords),
           });
@@ -188,7 +190,11 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
 
     const candidateWidth = candidate.box.maxX - candidate.box.minX;
     const existingWidth = existing.box.maxX - existing.box.minX;
-    if (candidateWidth < existingWidth) byCode.set(candidate.code, candidate);
+    if (candidate.unit && !existing.unit) {
+      byCode.set(candidate.code, candidate);
+    } else if (Boolean(candidate.unit) === Boolean(existing.unit) && candidateWidth < existingWidth) {
+      byCode.set(candidate.code, candidate);
+    }
   }
 
   return [...byCode.values()].sort((a, b) => centerY(a.box) - centerY(b.box));
@@ -343,8 +349,43 @@ function geometryMatches(document: OcrDocument) {
       ? currentY + Math.max(24, boxHeight(anchor.box) * 1.3)
       : (currentY + nextY) / 2;
 
-    const maxVerticalDistance = Math.max(24, boxHeight(anchor.box) * 1.5);
-    const candidates = values
+    const maxVerticalDistance = Math.max(10, boxHeight(anchor.box) * 0.8);
+
+    const directCandidates = anchor.unit
+      ? document.words
+        .map((word) => {
+          const amount = parseNumber(word.text);
+          if (amount === null) return null;
+          const valueY = centerY(word.box);
+          if (
+            valueY < rowTop
+            || valueY >= rowBottom
+            || Math.abs(valueY - currentY) > maxVerticalDistance
+            || word.box.minX < anchor.box.maxX - 8
+          ) return null;
+
+          const candidate: ValueCandidate = {
+            amount,
+            unit: anchor.unit,
+            text: `${word.text} [unit from ${anchor.text}]`,
+            box: word.box,
+            amountBox: word.box,
+            confidence: word.confidence,
+          };
+          const nutrient = parseCandidateForAnchor(anchor, candidate);
+          if (!nutrient) return null;
+          return {
+            candidate,
+            nutrient,
+            distance: Math.abs(valueY - currentY),
+          };
+        })
+        .filter((entry): entry is { candidate: ValueCandidate; nutrient: CommercialNutrient; distance: number } =>
+          entry !== null,
+        )
+      : [];
+
+    const genericCandidates = values
       .filter((candidate) => {
         const valueY = centerY(candidate.amountBox);
         return valueY >= rowTop
@@ -359,7 +400,9 @@ function geometryMatches(document: OcrDocument) {
       }))
       .filter((entry): entry is { candidate: ValueCandidate; nutrient: CommercialNutrient; distance: number } =>
         entry.nutrient !== null,
-      )
+      );
+
+    const candidates = [...directCandidates, ...genericCandidates]
       .sort((a, b) => a.distance - b.distance || a.candidate.amountBox.minX - b.candidate.amountBox.minX);
 
     const best = candidates[0];
