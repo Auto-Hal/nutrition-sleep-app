@@ -41,16 +41,24 @@ jobs:
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
       - name: Report optional Preview provider configuration
+        id: yahoo-config
         shell: bash
         run: |
           set +x
           ENV_LIST="$(pnpm dlx vercel@48.2.0 env ls preview --token=${{ secrets.VERCEL_TOKEN }} 2>&1)"
           if printf '%s\n' "$ENV_LIST" | grep -Fq 'YAHOO_SHOPPING_CLIENT_ID'; then
             echo 'Yahoo Shopping Preview credential: PRESENT' >> "$GITHUB_STEP_SUMMARY"
+            echo 'present=true' >> "$GITHUB_OUTPUT"
           else
             echo 'Yahoo Shopping Preview credential: MISSING' >> "$GITHUB_STEP_SUMMARY"
+            echo 'present=false' >> "$GITHUB_OUTPUT"
             echo '::warning::YAHOO_SHOPPING_CLIENT_ID is not configured for the Vercel Preview environment.'
           fi
+      - name: Run Yahoo real-JAN acceptance
+        if: steps.yahoo-config.outputs.present == 'true'
+        shell: bash
+        run: |
+          pnpm dlx vercel@48.2.0 env run -e preview -- node scripts/yahoo-real-jan-acceptance.mjs
       - run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
       - run: pnpm dlx vercel@48.2.0 build --target=preview --yes --token=${{ secrets.VERCEL_TOKEN }}
       - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --target=preview --token=${{ secrets.VERCEL_TOKEN }}
