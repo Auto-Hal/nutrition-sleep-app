@@ -276,7 +276,7 @@ Confirmed by physical iPhone acceptance on 2026-09-26:
 - normal Safari reload returned to a usable state;
 - no red error state, blank page, or infinite-loading failure was observed.
 
-### D2 — iPhone Today / Product / OCR — PARTIAL PASS
+### D2 — iPhone Today / Product / OCR — PASS
 
 Confirmed by physical iPhone acceptance on 2026-09-26:
 
@@ -288,16 +288,16 @@ Confirmed by physical iPhone acceptance on 2026-09-26:
 - Yahoo exact-JAN fallback reached successfully;
 - Yahoo returned multiple exact-JAN identity candidates and **did not auto-select**; explicit user selection was required as designed.
 
-Open D2 issue:
+OCR defect resolution:
 
-- nutrition-label OCR is functional but physical-device retests exposed parser row-alignment defects on a Japanese table label;
+- physical-device retests exposed parser row-alignment defects on a Japanese table label;
 - first defect: serving basis `1食分(40g)当たり` was misread and `40g` could be assigned as a nutrient value;
-- later retests improved substantially, but residual row shifts remained (for example protein/fat and vitamin B12/C/D/E);
-- the UI mapping was audited and confirmed code-keyed rather than index-keyed, so the remaining defect is parser-side;
+- later retests exposed residual row shifts across protein/fat and vitamin B12/C/D/E;
+- UI mapping was audited and confirmed code-keyed rather than index-keyed, isolating the defect to the parser;
 - parser hardening now uses structural unit rows (kcal/g/mg/ug) as row boundaries, rejects conflicting inline units, and disables fuzzy cross-matching within the vitamin family;
 - regression coverage includes skewed table rows, unsupported intervening rows such as folate/cholesterol, and vitamin-family separation;
-- latest application lint/typecheck/test/build all pass; Preview deployment is READY;
-- D2 remains open pending one final physical-device OCR retest on the same representative label.
+- final physical-device retest on the same representative label was confirmed correct by the user;
+- latest application lint/typecheck/test/build passed and the corrected Preview deployment reached READY.
 
 ### D3 — iPhone Nutrition / Sleep / Settings / export
 
