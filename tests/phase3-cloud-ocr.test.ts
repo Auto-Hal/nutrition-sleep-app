@@ -203,4 +203,73 @@ describe("Phase 3 Cloud Vision nutrition extraction", () => {
     expect(prep).toContain("MAX_OUTPUT_BYTES = 3_000_000");
     expect(prep).toContain('type: "image/jpeg"');
   });
+
+  it("parses Japanese table rows whose units are attached to labels without stealing the 40 g serving basis", () => {
+    const words: OcrWord[] = [
+      word("栄養成分表示", 20, 20, 180),
+      word("1食分(40g)当たり", 240, 20, 210),
+      word("エネルギー(kcal)", 20, 70, 220), word("164", 360, 70, 60),
+      word("たんぱく質(g)", 20, 110, 220), word("2.6", 360, 110, 55),
+      word("脂質(g)", 20, 150, 160), word("5.0", 360, 150, 55),
+      word("炭水化物(g)", 20, 190, 200), word("30.2", 360, 190, 65),
+      word("食物繊維(g)", 20, 230, 200), word("4.4", 360, 230, 55),
+      word("食塩相当量(g)", 20, 270, 220), word("0.25", 360, 270, 65),
+      word("カルシウム(mg)", 20, 310, 220), word("51", 360, 310, 45),
+      word("鉄(mg)", 20, 350, 140), word("4.2", 360, 350, 55),
+      word("ビタミンB1(mg)", 20, 390, 220), word("0.29", 360, 390, 65),
+      word("ビタミンB2(mg)", 20, 430, 220), word("0.11", 360, 430, 65),
+      word("ビタミンB6(mg)", 20, 470, 220), word("0.36", 360, 470, 65),
+      word("ビタミンB12(μg)", 20, 510, 230), word("0.32", 360, 510, 65),
+      word("ビタミンC(mg)", 20, 550, 200), word("24", 360, 550, 45),
+      word("ビタミンD(μg)", 20, 590, 200), word("2.6", 360, 590, 55),
+    ];
+
+    const document: OcrDocument = {
+      provider: "google_cloud_vision",
+      text: [
+        "栄養成分表示 1食分(40g)当たり",
+        "エネルギー(kcal) 164",
+        "たんぱく質(g) 2.6",
+        "脂質(g) 5.0",
+        "炭水化物(g) 30.2",
+        "食物繊維(g) 4.4",
+        "食塩相当量(g) 0.25",
+        "カルシウム(mg) 51",
+        "鉄(mg) 4.2",
+        "ビタミンB1(mg) 0.29",
+        "ビタミンB2(mg) 0.11",
+        "ビタミンB6(mg) 0.36",
+        "ビタミンB12(μg) 0.32",
+        "ビタミンC(mg) 24",
+        "ビタミンD(μg) 2.6",
+      ].join("\n"),
+      width: 520,
+      height: 660,
+      words,
+      lines: groupOcrWordsIntoLines(words),
+    };
+
+    const parsed = parseNutritionLabelDocument(document);
+
+    expect(parsed.basis).toEqual({ serving_size: 1, serving_unit: "食" });
+    expect(parsed.nutrients).toEqual(expect.arrayContaining([
+      { code: "energy", amount: 164, unit: "kcal" },
+      { code: "protein", amount: 2.6, unit: "g" },
+      { code: "fat", amount: 5, unit: "g" },
+      { code: "carbohydrate", amount: 30.2, unit: "g" },
+      { code: "fiber", amount: 4.4, unit: "g" },
+      { code: "salt_equivalent", amount: 0.25, unit: "g" },
+      { code: "calcium", amount: 51, unit: "mg" },
+      { code: "iron", amount: 4.2, unit: "mg" },
+      { code: "vitamin_b1", amount: 0.29, unit: "mg" },
+      { code: "vitamin_b2", amount: 0.11, unit: "mg" },
+      { code: "vitamin_b6", amount: 0.36, unit: "mg" },
+      { code: "vitamin_b12", amount: 0.32, unit: "ug" },
+      { code: "vitamin_c", amount: 24, unit: "mg" },
+      { code: "vitamin_d", amount: 2.6, unit: "ug" },
+    ]));
+    expect(parsed.nutrients.find((nutrient) => nutrient.code === "protein")?.amount).not.toBe(40);
+    expect(parsed.diagnostics.basis_detected).toBe(true);
+  });
+
 });
