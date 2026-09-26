@@ -18,7 +18,7 @@ Updated: 2026-09-26
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- current batch: **6.11 full MVP acceptance — 6.11-A PASS; 6.11-B functional regression next**
+- current batch: **6.11 full MVP acceptance — 6.11-A/B PASS; 6.11-C Yahoo/JAN external acceptance next**
 - Production: untouched
 
 ## Phase 6.7
@@ -164,7 +164,8 @@ Checkpoint status:
 
 - 6.11-A security / logs / stack integrity: PASS;
 - leaked-password protection: deferred as required Production Auth configuration check, not an implementation blocker;
-- next: 6.11-B Full Preview functional regression.
+- 6.11-B automated + Hosted Preview functional regression: PASS after fixing reload-time provisional Today nutrition hydration;
+- next: 6.11-C Yahoo/JAN external acceptance.
 
 Remaining final acceptance:
 
