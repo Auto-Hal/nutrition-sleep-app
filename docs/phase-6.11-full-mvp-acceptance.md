@@ -249,7 +249,7 @@ Live acceptance harness added:
 - found / ambiguous / not-found outcomes are summarized;
 - the Preview workflow automatically runs the live harness whenever the Preview credential is present.
 
-**Only remaining C blocker:** provision a Yahoo Shopping Client ID into the Vercel Preview environment as server-only `YAHOO_SHOPPING_CLIENT_ID`, then rerun the Preview workflow.
+**C live rerun requested:** the Yahoo Shopping Client ID has now been provisioned by the user in the Vercel Preview environment as server-only `YAHOO_SHOPPING_CLIENT_ID`. A fresh Preview workflow run must confirm credential presence and execute the 20-JAN live acceptance before C is marked PASS.
 
 C must not be marked PASS until that live run succeeds. No application code, DB migration, Production change, or user-data mutation is required.
 
