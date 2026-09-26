@@ -313,6 +313,25 @@ function structuralBoundsForAnchor(
   };
 }
 
+function hasConflictingInlineUnit(
+  document: OcrDocument,
+  amountWord: OcrWord,
+  anchorUnit: string,
+) {
+  const amountY = centerY(amountWord.box);
+  const maxVertical = Math.max(8, boxHeight(amountWord.box) * 0.8);
+
+  return document.words.some((word) => {
+    if (word === amountWord || parseNumber(word.text) !== null) return false;
+    const unit = normalizeUnit(word.text);
+    if (!unit || unit === anchorUnit) return false;
+
+    const vertical = Math.abs(centerY(word.box) - amountY);
+    const horizontal = word.box.minX - amountWord.box.maxX;
+    return vertical <= maxVertical && horizontal >= -4 && horizontal <= 120;
+  });
+}
+
 function findValueCandidates(document: OcrDocument): ValueCandidate[] {
   const words = [...document.words].sort((a, b) => {
     const y = centerY(a.box) - centerY(b.box);
@@ -426,6 +445,7 @@ function geometryMatches(document: OcrDocument) {
             valueY < structuralBounds.top
             || valueY >= structuralBounds.bottom
             || word.box.minX < anchor.box.maxX - 8
+            || hasConflictingInlineUnit(document, word, anchorUnit)
           ) return null;
 
           const candidate: ValueCandidate = {
