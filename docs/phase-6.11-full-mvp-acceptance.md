@@ -259,6 +259,61 @@ test utility.
 
 No database migration, Production deployment, or user-data mutation was required.
 
+## 6.11-D checkpoint — iPhone / iPad / PWA device acceptance
+
+Status: **IN PROGRESS**
+
+Acceptance is intentionally split into small device checkpoints so failures are isolated and repeatable.
+
+### D1 — iPhone baseline / navigation
+
+- open the exact Phase 6.11 Preview deployment on iPhone Safari;
+- sign in and confirm Today / Nutrition / Sleep / Settings navigation;
+- confirm Settings → Library remains reachable;
+- confirm no obvious clipping, horizontal overflow, unusable fixed footer/header, or blocked primary action;
+- confirm the app remains usable after a normal page reload.
+
+### D2 — iPhone Today / Product / OCR
+
+- add an ordinary meal entry;
+- add a snack/custom meal path;
+- verify skip/unskip and void paths;
+- scan a real barcode;
+- observe local → OFF → Yahoo → OCR/manual behavior as applicable;
+- if Yahoo returns multiple exact-JAN identities, verify no automatic identity selection occurs;
+- verify save and repeat local-hit behavior;
+- verify pending/retry presentation remains understandable.
+
+### D3 — iPhone Nutrition / Sleep / Settings / export
+
+- Nutrition default 30-day hierarchy and drilldown;
+- Sleep summary/history and missing-day presentation;
+- Settings / Library navigation;
+- JSON export save/share;
+- account-deletion UI through the safe boundary only, stopping before the final destructive request.
+
+### D4 — iPhone Home Screen PWA / offline / version recovery
+
+- add to Home Screen and launch standalone;
+- cold-start while offline;
+- online → offline transition while protected health UI is visible;
+- offline → online recovery;
+- create or retain a pending outbox intent, then exercise update/reload;
+- verify pending intent survives reload/update and resumes for the same owner;
+- verify unsupported/outdated contract content is blocked rather than silently dropped.
+
+### D5 — iPad responsive acceptance
+
+Repeat the semantic paths above at iPad layout width, emphasizing:
+
+- responsive hierarchy;
+- no horizontal overflow;
+- readable Nutrition/Sleep information density;
+- usable dialogs/forms;
+- touch targets and navigation.
+
+Evidence is recorded after each sub-checkpoint. No real account deletion is performed during D.
+
 ## Export
 
 PASS:
