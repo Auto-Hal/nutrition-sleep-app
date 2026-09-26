@@ -40,6 +40,7 @@ type ValueCandidate = {
   unit: string;
   text: string;
   box: OcrBox;
+  amountBox: OcrBox;
   confidence: number | null;
 };
 
@@ -247,6 +248,7 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
         ...combined,
         text: word.text,
         box: word.box,
+        amountBox: word.box,
         confidence: word.confidence,
       });
       continue;
@@ -267,10 +269,16 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
       const maxVertical = Math.max(boxHeight(unitWord.box), boxHeight(word.box)) * 0.8;
       if (verticalDistance > maxVertical) continue;
 
-      const horizontalGap = unitWord.box.minX - word.box.maxX;
-      if (horizontalGap < -8 || horizontalGap > Math.max(160, boxHeight(word.box) * 6)) continue;
+      const gapToRight = unitWord.box.minX - word.box.maxX;
+      const gapToLeft = word.box.minX - unitWord.box.maxX;
+      const horizontalGap = gapToRight >= -8
+        ? Math.max(0, gapToRight)
+        : gapToLeft >= -8
+          ? Math.max(0, gapToLeft)
+          : Number.POSITIVE_INFINITY;
+      if (horizontalGap > Math.max(240, boxHeight(word.box) * 10)) continue;
 
-      const distance = Math.abs(horizontalGap) + verticalDistance * 2;
+      const distance = horizontalGap + verticalDistance * 2;
       if (distance < bestDistance) {
         bestDistance = distance;
         bestUnitIndex = unitIndex;
@@ -288,6 +296,7 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
       unit,
       text: `${word.text} ${unitWord.text}`,
       box: unionBox([word.box, unitWord.box]),
+      amountBox: word.box,
       confidence: averageConfidence([word, unitWord]),
     });
   }
@@ -322,21 +331,21 @@ function geometryMatches(document: OcrDocument) {
     const maxVerticalDistance = Math.max(24, boxHeight(anchor.box) * 1.5);
     const candidates = values
       .filter((candidate) => {
-        const valueY = centerY(candidate.box);
+        const valueY = centerY(candidate.amountBox);
         return valueY >= rowTop
           && valueY < rowBottom
           && Math.abs(valueY - currentY) <= maxVerticalDistance
-          && candidate.box.minX >= anchor.box.maxX - 8;
+          && candidate.amountBox.minX >= anchor.box.maxX - 8;
       })
       .map((candidate) => ({
         candidate,
         nutrient: parseCandidateForAnchor(anchor, candidate),
-        distance: Math.abs(centerY(candidate.box) - currentY),
+        distance: Math.abs(centerY(candidate.amountBox) - currentY),
       }))
       .filter((entry): entry is { candidate: ValueCandidate; nutrient: CommercialNutrient; distance: number } =>
         entry.nutrient !== null,
       )
-      .sort((a, b) => a.distance - b.distance || a.candidate.box.minX - b.candidate.box.minX);
+      .sort((a, b) => a.distance - b.distance || a.candidate.amountBox.minX - b.candidate.amountBox.minX);
 
     const best = candidates[0];
     if (!best) continue;
