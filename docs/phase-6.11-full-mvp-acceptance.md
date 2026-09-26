@@ -219,41 +219,45 @@ Implementation acceptance is green:
 - OCR/manual remains nutrient fallback;
 - Product provenance v2 and reliable write/conflict behavior are tested.
 
-Still required for final Gate 11:
+External Yahoo/JAN acceptance is now complete in 6.11-C.
 
-- real Japanese JAN acceptance set of 20–50 representative packaged products;
-- zero false automatic identity matches in that set;
-- real OFF/Yahoo/OCR/manual fallback observations;
-- final save/repeat-local-hit usability check.
+Remaining Product/OCR interaction checks belong to physical-device acceptance in 6.11-D:
 
-This external-data acceptance is not replaced by unit tests.
+- camera/OCR interaction;
+- manual fallback interaction;
+- final save/repeat-local-hit usability.
 
 ## 6.11-C checkpoint — Yahoo/JAN external acceptance
 
-Status: **BLOCKED — external Preview credential missing; acceptance harness complete**
+Status: **PASS**
 
-Verified:
+Completed on 2026-09-26 against the protected Vercel Preview runtime with the real Preview
+`YAHOO_SHOPPING_CLIENT_ID` configured server-side.
 
-- Vercel Preview environment was queried through the authenticated Preview workflow without exposing values;
-- `YAHOO_SHOPPING_CLIENT_ID` is currently **not configured** in Preview;
-- current application behavior therefore takes the intended `yahoo_not_configured → OCR` fallback path rather than failing Product ingestion;
-- existing automated contracts continue to verify exact returned-JAN matching, mismatch rejection, ambiguous candidate handling, identity-only semantics, nutrition non-adoption, and OCR fallback.
+Live acceptance result:
 
-Live acceptance harness added:
+- representative Japanese JAN samples: **20**;
+- samples with an exact returned JAN candidate: **20 / 20**;
+- single exact candidate: **1**;
+- ambiguous exact-JAN candidate sets: **19**;
+- not found: **0**;
+- provider unavailable: **0**;
+- ambiguous results remain non-automatic and require explicit user selection;
+- exact returned-JAN equality remains mandatory before a Yahoo identity is eligible;
+- Yahoo remains identity-only; Yahoo nutrition is never adopted;
+- no raw Yahoo provider payload was returned by the acceptance surface or persisted;
+- existing automated contracts continue to cover returned-JAN mismatch rejection, ambiguous handling,
+  OCR fallback, provenance, and nutrition non-adoption.
 
-- `scripts/yahoo-real-jan-acceptance.mjs`;
-- 20 structurally valid, publicly observable Japanese JAN samples spanning beverages, instant noodles, snacks, cereal, chocolate, protein bar, soup and soy drinks;
-- requests are paced above one second apart;
-- the harness never prints the Client ID or raw provider response;
-- returned JAN values are normalized and non-exact values are rejected before candidate classification;
-- found / ambiguous / not-found outcomes are summarized;
-- the Preview workflow automatically runs the live harness whenever the Preview credential is present.
+The live run emitted only bounded acceptance metadata and did not print the Client ID or raw Yahoo
+responses. CI and Preview workflow both passed after the live acceptance.
 
-**C live rerun requested:** the Yahoo Shopping Client ID has now been provisioned by the user in the Vercel Preview environment as server-only `YAHOO_SHOPPING_CLIENT_ID`. A fresh Preview workflow run must confirm credential presence and execute the 20-JAN live acceptance before C is marked PASS.
+The temporary Preview-only acceptance endpoint and temporary workflow hooks used to exercise the
+server-only credential were removed after the evidence was captured, so no acceptance endpoint is
+carried forward toward Production. The reusable local acceptance script remains as a non-runtime
+test utility.
 
-C must not be marked PASS until that live run succeeds.
-
-Branch-scoped Preview Yahoo credential was updated by the user; fresh live acceptance rerun requested. No application code, DB migration, Production change, or user-data mutation is required.
+No database migration, Production deployment, or user-data mutation was required.
 
 ## Export
 
@@ -322,13 +326,12 @@ Still required on physical device:
 
 Before Phase 6.11 can be declared complete:
 
-1. real Japanese JAN acceptance set;
-2. iPhone acceptance across navigation, Today, Product/OCR, Nutrition, Sleep, Settings/Library,
+1. iPhone acceptance across navigation, Today, Product/OCR, Nutrition, Sleep, Settings/Library,
    export, account-deletion safe boundary, offline shell/version recovery;
-3. iPad acceptance for the same semantic flow and responsive hierarchy;
-4. physical-device pending-operation update/reload recovery;
-5. final Preview regression after those checks;
-6. explicit Production rollout approval.
+2. iPad acceptance for the same semantic flow and responsive hierarchy;
+3. physical-device pending-operation update/reload recovery;
+4. final Preview regression after those checks;
+5. explicit Production rollout approval.
 
 ## Production / MVP boundary
 
