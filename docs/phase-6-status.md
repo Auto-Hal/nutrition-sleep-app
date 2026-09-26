@@ -1,11 +1,11 @@
 # Phase 6 status
 
-Updated: 2026-09-25
+Updated: 2026-09-26
 
 ## Current state
 
 - Phase 6 design: **APPROVED — ASTRA CORRECTIONS APPLIED + SUPERVISOR/USER ACCEPTED**
-- Phase 6 implementation: **IN PROGRESS**
+- Phase 6 implementation: **6.1–6.10 IMPLEMENTED / 6.11 ACCEPTANCE IN PROGRESS**
 - completed / review-ready chain:
   - 6.1 Reliability server primitives
   - 6.2 IndexedDB client outbox / contract versioning
@@ -18,7 +18,7 @@ Updated: 2026-09-25
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- next batch: **6.11 full MVP acceptance**
+- current batch: **6.11 full MVP acceptance — 6.11-A/B/C PASS; 6.11-D device acceptance IN PROGRESS**
 - Production: untouched
 
 ## Phase 6.7
@@ -142,6 +142,41 @@ Automated acceptance:
 - Production remains untouched.
 
 Device-specific PWA acceptance (Home Screen install, cold-start offline, update/reload with pending intent) remains part of Phase 6.11 full MVP acceptance.
+
+## Phase 6.11
+
+Acceptance tracking is now recorded in `docs/phase-6.11-full-mvp-acceptance.md`.
+
+Current integrated findings:
+
+- current stacked application checks: green;
+- fresh DB / pgTAP regression: green;
+- Hosted Preview migration chain through Phase 6.9: present;
+- Phase 6.10 requires no DB migration;
+- Hosted Preview Nutrition + real-wearable Sleep state remains intact;
+- Preview runtime error/fatal review: no matching errors in the inspected 24-hour window;
+- all public user-data tables have RLS enabled;
+- anon has no SELECT/INSERT access to public user-data tables;
+- public SECURITY DEFINER RPCs are not anon-executable, reference `auth.uid()`, and set explicit `search_path`;
+- existing Security Advisor warnings are documented in the 6.11 acceptance matrix.
+
+Checkpoint status:
+
+- 6.11-A security / logs / stack integrity: PASS;
+- leaked-password protection: deferred as required Production Auth configuration check, not an implementation blocker;
+- 6.11-B automated + Hosted Preview functional regression: PASS after fixing reload-time provisional Today nutrition hydration;
+- 6.11-C Yahoo/JAN external acceptance: PASS — 20/20 samples produced exact-JAN candidates; 1 single candidate, 19 ambiguous/manual-selection cases, 0 not-found, 0 unavailable; identity-only/no-nutrition/raw-payload invariants held.
+- next: 6.11-D iPhone/iPad/PWA device acceptance.
+
+Remaining final acceptance:
+
+- iPhone device E2E including Product/OCR and PWA offline/update recovery;
+- iPad device E2E;
+- final Preview regression after device/external acceptance;
+- approved Production rollout;
+- explicit MVP COMPLETE decision.
+
+Production remains untouched.
 
 ## Phase 5 relationship
 

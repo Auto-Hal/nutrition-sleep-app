@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MealLog } from "@/components/meal-log";
 import type { TodayNutritionSummary } from "@/lib/nutrition/analytics";
 import type { CatalogItem, Meal } from "@/lib/nutrition/catalog";
 import type { OutboxBinding, PendingMutationStatus } from "@/lib/offline/outbox-contract";
+import { listOutboxMutations } from "@/lib/offline/outbox-idb";
 
 function formatEnergy(value: number | null) {
   if (value === null) return "—";
@@ -16,6 +17,28 @@ type PendingNutritionDelta = {
   energyAmount: number | null;
   energyKnown: boolean;
 };
+
+const PROVISIONAL_OUTBOX_STATUSES = new Set<PendingMutationStatus>([
+  "pending",
+  "in_flight",
+  "failed",
+  "paused_auth",
+]);
+
+function provisionalNutritionDelta(
+  item: CatalogItem | undefined,
+  quantity: number,
+): PendingNutritionDelta {
+  if (!item) return { energyAmount: null, energyKnown: false };
+  const energy = item.nutrients.find((nutrient) => nutrient.code === "energy");
+  const energyKnown = energy?.amount !== null && energy?.amount !== undefined;
+  return {
+    energyAmount: energyKnown
+      ? Number(energy.amount) * (quantity / item.serving_size)
+      : null,
+    energyKnown,
+  };
+}
 
 export function TodayInteractive({
   date,
@@ -40,6 +63,39 @@ export function TodayInteractive({
     () => ({ ownerUserId, environmentId }),
     [ownerUserId, environmentId],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void listOutboxMutations(binding)
+      .then((rows) => {
+        if (cancelled) return;
+        const itemById = new Map(initialItems.map((item) => [item.id, item]));
+        const restored: Record<string, PendingNutritionDelta> = {};
+
+        for (const row of rows) {
+          if (
+            row.kind !== "meal_entry_create"
+            || row.payload.meal_date !== date
+            || !PROVISIONAL_OUTBOX_STATUSES.has(row.status)
+          ) {
+            continue;
+          }
+          restored[row.operation_id] = provisionalNutritionDelta(
+            itemById.get(row.payload.catalog_item_id),
+            row.payload.quantity,
+          );
+        }
+
+        setPendingNutrition(restored);
+      })
+      .catch(() => {
+        // MealLog surfaces IndexedDB read errors. Keep server summary unchanged here.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [binding, date, initialItems]);
 
   const refreshSummary = useCallback((operationIdToClear?: string) => {
     const version = ++refreshVersion.current;

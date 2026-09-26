@@ -12,7 +12,16 @@ import {
 import { drainOutbox } from "@/lib/offline/outbox-runtime";
 import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 
-export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
+const ACCEPTANCE_OUTBOX_PAUSE_KEY = "nutrition-sleep:acceptance-outbox-pause";
+const ACCEPTANCE_OUTBOX_PAUSE_EVENT = "nutrition-sleep:acceptance-outbox-pause-changed";
+
+export function OutboxRuntime({
+  binding,
+  allowAcceptancePause = false,
+}: {
+  binding: OutboxBinding;
+  allowAcceptancePause?: boolean;
+}) {
   const running = useRef(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
@@ -39,6 +48,14 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
 
   const run = useCallback(async () => {
     if (running.current || !mounted.current) return;
+    if (
+      allowAcceptancePause
+      && typeof window !== "undefined"
+      && window.localStorage.getItem(ACCEPTANCE_OUTBOX_PAUSE_KEY) === "1"
+    ) {
+      await refreshCompatibility();
+      return;
+    }
     running.current = true;
     try {
       const result = await drainOutbox(binding);
@@ -57,7 +74,7 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
     } finally {
       running.current = false;
     }
-  }, [binding, refreshCompatibility, scheduleRetry]);
+  }, [allowAcceptancePause, binding, refreshCompatibility, scheduleRetry]);
 
   useEffect(() => {
     mounted.current = true;
@@ -76,9 +93,18 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
       if (document.visibilityState === "visible") void run();
     };
     const onDrain = () => void run();
+    const onAcceptancePauseChanged = () => {
+      if (
+        !allowAcceptancePause
+        || window.localStorage.getItem(ACCEPTANCE_OUTBOX_PAUSE_KEY) !== "1"
+      ) {
+        void run();
+      }
+    };
 
     window.addEventListener("online", onOnline);
     window.addEventListener(OUTBOX_DRAIN_EVENT, onDrain);
+    window.addEventListener(ACCEPTANCE_OUTBOX_PAUSE_EVENT, onAcceptancePauseChanged);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
@@ -87,9 +113,10 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
       retryTimer.current = null;
       window.removeEventListener("online", onOnline);
       window.removeEventListener(OUTBOX_DRAIN_EVENT, onDrain);
+      window.removeEventListener(ACCEPTANCE_OUTBOX_PAUSE_EVENT, onAcceptancePauseChanged);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [binding, refreshCompatibility, run]);
+  }, [allowAcceptancePause, binding, refreshCompatibility, run]);
 
   if (incompatibleCount === 0) return null;
 

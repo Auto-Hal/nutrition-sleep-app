@@ -77,4 +77,14 @@ describe("Phase 6.10 PWA shell and version recovery", () => {
     expect(nextConfig).toContain("no-cache, no-store, must-revalidate");
     expect(nextConfig).toContain("Service-Worker-Allowed");
   });
+
+  it("reconstructs cached offline navigation as a final non-redirected response for iOS PWA", () => {
+    expect(sw).toContain("async function asFinalResponse(response)");
+    expect(sw).toContain("new Response(await response.clone().blob()");
+    expect(sw).toContain('headers.delete("location")');
+    expect(sw).toContain("return asFinalResponse(cached)");
+    expect(sw).toContain('credentials: "same-origin"');
+    expect(sw).not.toContain("return (await caches.match(OFFLINE_URL))");
+  });
+
 });

@@ -14,6 +14,7 @@ export default async function ProtectedLayout({ children }: Readonly<{ children:
       email={session.email ?? undefined}
       ownerUserId={session.userId}
       environmentId={appEnvironmentId()}
+      allowAcceptanceOutboxPause={process.env.VERCEL_ENV === "preview"}
     >
       {children}
     </AppShell>

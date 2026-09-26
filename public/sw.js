@@ -18,8 +18,13 @@ self.addEventListener("install", (event) => {
     const cache = await caches.open(CACHE_NAME);
     await Promise.all(STATIC_SHELL.map(async (url) => {
       try {
-        const response = await fetch(url, { cache: "reload" });
-        if (response.ok) await cache.put(url, response);
+        const response = await fetch(url, {
+          cache: "reload",
+          credentials: "same-origin",
+        });
+        if (isSafeStaticShellResponse(response)) {
+          await cache.put(url, await asFinalResponse(response));
+        }
       } catch {
         // A partial static shell can still install; navigation fallback is best-effort.
       }
@@ -49,6 +54,45 @@ function isStaticAsset(pathname) {
     || STATIC_SHELL.includes(pathname);
 }
 
+async function asFinalResponse(response) {
+  const headers = new Headers(response.headers);
+  // A Response reconstructed from its body no longer carries a redirect chain.
+  // Drop transport/redirect-only headers because the body is already decoded.
+  headers.delete("content-encoding");
+  headers.delete("content-length");
+  headers.delete("transfer-encoding");
+  headers.delete("location");
+
+  return new Response(await response.clone().blob(), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function isSafeStaticShellResponse(response) {
+  if (!response.ok) return false;
+  try {
+    return new URL(response.url).origin === self.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+async function offlineShellResponse() {
+  const cached = await caches.match(OFFLINE_URL);
+  if (!cached) {
+    return new Response(
+      "<!doctype html><html lang=\"ja\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>オフライン</title><body><main><h1>オフラインです</h1><p>現在、サーバーから最新の栄養・睡眠データを読み込めません。</p><p>接続を戻してから再試行してください。</p></main></body></html>",
+      {
+        status: 503,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      },
+    );
+  }
+  return asFinalResponse(cached);
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -62,11 +106,7 @@ self.addEventListener("fetch", (event) => {
       try {
         return await fetch(request, { cache: "no-store" });
       } catch {
-        return (await caches.match(OFFLINE_URL))
-          || new Response("Offline", {
-            status: 503,
-            headers: { "content-type": "text/plain; charset=utf-8" },
-          });
+        return offlineShellResponse();
       }
     })());
     return;

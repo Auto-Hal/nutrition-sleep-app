@@ -151,4 +151,14 @@ describe("Phase 4.5 optimistic Today energy", () => {
     expect(source).toContain('state === "expired"');
     expect(source).toContain('state === "blocked"');
   });
+
+  it("rehydrates provisional nutrition from persisted MealEntry outbox state after reload", () => {
+    const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");
+    expect(source).toContain("listOutboxMutations(binding)");
+    expect(source).toContain('row.kind !== "meal_entry_create"');
+    expect(source).toContain("row.payload.meal_date !== date");
+    expect(source).toContain("PROVISIONAL_OUTBOX_STATUSES.has(row.status)");
+    expect(source).toContain('"paused_auth"');
+    expect(source).toContain("setPendingNutrition(restored)");
+  });
 });
