@@ -351,7 +351,8 @@ function geometryMatches(document: OcrDocument) {
 
     const maxVerticalDistance = Math.max(10, boxHeight(anchor.box) * 0.8);
 
-    const directCandidates = anchor.unit
+    const anchorUnit = anchor.unit;
+    const directCandidates = anchorUnit
       ? document.words
         .map((word) => {
           const amount = parseNumber(word.text);
@@ -366,7 +367,7 @@ function geometryMatches(document: OcrDocument) {
 
           const candidate: ValueCandidate = {
             amount,
-            unit: anchor.unit,
+            unit: anchorUnit,
             text: `${word.text} [unit from ${anchor.text}]`,
             box: word.box,
             amountBox: word.box,
