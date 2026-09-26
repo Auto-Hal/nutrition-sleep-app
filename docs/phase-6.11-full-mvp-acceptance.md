@@ -265,13 +265,16 @@ Status: **IN PROGRESS**
 
 Acceptance is intentionally split into small device checkpoints so failures are isolated and repeatable.
 
-### D1 — iPhone baseline / navigation
+### D1 — iPhone baseline / navigation — PASS
 
-- open the exact Phase 6.11 Preview deployment on iPhone Safari;
-- sign in and confirm Today / Nutrition / Sleep / Settings navigation;
-- confirm Settings → Library remains reachable;
-- confirm no obvious clipping, horizontal overflow, unusable fixed footer/header, or blocked primary action;
-- confirm the app remains usable after a normal page reload.
+Confirmed by physical iPhone acceptance on 2026-09-26:
+
+- exact Phase 6.11 Preview opened successfully in iPhone Safari;
+- Today / Nutrition / Sleep / Settings navigation worked;
+- Settings → Library was reachable;
+- no obvious clipping, horizontal overflow, unusable fixed footer/header, or blocked primary action was observed;
+- normal Safari reload returned to a usable state;
+- no red error state, blank page, or infinite-loading failure was observed.
 
 ### D2 — iPhone Today / Product / OCR
 
