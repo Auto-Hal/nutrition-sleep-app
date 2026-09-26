@@ -108,6 +108,11 @@ function labelMatches(phrase: string, label: string) {
   const normalizedLabel = normalizeToken(label);
   if (normalizedPhrase === normalizedLabel) return true;
 
+  if (normalizedPhrase.startsWith(normalizedLabel)) {
+    const suffix = normalizedPhrase.slice(normalizedLabel.length);
+    if (["g", "mg", "ug", "kcal", "kj"].includes(suffix)) return true;
+  }
+
   // Fuzzy matching is intentionally limited to longer known nutrition labels.
   // It repairs one-character OCR noise without making short labels such as 鉄 ambiguous.
   return normalizedLabel.length >= 4
