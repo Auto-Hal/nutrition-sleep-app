@@ -76,10 +76,14 @@ jobs:
             exit 0
           fi
 
-          pnpm dlx vercel@48.2.0 env run -e preview --token="$VERCEL_TOKEN" -- bash -c '
-            set -euo pipefail
-            test -n "${YAHOO_SHOPPING_CLIENT_ID:-}"
-            printf "%s" "$YAHOO_SHOPPING_CLIENT_ID" |
-              pnpm dlx vercel@48.2.0 env add YAHOO_SHOPPING_CLIENT_ID production --sensitive --token="$VERCEL_TOKEN"
-          '
+          pnpm dlx vercel@48.2.0 env pull /tmp/preview.env --environment=preview --yes --token="$VERCEL_TOKEN" >/dev/null
+          node --input-type=module - <<'NODE' \
+            | pnpm dlx vercel@48.2.0 env add YAHOO_SHOPPING_CLIENT_ID production --sensitive --token="$VERCEL_TOKEN"
+          import { loadEnvFile } from "node:process";
+          loadEnvFile("/tmp/preview.env");
+          const value = process.env.YAHOO_SHOPPING_CLIENT_ID;
+          if (!value) process.exit(2);
+          process.stdout.write(value);
+          NODE
+          rm -f /tmp/preview.env
           echo "YAHOO_SHOPPING_CLIENT_ID copied to Production without printing its value."
