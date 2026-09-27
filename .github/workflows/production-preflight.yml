@@ -70,15 +70,20 @@ jobs:
           fi
           echo "All required Production environment variable names are present."
 
+      - name: Pull Production environment for validation
+        shell: bash
+        run: |
+          pnpm dlx vercel@48.2.0 env pull /tmp/production.env --environment=production --yes --token="${{ secrets.VERCEL_TOKEN }}" >/dev/null
+
       - name: Validate Production environment contract
         shell: bash
         run: |
-          pnpm dlx vercel@48.2.0 env run -e production -- node scripts/verify-env.mjs --token="${{ secrets.VERCEL_TOKEN }}"
+          node --env-file=/tmp/production.env scripts/verify-env.mjs
 
       - name: Validate safe Production bindings
         shell: bash
         run: |
-          pnpm dlx vercel@48.2.0 env run -e production -- node --input-type=module - --token="${{ secrets.VERCEL_TOKEN }}" <<'NODE'
+          node --env-file=/tmp/production.env --input-type=module - <<'NODE'
           const expectedProjectRef = "vyvnicyupcrsmtgdyypv";
           const expectedOriginHost = "nutrition-sleep-app.vercel.app";
           const url = new URL(process.env.SUPABASE_URL);
@@ -103,3 +108,4 @@ jobs:
             process.exit(1);
           }
           NODE
+          rm -f /tmp/production.env
