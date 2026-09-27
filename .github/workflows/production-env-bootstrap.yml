@@ -1,0 +1,85 @@
+name: Production Environment Bootstrap
+
+on:
+  push:
+    branches:
+      - phase/6.11-full-mvp-acceptance
+    paths:
+      - .github/workflows/production-env-bootstrap.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    environment: preview
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Select the dedicated Vercel project
+        shell: bash
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'JSON'
+          {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
+          JSON
+
+      - name: Add generated Production-only secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          names="$(pnpm dlx vercel@48.2.0 env ls production --token="$VERCEL_TOKEN" 2>&1)"
+
+          has_name() {
+            grep -Eq "(^|[[:space:]])$1([[:space:]]|$)" <<<"$names"
+          }
+
+          add_random() {
+            local name="$1"
+            if has_name "$name"; then
+              echo "$name already present; leaving unchanged."
+              return
+            fi
+            node -e 'process.stdout.write(require("crypto").randomBytes(48).toString("base64url"))' \
+              | pnpm dlx vercel@48.2.0 env add "$name" production --sensitive --token="$VERCEL_TOKEN"
+            echo "$name configured."
+          }
+
+          add_random PROVIDER_TOKEN_ENCRYPTION_KEY
+          add_random CRON_SECRET
+          add_random ACCOUNT_DELETION_STATUS_HMAC_KEY
+
+          if ! has_name ACCOUNT_DELETION_ADMIN_ENVIRONMENT; then
+            printf '%s' 'production' \
+              | pnpm dlx vercel@48.2.0 env add ACCOUNT_DELETION_ADMIN_ENVIRONMENT production --token="$VERCEL_TOKEN"
+            echo "ACCOUNT_DELETION_ADMIN_ENVIRONMENT configured."
+          fi
+
+      - name: Copy accepted Yahoo Client ID from Preview to Production
+        shell: bash
+        run: |
+          set -euo pipefail
+          names="$(pnpm dlx vercel@48.2.0 env ls production --token="$VERCEL_TOKEN" 2>&1)"
+          if grep -Eq '(^|[[:space:]])YAHOO_SHOPPING_CLIENT_ID([[:space:]]|$)' <<<"$names"; then
+            echo "YAHOO_SHOPPING_CLIENT_ID already present; leaving unchanged."
+            exit 0
+          fi
+
+          pnpm dlx vercel@48.2.0 env run -e preview -- bash -c '
+            set -euo pipefail
+            test -n "${YAHOO_SHOPPING_CLIENT_ID:-}"
+            printf "%s" "$YAHOO_SHOPPING_CLIENT_ID" |
+              pnpm dlx vercel@48.2.0 env add YAHOO_SHOPPING_CLIENT_ID production --sensitive --token="$VERCEL_TOKEN"
+          '
+          echo "YAHOO_SHOPPING_CLIENT_ID copied to Production without printing its value."
