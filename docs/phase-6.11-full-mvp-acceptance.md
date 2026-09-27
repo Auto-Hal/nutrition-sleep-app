@@ -261,7 +261,7 @@ No database migration, Production deployment, or user-data mutation was required
 
 ## 6.11-D checkpoint — iPhone / iPad / PWA device acceptance
 
-Status: **IN PROGRESS**
+Status: **IN PROGRESS — 6.11-D PASS; final blocker review (6.11-E) active**
 
 Acceptance is intentionally split into small device checkpoints so failures are isolated and repeatable.
 
@@ -350,17 +350,28 @@ This confirms pending intent persistence across restart + version transition and
 
 Remaining PWA contract behavior for unsupported/outdated outbox content is already covered by automated tests and remains blocked/preserved rather than silently converted or deleted.
 
-### D5 — iPad responsive acceptance
+### D5 — iPad responsive acceptance — PASS
 
-Repeat the semantic paths above at iPad layout width, emphasizing:
+Confirmed by physical iPad acceptance on 2026-09-27:
 
-- responsive hierarchy;
-- no horizontal overflow;
-- readable Nutrition/Sleep information density;
-- usable dialogs/forms;
-- touch targets and navigation.
+- Today remained usable at iPad width with no horizontal overflow or blocked primary actions;
+- Nutrition review hierarchy and drilldown remained readable without layout collapse;
+- Sleep summary/history/stage presentation remained within the viewport;
+- Settings / Library navigation, forms, export and safe account-deletion boundary remained usable;
+- portrait and landscape responsive behavior showed no blocking layout defect;
+- touch targets and bottom navigation remained usable.
 
-Evidence is recorded after each sub-checkpoint. No real account deletion is performed during D.
+### 6.11-D result — PASS
+
+Physical-device acceptance is complete across:
+
+- D1 iPhone baseline/navigation;
+- D2 Today/Product/barcode/Yahoo/OCR, including parser hardening discovered during acceptance;
+- D3 Nutrition/Sleep/Settings/Library/export/account-deletion safe boundary;
+- D4 Home Screen PWA offline/recovery + pending outbox persistence across restart/version update;
+- D5 iPad responsive acceptance.
+
+No real account deletion was performed during D.
 
 ## Export
 
