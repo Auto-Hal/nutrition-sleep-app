@@ -2,7 +2,7 @@
 
 Updated: 2026-09-26
 
-Status: **IN PROGRESS — automated/hosted gates substantially green; device/external/rollout gates remain**
+Status: **COMPLETE — Phase 6.11 acceptance passed; Gate 13 Production rollout not started**
 
 ## Purpose
 
@@ -261,7 +261,7 @@ No database migration, Production deployment, or user-data mutation was required
 
 ## 6.11-D checkpoint — iPhone / iPad / PWA device acceptance
 
-Status: **IN PROGRESS — 6.11-D PASS; final blocker review (6.11-E) active**
+Status: **PASS**
 
 Acceptance is intentionally split into small device checkpoints so failures are isolated and repeatable.
 
@@ -312,7 +312,7 @@ Confirmed by physical iPhone acceptance on 2026-09-26:
 - account-deletion UI was exercised through the safe pre-destructive boundary only;
 - no real account deletion was performed.
 
-### D4 — iPhone Home Screen PWA / offline / version recovery — IN PROGRESS
+### D4 — iPhone Home Screen PWA / offline / version recovery — PASS
 
 D4a first physical-device attempt exposed an iOS PWA blocker:
 
@@ -386,7 +386,7 @@ PASS:
 - token/password/ciphertext/provider-internal/mutation/deletion internals excluded;
 - real wearable Sleep export inspected in Hosted Preview.
 
-Device save/share still belongs to Gate 12.
+Physical-device JSON save/share acceptance passed in 6.11-D3.
 
 ## Account deletion
 
@@ -406,11 +406,9 @@ PASS at implementation/synthetic level:
 
 The sole real Preview user has intentionally **not** been deleted.
 
-Still required before final rollout acceptance:
-
-- safe acceptance through the UI boundary on device;
-- optional isolated synthetic Hosted Preview account test if the dedicated Admin environment is enabled;
-- no destructive test against the sole Production user.
+Physical-device safe-boundary acceptance passed in 6.11-D3.
+No destructive test was performed against the real Preview or Production user.
+An isolated synthetic destructive test remains optional and is not required to close Phase 6.11.
 
 ## PWA / version recovery
 
@@ -426,37 +424,89 @@ PASS at automated/Preview deployment level:
 - no automatic intent deletion on app update;
 - live offline boundary hides previously rendered server health UI.
 
-Still required on physical device:
+Physical-device PWA acceptance passed in 6.11-D4:
 
 - Home Screen launch;
 - cold-start offline;
 - online → offline transition;
 - offline → online recovery;
-- update/reload while pending operation exists;
+- update/reload while a pending operation existed;
 - same-owner resume;
-- verify pending intent survives update.
+- pending intent survived restart/version update and replayed once without duplication.
 
-## Remaining Gate 11 / 12 work
+## 6.11-E checkpoint — final blocker review
 
-Before Phase 6.11 can be declared complete:
+Status: **PASS**
 
-1. iPhone acceptance across navigation, Today, Product/OCR, Nutrition, Sleep, Settings/Library,
-   export, account-deletion safe boundary, offline shell/version recovery;
-2. iPad acceptance for the same semantic flow and responsive hierarchy;
-3. physical-device pending-operation update/reload recovery;
-4. final Preview regression after those checks;
-5. explicit Production rollout approval.
+Final review completed on 2026-09-27.
+
+Current final-head evidence:
+
+- application lint / typecheck / unit / environment validation / build: PASS;
+- fresh Supabase start / reset / pgTAP regression: PASS;
+- Preview workflow: PASS;
+- latest Vercel Preview deployment: READY;
+- latest Preview deployment error/fatal runtime log query: no matches;
+- one earlier `JWT issued at future` 500 occurred on the temporary D4b acceptance deployment; it did not recur on the final deployment and is not treated as a current blocker;
+- temporary D4b acceptance UI/pause hooks and temporary Yahoo runtime acceptance endpoint/workflow hooks are removed;
+- the remaining Yahoo real-JAN script is a non-runtime acceptance utility only.
+
+Final Hosted Preview integrity review:
+
+- meals: 9;
+- meal entries: 17 total / 16 active;
+- Catalog items: 2;
+- Products: 1;
+- Sleep sessions: 2 active / 2 total;
+- Sleep stage intervals: 45;
+- Google Health connections: 1 connected / 1 total;
+- deletion guards / operations: 0 / 0;
+- invalid Sleep stage intervals: 0;
+- overlapping Sleep stage pairs: 0;
+- overlapping active Sleep sessions: 0;
+- duplicate active provider resources: 0;
+- null meal/catalog revisions: 0 / 0.
+
+Final security/performance review:
+
+- Security Advisor continues to report the six intentional private server-only tables with RLS and no end-user policies;
+- Security Advisor continues to report the established 28 authenticated SECURITY DEFINER RPCs; 6.11-A already verified these are not anon-executable, reference `auth.uid()`, and define explicit `search_path`;
+- leaked-password protection remains disabled and is carried forward as a **required Gate 13 Production Auth configuration check**;
+- Performance Advisor reports unused-index INFO items only; no acceptance-time index deletion is warranted.
+
+Production boundary verification:
+
+- Preview Supabase migration chain reaches `phase6_account_lifecycle`;
+- Production Supabase migration chain still ends at `phase4_astra_corrections`, so Phase 5/6 migrations have not been applied there;
+- no Production-target Vercel deployment was performed during Phase 6.11;
+- no Production DB mutation or real-account deletion was performed.
+
+No open Phase 6.11 blocker remains.
+
+## Phase 6.11 result
+
+**COMPLETE / PASS**
+
+Passed checkpoints:
+
+- 6.11-A security / logs / stack integrity;
+- 6.11-B full Preview functional regression;
+- 6.11-C Yahoo/JAN external acceptance;
+- 6.11-D iPhone / iPad / PWA physical-device acceptance;
+- 6.11-E final blocker review.
+
+The next step is **Gate 13 Production rollout**, which requires explicit user approval and must not be started implicitly.
 
 ## Production / MVP boundary
 
-Do not declare MVP COMPLETE yet.
+Phase 6.11 acceptance is complete, but **MVP Production rollout is not complete**.
 
-MVP COMPLETE requires:
+MVP COMPLETE still requires:
 
-- Phase 5 complete through the approved Production boundary;
-- all Phase 6 acceptance gates complete;
-- no open blocking security/data-integrity issue;
-- approved Production rollout and non-destructive smoke;
-- explicit Supervisor/user acceptance.
+- explicit Gate 13 Production rollout approval;
+- required Production Auth/configuration checks, including leaked-password protection;
+- approved Production migration/deployment sequence;
+- non-destructive Production smoke verification;
+- explicit Supervisor/user acceptance after rollout.
 
 Production remains untouched.
