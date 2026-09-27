@@ -66,26 +66,8 @@ jobs:
             echo "ACCOUNT_DELETION_ADMIN_ENVIRONMENT configured."
           fi
 
-      - name: Copy accepted Yahoo Client ID from Preview to Production
+      - name: Report remaining manual Production credentials
         shell: bash
         run: |
-          set -euo pipefail
-          names="$(pnpm dlx vercel@48.2.0 env ls production --token="$VERCEL_TOKEN" 2>&1)"
-          if grep -Eq '(^|[[:space:]])YAHOO_SHOPPING_CLIENT_ID([[:space:]]|$)' <<<"$names"; then
-            echo "YAHOO_SHOPPING_CLIENT_ID already present; leaving unchanged."
-            exit 0
-          fi
-
-          pnpm dlx vercel@48.2.0 env pull /tmp/preview.env --environment=preview --git-branch=phase/6.11-full-mvp-acceptance --yes --token="$VERCEL_TOKEN" >/dev/null
-          node --input-type=module - <<'NODE'
-          import { loadEnvFile } from "node:process";
-          import { writeFileSync } from "node:fs";
-          loadEnvFile("/tmp/preview.env");
-          const value = process.env.YAHOO_SHOPPING_CLIENT_ID;
-          if (!value) process.exit(2);
-          writeFileSync("/tmp/yahoo-client-id", value, { mode: 0o600 });
-          NODE
-          cat /tmp/yahoo-client-id \
-            | pnpm dlx vercel@48.2.0 env add YAHOO_SHOPPING_CLIENT_ID production --sensitive --token="$VERCEL_TOKEN"
-          rm -f /tmp/preview.env /tmp/yahoo-client-id
-          echo "YAHOO_SHOPPING_CLIENT_ID copied to Production without printing its value."
+          echo "Generated Production-only secrets are configured."
+          echo "Sensitive/provider credentials are intentionally left for manual environment-specific setup."
