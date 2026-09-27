@@ -77,13 +77,15 @@ jobs:
           fi
 
           pnpm dlx vercel@48.2.0 env pull /tmp/preview.env --environment=preview --yes --token="$VERCEL_TOKEN" >/dev/null
-          node --input-type=module - <<'NODE' \
-            | pnpm dlx vercel@48.2.0 env add YAHOO_SHOPPING_CLIENT_ID production --sensitive --token="$VERCEL_TOKEN"
+          node --input-type=module - <<'NODE'
           import { loadEnvFile } from "node:process";
+          import { writeFileSync } from "node:fs";
           loadEnvFile("/tmp/preview.env");
           const value = process.env.YAHOO_SHOPPING_CLIENT_ID;
           if (!value) process.exit(2);
-          process.stdout.write(value);
+          writeFileSync("/tmp/yahoo-client-id", value, { mode: 0o600 });
           NODE
-          rm -f /tmp/preview.env
+          cat /tmp/yahoo-client-id \
+            | pnpm dlx vercel@48.2.0 env add YAHOO_SHOPPING_CLIENT_ID production --sensitive --token="$VERCEL_TOKEN"
+          rm -f /tmp/preview.env /tmp/yahoo-client-id
           echo "YAHOO_SHOPPING_CLIENT_ID copied to Production without printing its value."
