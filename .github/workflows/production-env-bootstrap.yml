@@ -76,7 +76,7 @@ jobs:
             exit 0
           fi
 
-          pnpm dlx vercel@48.2.0 env run -e preview -- bash -c '
+          pnpm dlx vercel@48.2.0 env run -e preview --token="$VERCEL_TOKEN" -- bash -c '
             set -euo pipefail
             test -n "${YAHOO_SHOPPING_CLIENT_ID:-}"
             printf "%s" "$YAHOO_SHOPPING_CLIENT_ID" |
