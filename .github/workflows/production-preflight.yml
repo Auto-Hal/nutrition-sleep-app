@@ -1,0 +1,105 @@
+name: Production Preflight
+
+on:
+  push:
+    branches:
+      - phase/6.11-full-mvp-acceptance
+    paths:
+      - .github/workflows/production-preflight.yml
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    environment: preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Select the dedicated Vercel project
+        shell: bash
+        run: |
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'JSON'
+          {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
+          JSON
+
+      - name: Check Production environment names
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$(pnpm dlx vercel@48.2.0 env ls production --token="${{ secrets.VERCEL_TOKEN }}" 2>&1)"
+          required=(
+            SUPABASE_URL
+            SUPABASE_PUBLISHABLE_KEY
+            DATABASE_URL
+            APP_SESSION_ENCRYPTION_KEY
+            APP_ALLOWED_USER_ID
+            APP_LOGIN_RATE_LIMIT_KEY
+            APP_ORIGIN
+            GOOGLE_CLOUD_VISION_API_KEY
+            YAHOO_SHOPPING_CLIENT_ID
+            GOOGLE_HEALTH_CLIENT_ID
+            GOOGLE_HEALTH_CLIENT_SECRET
+            GOOGLE_HEALTH_REDIRECT_URI
+            PROVIDER_TOKEN_ENCRYPTION_KEY
+            CRON_SECRET
+            SUPABASE_SERVICE_ROLE_KEY
+            ACCOUNT_DELETION_STATUS_HMAC_KEY
+            ACCOUNT_DELETION_ADMIN_ENVIRONMENT
+            EXPECTED_SUPABASE_PROJECT_REF
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            if ! grep -Eq "(^|[[:space:]])${name}([[:space:]]|$)" <<<"$output"; then
+              missing+=("$name")
+            fi
+          done
+          if ((${#missing[@]})); then
+            printf 'Missing Production environment variables: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "All required Production environment variable names are present."
+
+      - name: Validate Production environment contract
+        shell: bash
+        run: |
+          pnpm dlx vercel@48.2.0 env run -e production -- node scripts/verify-env.mjs --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Validate safe Production bindings
+        shell: bash
+        run: |
+          pnpm dlx vercel@48.2.0 env run -e production -- node --input-type=module - --token="${{ secrets.VERCEL_TOKEN }}" <<'NODE'
+          const expectedProjectRef = "vyvnicyupcrsmtgdyypv";
+          const expectedOriginHost = "nutrition-sleep-app.vercel.app";
+          const url = new URL(process.env.SUPABASE_URL);
+          const appOrigin = new URL(process.env.APP_ORIGIN);
+          const redirect = new URL(process.env.GOOGLE_HEALTH_REDIRECT_URI);
+
+          const checks = {
+            supabase_project_ref: url.hostname === expectedProjectRef + ".supabase.co",
+            app_origin_host: appOrigin.hostname === expectedOriginHost,
+            google_redirect_host: redirect.hostname === expectedOriginHost,
+            google_redirect_path: redirect.pathname === "/api/health/google/callback" && !redirect.search && !redirect.hash,
+            deletion_environment: process.env.ACCOUNT_DELETION_ADMIN_ENVIRONMENT === "production",
+            expected_project_ref: process.env.EXPECTED_SUPABASE_PROJECT_REF === expectedProjectRef,
+          };
+
+          const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+          for (const [name, ok] of Object.entries(checks)) {
+            console.log(name + ": " + (ok ? "PASS" : "FAIL"));
+          }
+          if (failed.length) {
+            console.error("Production binding validation failed: " + failed.join(", "));
+            process.exit(1);
+          }
+          NODE
