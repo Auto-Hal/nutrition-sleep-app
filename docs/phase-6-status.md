@@ -18,7 +18,7 @@ Updated: 2026-09-26
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- current batch: **6.11 full MVP acceptance — 6.11-A/B/C PASS; 6.11-D device acceptance IN PROGRESS**
+- current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D PASS; 6.11-E final blocker review IN PROGRESS**
 - Production: untouched
 
 ## Phase 6.7
