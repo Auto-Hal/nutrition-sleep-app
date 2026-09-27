@@ -5,7 +5,7 @@ Updated: 2026-09-26
 ## Current state
 
 - Phase 6 design: **APPROVED — ASTRA CORRECTIONS APPLIED + SUPERVISOR/USER ACCEPTED**
-- Phase 6 implementation: **6.1–6.10 IMPLEMENTED / 6.11 ACCEPTANCE IN PROGRESS**
+- Phase 6 implementation: **6.1–6.10 IMPLEMENTED / 6.11 ACCEPTANCE COMPLETE**
 - completed / review-ready chain:
   - 6.1 Reliability server primitives
   - 6.2 IndexedDB client outbox / contract versioning
@@ -18,7 +18,7 @@ Updated: 2026-09-26
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D PASS; 6.11-E final blocker review IN PROGRESS**
+- current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D/E PASS / COMPLETE**
 - Production: untouched
 
 ## Phase 6.7
@@ -141,7 +141,7 @@ Automated acceptance:
 - no Phase 6.10 DB migration was required;
 - Production remains untouched.
 
-Device-specific PWA acceptance (Home Screen install, cold-start offline, update/reload with pending intent) remains part of Phase 6.11 full MVP acceptance.
+Device-specific PWA acceptance passed in Phase 6.11-D, including Home Screen cold-start offline and pending-intent survival across an app version update.
 
 ## Phase 6.11
 
@@ -163,18 +163,20 @@ Current integrated findings:
 Checkpoint status:
 
 - 6.11-A security / logs / stack integrity: PASS;
-- leaked-password protection: deferred as required Production Auth configuration check, not an implementation blocker;
+- leaked-password protection: carried forward as a required Gate 13 Production Auth configuration check, not a Phase 6.11 implementation blocker;
 - 6.11-B automated + Hosted Preview functional regression: PASS after fixing reload-time provisional Today nutrition hydration;
-- 6.11-C Yahoo/JAN external acceptance: PASS — 20/20 samples produced exact-JAN candidates; 1 single candidate, 19 ambiguous/manual-selection cases, 0 not-found, 0 unavailable; identity-only/no-nutrition/raw-payload invariants held.
-- next: 6.11-D iPhone/iPad/PWA device acceptance.
+- 6.11-C Yahoo/JAN external acceptance: PASS — 20/20 samples produced exact-JAN candidates; 1 single candidate, 19 ambiguous/manual-selection cases, 0 not-found, 0 unavailable; identity-only/no-nutrition/raw-payload invariants held;
+- 6.11-D physical-device acceptance: PASS — iPhone navigation/Today/Product/OCR/Nutrition/Sleep/Settings/export, PWA offline/update recovery, and iPad responsive acceptance completed;
+- 6.11-E final blocker review: PASS — final CI/Preview green, latest deployment READY with no current error/fatal logs, Hosted Preview integrity green, no temporary acceptance runtime hooks remain.
 
-Remaining final acceptance:
+Phase 6.11 result: **COMPLETE / PASS**.
 
-- iPhone device E2E including Product/OCR and PWA offline/update recovery;
-- iPad device E2E;
-- final Preview regression after device/external acceptance;
-- approved Production rollout;
-- explicit MVP COMPLETE decision.
+Next gate:
+
+- Gate 13 Production rollout requires explicit user approval;
+- Production Auth/configuration checks first, including leaked-password protection;
+- Production migrations/deployment and non-destructive smoke only after approval;
+- explicit MVP COMPLETE decision after Production verification.
 
 Production remains untouched.
 
