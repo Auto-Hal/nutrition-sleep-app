@@ -66,6 +66,12 @@ jobs:
             echo "ACCOUNT_DELETION_ADMIN_ENVIRONMENT configured."
           fi
 
+          if ! has_name GOOGLE_HEALTH_REDIRECT_URI; then
+            printf '%s' 'https://nutrition-sleep-app.vercel.app/api/health/google/callback' \
+              | pnpm dlx vercel@48.2.0 env add GOOGLE_HEALTH_REDIRECT_URI production --token="$VERCEL_TOKEN"
+            echo "GOOGLE_HEALTH_REDIRECT_URI configured."
+          fi
+
       - name: Report remaining manual Production credentials
         shell: bash
         run: |
