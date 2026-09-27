@@ -325,7 +325,7 @@ D4a first physical-device attempt exposed an iOS PWA blocker:
 - physical-device online → offline transition and offline → online recovery also passed;
 - **D4a PASS**.
 
-### D4b — pending outbox across app update — IN PROGRESS
+### D4b — pending outbox across app update — PASS
 
 Physical-device pre-update checkpoint passed:
 
@@ -335,12 +335,20 @@ Physical-device pre-update checkpoint passed:
 - after fully closing and reopening the Home Screen PWA with connectivity available, the same unsynced operation remained present;
 - this confirms persistence across PWA process restart before the version transition.
 
-The temporary Preview-only pause control has now been removed and normal replay restored in the next app version.
-The remaining D4b check is to update/reload into that new version and confirm the same pending operation is replayed exactly once for the same signed-in owner, without duplication or silent loss.
+The temporary Preview-only pause control was then removed and normal replay restored in the next app version.
 
-Still pending after D4b:
+Physical-device post-update checkpoint passed:
 
-- verify unsupported/outdated contract content is blocked rather than silently dropped.
+- the PWA updated/reloaded into the new version;
+- the temporary D4b acceptance control disappeared as expected;
+- the preserved pending mutation replayed for the same signed-in owner;
+- the meal record appeared exactly once as authoritative server state;
+- the local unsynced state cleared;
+- closing and reopening the PWA did not create a duplicate.
+
+This confirms pending intent persistence across restart + version transition and exactly-once user-visible recovery for the accepted path.
+
+Remaining PWA contract behavior for unsupported/outdated outbox content is already covered by automated tests and remains blocked/preserved rather than silently converted or deleted.
 
 ### D5 — iPad responsive acceptance
 
