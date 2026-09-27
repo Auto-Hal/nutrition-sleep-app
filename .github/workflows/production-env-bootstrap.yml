@@ -76,7 +76,7 @@ jobs:
             exit 0
           fi
 
-          pnpm dlx vercel@48.2.0 env pull /tmp/preview.env --environment=preview --yes --token="$VERCEL_TOKEN" >/dev/null
+          pnpm dlx vercel@48.2.0 env pull /tmp/preview.env --environment=preview --git-branch=phase/6.11-full-mvp-acceptance --yes --token="$VERCEL_TOKEN" >/dev/null
           node --input-type=module - <<'NODE'
           import { loadEnvFile } from "node:process";
           import { writeFileSync } from "node:fs";
