@@ -39,6 +39,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             ownerUserId={session?.userId ?? ""}
             environmentId={appEnvironmentId()}
           />
+          <section className="card stack">
+            <div>
+              <p className="eyebrow">Privacy & legal</p>
+              <h2>データの取り扱い</h2>
+              <p className="muted">
+                Google Healthを含むデータの利用目的・保存・削除について確認できます。
+              </p>
+            </div>
+            <nav className="subnav" aria-label="Privacy and legal">
+              <Link href="/privacy">プライバシーポリシー</Link>
+              <Link href="/terms">利用規約</Link>
+              <Link href="/about">アプリについて</Link>
+            </nav>
+          </section>
           <AccountDeletion available={Boolean(accountDeletionAdminEnv())} />
         </div>
       )}
