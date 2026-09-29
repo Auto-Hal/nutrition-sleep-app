@@ -4,7 +4,7 @@
 
 - Phase 1–4.5 COMPLETE
 - CR-001 APPROVED — 2026-09-16
-- **Phase 5 REAL-WEARABLE PREVIEW ACCEPTANCE COMPLETE / PRODUCTION SERVER ROLLOUT COMPLETE / PRODUCTION OAUTH+SYNC ACCEPTANCE PENDING**
+- **Phase 5 REAL-WEARABLE PREVIEW ACCEPTANCE COMPLETE / PRODUCTION OAUTH+SYNC ACCEPTANCE PASS**
 - implementation branch: `phase/5-sleep-foundation`
 
 ## Binding provider contract
@@ -253,3 +253,14 @@ Still required before Phase 5 Production acceptance is closed:
 - verify real-device recent sync and normalized Sleep persistence;
 - verify repeated sync does not duplicate the observation;
 - no destructive account-deletion test against the real Production user.
+
+
+## Production Google Health real-device acceptance — 2026-09-29
+
+PASS:
+- Production Google OAuth authorization completed with the expected sleep-readonly permission;
+- provider returned connected;
+- initial Production sleep sync completed;
+- manual recent-3-day sync completed;
+- repeated reconciliation left 0 duplicate active provider resources;
+- no Production runtime error/fatal entries were observed after the OAuth/sync flow.
