@@ -2,7 +2,7 @@
 
 Updated: 2026-09-26
 
-Status: **COMPLETE — Phase 6.11 acceptance passed; Gate 13 Production rollout not started**
+Status: **COMPLETE — Phase 6.11 PASS; Gate 13 server rollout deployed, final real-account acceptance pending**
 
 ## Purpose
 
@@ -477,9 +477,10 @@ Final security/performance review:
 Production boundary verification:
 
 - Preview Supabase migration chain reaches `phase6_account_lifecycle`;
-- Production Supabase migration chain still ends at `phase4_astra_corrections`, so Phase 5/6 migrations have not been applied there;
-- no Production-target Vercel deployment was performed during Phase 6.11;
-- no Production DB mutation or real-account deletion was performed.
+- Production Supabase now includes the Phase 5/6 migration chain through `phase6_account_lifecycle`;
+- Gate 13 Production Vercel deployment is READY at `nutrition-sleep-app.vercel.app`;
+- public/unauthenticated Production smoke is PASS and runtime error/fatal scan is clean;
+- no real-account deletion was performed.
 
 No open Phase 6.11 blocker remains.
 
@@ -495,18 +496,17 @@ Passed checkpoints:
 - 6.11-D iPhone / iPad / PWA physical-device acceptance;
 - 6.11-E final blocker review.
 
-Gate 13 Production rollout was explicitly approved on 2026-09-29. Production preflight passed, Phase 5/6 database migrations were applied successfully, and post-migration security/integrity review passed. Application release/deployment remains the next step.
+Gate 13 Production rollout was explicitly approved on 2026-09-29. Production preflight passed, Phase 5/6 database migrations were applied successfully, post-migration security/integrity review passed, `main` release PR #24 was merged, and the Production deployment reached READY. Public/unauthenticated smoke passed and the Production deployment had no error/fatal runtime entries in the inspected window. Final authenticated real-account acceptance remains pending.
 
 ## Production / MVP boundary
 
-Phase 6.11 acceptance is complete, but **MVP Production rollout is not complete**.
+Phase 6.11 acceptance and the server-side Production rollout are complete, but **MVP COMPLETE still awaits authenticated real-account Production acceptance**.
 
 MVP COMPLETE still requires:
 
-- explicit Gate 13 Production rollout approval;
-- required Production Auth/configuration checks, including leaked-password protection;
-- approved Production migration/deployment sequence;
-- non-destructive Production smoke verification;
-- explicit Supervisor/user acceptance after rollout.
+- authenticated Production login/navigation smoke;
+- Production Google Health OAuth connection + real-device sync confirmation;
+- a final non-destructive Production data/export check;
+- explicit Supervisor/user acceptance after those checks.
 
-Production remains untouched.
+Production is deployed; destructive real-account deletion remains prohibited during final acceptance.
