@@ -2,7 +2,7 @@
 
 Updated: 2026-09-26
 
-Status: **COMPLETE — Phase 6.11 PASS; Gate 13 server rollout deployed, final real-account acceptance pending**
+Status: **COMPLETE — Phase 6.11 PASS / Gate 13 PASS / MVP COMPLETE**
 
 ## Purpose
 
@@ -500,13 +500,34 @@ Gate 13 Production rollout was explicitly approved on 2026-09-29. Production pre
 
 ## Production / MVP boundary
 
-Phase 6.11 acceptance and the server-side Production rollout are complete, but **MVP COMPLETE still awaits authenticated real-account Production acceptance**.
+Phase 6.11 acceptance, Gate 13 Production rollout, and authenticated real-account Production acceptance are complete. **MVP COMPLETE**.
 
 MVP COMPLETE still requires:
 
-- authenticated Production login/navigation smoke;
-- Production Google Health OAuth connection + real-device sync confirmation;
-- a final non-destructive Production data/export check;
-- explicit Supervisor/user acceptance after those checks.
+- authenticated Production login/navigation smoke: PASS;
+- Production Google Health OAuth connection + real-device sync confirmation: PASS;
+- repeated recent sync with 0 duplicate active provider resources: PASS;
+- final non-destructive Production JSON export/share-save smoke: PASS;
+- post-acceptance Production runtime error/fatal scan: 0;
+- Supervisor/user final acceptance: PASS.
 
 Production is deployed; destructive real-account deletion remains prohibited during final acceptance.
+
+
+## Gate 13 final result — 2026-09-29
+
+**PASS — MVP COMPLETE**
+
+Production acceptance completed successfully:
+- Production deployment READY;
+- Production Phase 5/6 database migrations applied;
+- post-migration security/integrity review passed;
+- Google Health production OAuth connected successfully with sleep-readonly access;
+- initial sleep sync completed;
+- manual recent-3-day resync completed;
+- duplicate active provider resources after repeat sync: 0;
+- Production JSON export/share-save flow completed on iPhone;
+- Production runtime error/fatal scan after final acceptance: 0.
+
+Known accepted limitation:
+- Supabase Leaked Password Protection remains disabled because it is Pro-plan-only; this was explicitly accepted for the current single-user Free-plan MVP and must be revisited before any multi-user/public rollout.
