@@ -7,9 +7,6 @@ const STATIC_SHELL = [
   OFFLINE_URL,
   "/manifest.webmanifest",
   "/icon.svg",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/apple-icon.png",
 ];
 const NEVER_INTERCEPT_PREFIXES = [
   "/api/",
