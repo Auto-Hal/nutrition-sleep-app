@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7f4">
+  <title>オフライン | 栄養・睡眠管理</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body { margin:0; background:#f5f7f4; color:#17221c; }
+    main { max-width:680px; margin:0 auto; padding:32px 18px 48px; }
+    section { background:#fff; border:1px solid #d9e1dc; border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(0,0,0,.04); }
+    .eyebrow { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#5c6c63; }
+    h1 { font-size:26px; margin:8px 0 14px; }
+    p { line-height:1.65; }
+    .muted { color:#647168; }
+    button { min-height:44px; padding:10px 16px; border:0; border-radius:12px; font:inherit; font-weight:700; background:#17221c; color:#fff; }
+    ul { padding-left:20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <div class="eyebrow">Offline shell</div>
+      <h1>オフラインです</h1>
+      <p>現在、サーバーから最新の栄養・睡眠データを読み込めません。</p>
+      <p class="muted">認証済みの画面やAPI結果をキャッシュから現在値として表示することはありません。</p>
+      <div id="pending" class="muted">この端末の未同期状態を確認しています…</div>
+      <button type="button" onclick="location.reload()">再試行</button>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var target = document.getElementById("pending");
+      function setText(text) { target.textContent = text; }
+
+      try {
+        var request = indexedDB.open("nutrition-sleep-outbox");
+        var abortedForMissingDb = false;
+
+        request.onupgradeneeded = function () {
+          abortedForMissingDb = true;
+          request.transaction.abort();
+        };
+        request.onerror = function () {
+          if (abortedForMissingDb) {
+            setText("この端末に未同期の操作はありません。");
+          } else {
+            setText("この端末の未同期状態を確認できませんでした。");
+          }
+        };
+        request.onsuccess = function () {
+          var db = request.result;
+          if (!db.objectStoreNames.contains("mutations")) {
+            db.close();
+            setText("この端末に未同期の操作はありません。");
+            return;
+          }
+
+          var tx = db.transaction("mutations", "readonly");
+          var store = tx.objectStore("mutations");
+          var all = store.getAll();
+          all.onerror = function () {
+            setText("この端末の未同期状態を確認できませんでした。");
+          };
+          all.onsuccess = function () {
+            var rows = Array.isArray(all.result) ? all.result : [];
+            var unresolved = rows.filter(function (row) {
+              return row && row.status !== "synced";
+            });
+            if (unresolved.length === 0) {
+              setText("この端末に未同期の操作はありません。");
+              return;
+            }
+
+            var blocked = unresolved.filter(function (row) {
+              return row.status === "blocked";
+            }).length;
+            var message = "この端末には未同期の操作が" + unresolved.length + "件あります。";
+            if (blocked > 0) {
+              message += " うち" + blocked + "件は確認が必要な状態です。";
+            }
+            message += " 接続復帰後も記録は自動削除されません。";
+            setText(message);
+          };
+          tx.oncomplete = function () { db.close(); };
+        };
+      } catch (_) {
+        setText("この端末の未同期状態を確認できませんでした。");
+      }
+    })();
+  </script>
+</body>
+</html>

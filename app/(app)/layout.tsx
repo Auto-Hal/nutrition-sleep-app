@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { appEnvironmentId } from "@/lib/app-environment";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,11 @@ export default async function ProtectedLayout({ children }: Readonly<{ children:
   if (!session) redirect("/login");
 
   return (
-    <AppShell email={session.email ?? undefined}>
+    <AppShell
+      email={session.email ?? undefined}
+      ownerUserId={session.userId}
+      environmentId={appEnvironmentId()}
+    >
       {children}
     </AppShell>
   );

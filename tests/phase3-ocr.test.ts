@@ -87,4 +87,10 @@ describe("Phase 3 nutrition label OCR parser", () => {
     const parsed = parseNutritionLabelText("カルシウム 100mg");
     expect(parsed.basis).toEqual({ serving_size: 1, serving_unit: "serving" });
   });
+
+  it("recognizes Japanese 1食分(weight)当たり basis", () => {
+    const parsed = parseNutritionLabelText("栄養成分表示 1食分(40g)当たり");
+    expect(parsed.basis).toEqual({ serving_size: 1, serving_unit: "食" });
+  });
+
 });

@@ -5,6 +5,44 @@ import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
+const identitySourceTypeSchema = z.enum([
+  "manufacturer_official",
+  "external_database",
+  "user_entered",
+]);
+
+const nutrientProvenanceSchema = z.enum([
+  "user_entered",
+  "product_label",
+  "barcode_db",
+  "approved_external_db",
+  "ocr",
+  "estimated_dish",
+  "batch_calculation",
+]);
+
+const nutrientQualitySchema = z.enum(["unknown", "unverified", "user_verified"]);
+
+const nutrientPatchSchema = z.object({
+  code: z.string().refine(
+    (value) => NUTRIENT_DEFINITIONS.some((definition) => definition.code === value),
+    "unknown nutrient",
+  ),
+  amount: z.number().finite().min(0).nullable().optional(),
+  unit: z.enum(["kcal", "g", "mg", "ug_rae", "ug"]).optional(),
+  provenance: nutrientProvenanceSchema.optional(),
+  quality: nutrientQualitySchema.optional(),
+  source_uri: z.string().url().max(1000).nullable().optional(),
+  source_observed_at: z.string().datetime().nullable().optional(),
+}).superRefine((value, context) => {
+  if (value.provenance === "approved_external_db" && value.quality === "user_verified") {
+    context.addIssue({
+      code: "custom",
+      message: "external database nutrients cannot be adapter-verified",
+    });
+  }
+});
+
 const schema = z.object({
   expected_revision: z.number().int().positive(),
   name: z.string().trim().min(1).max(200),
@@ -15,15 +53,13 @@ const schema = z.object({
   manufacturer: z.string().trim().max(200).nullable().optional(),
   package_amount: z.number().finite().positive().nullable().optional(),
   package_unit: z.string().trim().min(1).max(32).nullable().optional(),
-  source_type: z.enum(["manufacturer_official", "label_ocr", "external_database"]),
-  source_provider: z.string().trim().min(1).max(80),
-  source_uri: z.string().url().max(1000).nullable().optional(),
-  source_observed_at: z.string().datetime(),
-  nutrients: z.array(z.object({
-    code: z.string().refine((value) => NUTRIENT_DEFINITIONS.some((definition) => definition.code === value)),
-    amount: z.number().finite().min(0),
-    unit: z.enum(["kcal", "g", "mg", "ug_rae", "ug"]),
-  })).max(NUTRIENT_DEFINITIONS.length),
+  identity_source_type: identitySourceTypeSchema,
+  identity_source_provider: z.string().trim().min(1).max(80),
+  identity_source_uri: z.string().url().max(1000).nullable().optional(),
+  identity_source_observed_at: z.string().datetime(),
+  nutrients: z.array(nutrientPatchSchema).max(NUTRIENT_DEFINITIONS.length),
+  replace_all_nutrients: z.boolean().default(false),
+  confirm_verified_overwrite: z.boolean().default(false),
 }).superRefine((value, context) => {
   if ((value.package_amount == null) !== (value.package_unit == null)) {
     context.addIssue({ code: "custom", message: "package amount and unit must be provided together" });
@@ -31,6 +67,23 @@ const schema = z.object({
   const codes = value.nutrients.map((nutrient) => nutrient.code);
   if (new Set(codes).size !== codes.length) {
     context.addIssue({ code: "custom", message: "nutrients must be unique" });
+  }
+
+  if (value.replace_all_nutrients) {
+    for (const nutrient of value.nutrients) {
+      if (
+        nutrient.amount === undefined
+        || nutrient.unit === undefined
+        || nutrient.provenance === undefined
+        || nutrient.quality === undefined
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "full replacement requires complete nutrient tuples",
+        });
+        break;
+      }
+    }
   }
 });
 
@@ -55,7 +108,7 @@ export async function PATCH(request: Request, context: Context) {
   }
 
   const input = parsed.data;
-  const result = await createUserClient(session.accessToken).rpc("update_product_item", {
+  const result = await createUserClient(session.accessToken).rpc("update_product_item_v2", {
     p_catalog_item_id: id,
     p_expected_revision: input.expected_revision,
     p_name: input.name,
@@ -66,21 +119,39 @@ export async function PATCH(request: Request, context: Context) {
     p_manufacturer: input.manufacturer ?? null,
     p_package_amount: input.package_amount ?? null,
     p_package_unit: input.package_unit ?? null,
-    p_source_type: input.source_type,
-    p_source_provider: input.source_provider,
-    p_source_uri: input.source_uri ?? null,
-    p_source_observed_at: input.source_observed_at,
+    p_identity_source_type: input.identity_source_type,
+    p_identity_source_provider: input.identity_source_provider,
+    p_identity_source_uri: input.identity_source_uri ?? null,
+    p_identity_source_observed_at: input.identity_source_observed_at,
     p_nutrients: input.nutrients,
+    p_replace_all_nutrients: input.replace_all_nutrients,
+    p_confirm_verified_overwrite: input.confirm_verified_overwrite,
   });
 
   if (result.error) {
     if (result.error.code === "40001") {
-      return NextResponse.json({ error: "別の端末で更新されています。再読み込みしてから保存してください。" }, { status: 409 });
+      return NextResponse.json(
+        { error: "別の端末で更新されています。再読み込みしてから保存してください。" },
+        { status: 409 },
+      );
     }
-    const sourcePriority = result.error.message?.includes("lower-priority source");
+
+    const verifiedConflict = result.error.message?.includes(
+      "verified nutrient replacement requires explicit confirmation",
+    );
+    const basisConflict = result.error.message?.includes(
+      "serving basis change requires complete nutrient replacement",
+    );
+
     return NextResponse.json(
-      { error: sourcePriority ? "確認済みの高品質データを、低優先度のデータで上書きできません。" : "商品を更新できませんでした。" },
-      { status: sourcePriority ? 409 : 400 },
+      {
+        error: verifiedConflict
+          ? "確認済みの栄養値を変更するには、差分を確認して明示的に保存してください。"
+          : basisConflict
+            ? "表示基準量を変更する場合は、栄養値一式を同時に確認してください。"
+            : "商品を更新できませんでした。",
+      },
+      { status: verifiedConflict || basisConflict ? 409 : 400 },
     );
   }
 

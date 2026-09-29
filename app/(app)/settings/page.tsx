@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { ProfileForm } from "@/components/profile-form";
+import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
+import { DataExport } from "@/components/data-export";
+import { AccountDeletion } from "@/components/account-deletion";
+import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 
@@ -20,9 +24,37 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <Link href="/settings?view=library" aria-current={view === "library" ? "page" : undefined}>Library</Link>
       </nav>
       {view === "library" ? (
-        <CatalogLibrary />
+        <CatalogLibrary
+          ownerUserId={session?.userId ?? ""}
+          environmentId={appEnvironmentId()}
+        />
       ) : (
-        <ProfileForm initialProfile={profile} />
+        <div className="stack">
+          <ProfileForm
+            initialProfile={profile}
+            ownerUserId={session?.userId ?? ""}
+            environmentId={appEnvironmentId()}
+          />
+          <DataExport
+            ownerUserId={session?.userId ?? ""}
+            environmentId={appEnvironmentId()}
+          />
+          <section className="card stack">
+            <div>
+              <p className="eyebrow">Privacy & legal</p>
+              <h2>データの取り扱い</h2>
+              <p className="muted">
+                Google Healthを含むデータの利用目的・保存・削除について確認できます。
+              </p>
+            </div>
+            <nav className="subnav" aria-label="Privacy and legal">
+              <Link href="/privacy">プライバシーポリシー</Link>
+              <Link href="/terms">利用規約</Link>
+              <Link href="/about">アプリについて</Link>
+            </nav>
+          </section>
+          <AccountDeletion available={Boolean(accountDeletionAdminEnv())} />
+        </div>
       )}
     </main>
   );
