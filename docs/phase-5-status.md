@@ -4,7 +4,7 @@
 
 - Phase 1–4.5 COMPLETE
 - CR-001 APPROVED — 2026-09-16
-- **Phase 5 REAL-WEARABLE PREVIEW ACCEPTANCE COMPLETE / READY FOR REVIEW**
+- **Phase 5 REAL-WEARABLE PREVIEW ACCEPTANCE COMPLETE / PRODUCTION SERVER ROLLOUT COMPLETE / PRODUCTION OAUTH+SYNC ACCEPTANCE PENDING**
 - implementation branch: `phase/5-sleep-foundation`
 
 ## Binding provider contract
@@ -234,3 +234,22 @@ The earlier manual Preview pgTAP result remains useful historical evidence:
 - pgtap 1.3.3 was enabled temporarily in Preview;
 - all 56 Phase 5 assertions completed with no failure diagnostics;
 - the temporary pgtap extension was removed afterward.
+
+
+## Gate 13 Production rollout — 2026-09-29
+
+Completed server-side:
+- Production Supabase resumed and healthy;
+- Phase 5 sleep foundation / FK indexes / API-contract / backfill migrations applied;
+- Phase 6 reliability/lifecycle migrations subsequently applied;
+- post-migration RLS, grants, SECURITY DEFINER and integrity checks passed;
+- Production Vercel environment includes Google Health OAuth credentials, provider-token encryption key and cron secret;
+- Production application deployment reached READY at `nutrition-sleep-app.vercel.app`;
+- public/unauthenticated Production smoke passed with no inspected runtime error/fatal entries.
+
+Still required before Phase 5 Production acceptance is closed:
+- authenticated Production login;
+- connect the Production Google OAuth client with exactly `googlehealth.sleep.readonly`;
+- verify real-device recent sync and normalized Sleep persistence;
+- verify repeated sync does not duplicate the observation;
+- no destructive account-deletion test against the real Production user.
