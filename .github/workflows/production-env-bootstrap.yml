@@ -72,6 +72,15 @@ jobs:
             echo "GOOGLE_HEALTH_REDIRECT_URI configured."
           fi
 
+          if has_name EXPECTED_SUPABASE_PROJECT_REF; then
+            printf '%s' 'vyvnicyupcrsmtgdyypv' \
+              | pnpm dlx vercel@48.2.0 env update EXPECTED_SUPABASE_PROJECT_REF production --token="$VERCEL_TOKEN"
+          else
+            printf '%s' 'vyvnicyupcrsmtgdyypv' \
+              | pnpm dlx vercel@48.2.0 env add EXPECTED_SUPABASE_PROJECT_REF production --token="$VERCEL_TOKEN"
+          fi
+          echo "EXPECTED_SUPABASE_PROJECT_REF bound to Production."
+
       - name: Report remaining manual Production credentials
         shell: bash
         run: |
