@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   description: "食事と睡眠を低負担で記録するための基盤",
   applicationName: "栄養・睡眠管理",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
   appleWebApp: {
     capable: true,
     title: "栄養・睡眠管理",
