@@ -10,6 +10,10 @@ const callbackSource = readFileSync(
   resolve(process.cwd(), "app/api/health/google/callback/route.ts"),
   "utf8",
 );
+const sleepPageSource = readFileSync(
+  resolve(process.cwd(), "app/(app)/sleep/page.tsx"),
+  "utf8",
+);
 
 describe("Google Health OAuth persistence contract", () => {
   it("persists provider metadata and encrypted credentials in one transaction", () => {
@@ -29,5 +33,18 @@ describe("Google Health OAuth persistence contract", () => {
     expect(callbackSource).not.toContain("NextResponse.json({ tokens");
     expect(callbackSource).not.toContain("NextResponse.json({ accessToken");
     expect(callbackSource).not.toContain("NextResponse.json({ refreshToken");
+  });
+
+  it("shows the health-data disclosure before starting Google OAuth", () => {
+    expect(sleepPageSource).toContain("Google Healthの睡眠データ利用について");
+    expect(sleepPageSource).toContain("Google Healthの睡眠データ");
+    expect(sleepPageSource).toContain("Google Healthには書き込みません");
+    expect(sleepPageSource).toContain("広告配信・データ販売・マーケティング目的には使用せず");
+    expect(sleepPageSource).toContain('href="/privacy"');
+
+    const disclosure = sleepPageSource.indexOf("Google Healthの睡眠データ利用について");
+    const connectAction = sleepPageSource.indexOf("/api/health/google/connect");
+    expect(disclosure).toBeGreaterThan(-1);
+    expect(connectAction).toBeGreaterThan(disclosure);
   });
 });
