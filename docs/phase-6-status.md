@@ -20,12 +20,12 @@ Updated: 2026-09-26
   - 6.10 PWA shell / version recovery
 - current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D/E PASS / COMPLETE**
 - Production: untouched
-- Gate 13 Production rollout: **IN PROGRESS — PRODUCTION PREFLIGHT PASS; LEAKED-PASSWORD POLICY DECISION PENDING**
+- Gate 13 Production rollout: **IN PROGRESS — PREFLIGHT PASS / PRODUCTION DB MIGRATED / RELEASE DEPLOY PENDING**
 - Gate 13 preflight confirmed Production Vercel already has the Phase 1–4/base application variables plus Google Cloud Vision.
 - Gate 13 automatically configured Production-only `PROVIDER_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET`, `ACCOUNT_DELETION_STATUS_HMAC_KEY`, and `ACCOUNT_DELETION_ADMIN_ENVIRONMENT=production`.
 - Production Vercel environment preflight: PASS. Yahoo, Google Health, Supabase admin, generated secrets, callback URI, deletion environment, and Production project-ref binding are all configured.
-- Production Supabase leaked-password protection remains disabled. Supabase documents this feature as Pro-plan-and-above only; Gate 13 requires an explicit decision to upgrade or accept/document this limitation before rollout.
-- Production DB migrations and Production deployment have **not** started.
+- Production Supabase leaked-password protection remains disabled because it is Pro-plan-and-above only. The user explicitly accepted this Free-plan limitation for the current single-user MVP; revisit before any multi-user/public rollout.
+- Production Phase 5/6 DB migrations are applied and post-migration security/integrity review passed. Production application deployment has **not** started yet.
 
 
 ## Phase 6.7
