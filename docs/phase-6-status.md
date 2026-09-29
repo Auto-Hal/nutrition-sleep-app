@@ -20,11 +20,11 @@ Updated: 2026-09-26
   - 6.10 PWA shell / version recovery
 - current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D/E PASS / COMPLETE**
 - Production: untouched
-- Gate 13 Production rollout: **IN PROGRESS — PREFLIGHT BLOCKED ON EXTERNAL PRODUCTION CONFIGURATION**
+- Gate 13 Production rollout: **IN PROGRESS — PRODUCTION PREFLIGHT PASS; LEAKED-PASSWORD POLICY DECISION PENDING**
 - Gate 13 preflight confirmed Production Vercel already has the Phase 1–4/base application variables plus Google Cloud Vision.
 - Gate 13 automatically configured Production-only `PROVIDER_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET`, `ACCOUNT_DELETION_STATUS_HMAC_KEY`, and `ACCOUNT_DELETION_ADMIN_ENVIRONMENT=production`.
-- Remaining Vercel Production variables: `YAHOO_SHOPPING_CLIENT_ID`, `GOOGLE_HEALTH_CLIENT_ID`, `GOOGLE_HEALTH_CLIENT_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY`. `GOOGLE_HEALTH_REDIRECT_URI` is configured as `https://nutrition-sleep-app.vercel.app/api/health/google/callback`.
-- Production Supabase leaked-password protection remains disabled and must be checked/enabled before rollout.
+- Production Vercel environment preflight: PASS. Yahoo, Google Health, Supabase admin, generated secrets, callback URI, deletion environment, and Production project-ref binding are all configured.
+- Production Supabase leaked-password protection remains disabled. Supabase documents this feature as Pro-plan-and-above only; Gate 13 requires an explicit decision to upgrade or accept/document this limitation before rollout.
 - Production DB migrations and Production deployment have **not** started.
 
 
