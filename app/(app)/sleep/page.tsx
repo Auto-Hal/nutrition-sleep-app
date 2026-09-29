@@ -162,6 +162,22 @@ export default async function SleepPage({
             <p className="notice warning">睡眠データを同期できませんでした。再認証が必要な場合があります。</p>
           )}
 
+          {oauthConfigured && (
+            <div className="notice" aria-label="Google Healthデータ利用について">
+              <strong>Google Healthの睡眠データ利用について</strong>
+              <p>
+                Nutrition Sleep Appは、あなたが許可したGoogle Healthの睡眠データ
+                （睡眠セッション・睡眠ステージ等）を読み取り、睡眠時間・タイミング・
+                ステージの表示と振り返りに使用します。
+              </p>
+              <p>
+                Google Healthには書き込みません。広告配信・データ販売・マーケティング目的には使用せず、
+                サービス提供に必要な範囲で処理・保存します。
+                詳細は<Link href="/privacy">プライバシーポリシー</Link>をご確認ください。
+              </p>
+            </div>
+          )}
+
           {!oauthConfigured ? (
             <div className="empty-state">
               Preview用のGoogle Health OAuth設定待ちです。Client ID / Secret / Redirect URI / provider暗号鍵が揃うまで接続は開始しません。
