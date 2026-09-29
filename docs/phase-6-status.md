@@ -19,13 +19,13 @@ Updated: 2026-09-26
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
 - current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D/E PASS / COMPLETE**
-- Production: untouched
-- Gate 13 Production rollout: **IN PROGRESS — PREFLIGHT PASS / PRODUCTION DB MIGRATED / RELEASE DEPLOY PENDING**
+- Production: **Gate 13 server rollout deployed; final real-account acceptance pending**
+- Gate 13 Production rollout: **IN PROGRESS — SERVER ROLLOUT PASS / REAL-ACCOUNT PRODUCTION ACCEPTANCE PENDING**
 - Gate 13 preflight confirmed Production Vercel already has the Phase 1–4/base application variables plus Google Cloud Vision.
 - Gate 13 automatically configured Production-only `PROVIDER_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET`, `ACCOUNT_DELETION_STATUS_HMAC_KEY`, and `ACCOUNT_DELETION_ADMIN_ENVIRONMENT=production`.
 - Production Vercel environment preflight: PASS. Yahoo, Google Health, Supabase admin, generated secrets, callback URI, deletion environment, and Production project-ref binding are all configured.
 - Production Supabase leaked-password protection remains disabled because it is Pro-plan-and-above only. The user explicitly accepted this Free-plan limitation for the current single-user MVP; revisit before any multi-user/public rollout.
-- Production Phase 5/6 DB migrations are applied and post-migration security/integrity review passed. Production application deployment has **not** started yet.
+- Production Phase 5/6 DB migrations are applied and post-migration security/integrity review passed. Production application deployment is READY at `nutrition-sleep-app.vercel.app`; public/unauthenticated smoke passed and the deployed Production runtime reported no error/fatal entries in the inspected window.
 
 
 ## Phase 6.7
@@ -185,16 +185,14 @@ Next gate:
 - Production migrations/deployment and non-destructive smoke only after approval;
 - explicit MVP COMPLETE decision after Production verification.
 
-Production remains untouched.
+Production server rollout is complete; final authenticated Production acceptance remains pending.
 
 ## Phase 5 relationship
 
 Phase 5 real wearable/STAGES/device acceptance is complete in Preview.
 
-Phase 5 Production rollout remains a separate gate and is intentionally deferred until the
-Phase 6 integration/rollout sequence is approved.
+Phase 5 Production schema/application rollout is now complete under Gate 13. Final Production Google Health OAuth + real-device sync acceptance remains pending.
 
 ## Production rule
 
-No Phase 6 changes are merged/deployed to Production until the required Preview, fresh replay,
-security, Phase 5 boundary, and explicit rollout gates are satisfied.
+Phase 6 has been merged to `main` and deployed to Production after the required Preview, fresh replay, security, Phase 5 boundary, and explicit rollout gates were satisfied. Final authenticated Production acceptance is still required before MVP COMPLETE.
