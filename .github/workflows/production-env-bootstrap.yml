@@ -74,7 +74,7 @@ jobs:
 
           if has_name EXPECTED_SUPABASE_PROJECT_REF; then
             printf '%s' 'vyvnicyupcrsmtgdyypv' \
-              | pnpm dlx vercel@48.2.0 env update EXPECTED_SUPABASE_PROJECT_REF production --token="$VERCEL_TOKEN"
+              | pnpm dlx vercel@48.2.0 env update EXPECTED_SUPABASE_PROJECT_REF production --yes --token="$VERCEL_TOKEN"
           else
             printf '%s' 'vyvnicyupcrsmtgdyypv' \
               | pnpm dlx vercel@48.2.0 env add EXPECTED_SUPABASE_PROJECT_REF production --token="$VERCEL_TOKEN"
