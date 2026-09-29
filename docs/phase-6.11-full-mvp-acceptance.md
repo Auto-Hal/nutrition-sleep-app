@@ -471,7 +471,7 @@ Final security/performance review:
 
 - Security Advisor continues to report the six intentional private server-only tables with RLS and no end-user policies;
 - Security Advisor continues to report the established 28 authenticated SECURITY DEFINER RPCs; 6.11-A already verified these are not anon-executable, reference `auth.uid()`, and define explicit `search_path`;
-- leaked-password protection remains disabled and is carried forward as a **required Gate 13 Production Auth configuration check**;
+- leaked-password protection remains disabled because it is Pro-only; the user explicitly accepted this limitation for the current single-user Free-plan MVP;
 - Performance Advisor reports unused-index INFO items only; no acceptance-time index deletion is warranted.
 
 Production boundary verification:
@@ -495,7 +495,7 @@ Passed checkpoints:
 - 6.11-D iPhone / iPad / PWA physical-device acceptance;
 - 6.11-E final blocker review.
 
-The next step is **Gate 13 Production rollout**, which requires explicit user approval and must not be started implicitly.
+Gate 13 Production rollout was explicitly approved on 2026-09-29. Production preflight passed, Phase 5/6 database migrations were applied successfully, and post-migration security/integrity review passed. Application release/deployment remains the next step.
 
 ## Production / MVP boundary
 
