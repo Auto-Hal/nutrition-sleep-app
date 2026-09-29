@@ -1,11 +1,11 @@
 # Phase 6 status
 
-Updated: 2026-09-25
+Updated: 2026-09-26
 
 ## Current state
 
 - Phase 6 design: **APPROVED — ASTRA CORRECTIONS APPLIED + SUPERVISOR/USER ACCEPTED**
-- Phase 6 implementation: **IN PROGRESS**
+- Phase 6 implementation: **6.1–6.10 IMPLEMENTED / 6.11 ACCEPTANCE COMPLETE**
 - completed / review-ready chain:
   - 6.1 Reliability server primitives
   - 6.2 IndexedDB client outbox / contract versioning
@@ -18,8 +18,15 @@ Updated: 2026-09-25
   - 6.8 consistent export
   - 6.9 account deletion / lifecycle guard
   - 6.10 PWA shell / version recovery
-- next batch: **6.11 full MVP acceptance**
+- current batch: **6.11 full MVP acceptance — 6.11-A/B/C/D/E PASS / COMPLETE**
 - Production: untouched
+- Gate 13 Production rollout: **IN PROGRESS — PREFLIGHT PASS / PRODUCTION DB MIGRATED / RELEASE DEPLOY PENDING**
+- Gate 13 preflight confirmed Production Vercel already has the Phase 1–4/base application variables plus Google Cloud Vision.
+- Gate 13 automatically configured Production-only `PROVIDER_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET`, `ACCOUNT_DELETION_STATUS_HMAC_KEY`, and `ACCOUNT_DELETION_ADMIN_ENVIRONMENT=production`.
+- Production Vercel environment preflight: PASS. Yahoo, Google Health, Supabase admin, generated secrets, callback URI, deletion environment, and Production project-ref binding are all configured.
+- Production Supabase leaked-password protection remains disabled because it is Pro-plan-and-above only. The user explicitly accepted this Free-plan limitation for the current single-user MVP; revisit before any multi-user/public rollout.
+- Production Phase 5/6 DB migrations are applied and post-migration security/integrity review passed. Production application deployment has **not** started yet.
+
 
 ## Phase 6.7
 
@@ -141,7 +148,44 @@ Automated acceptance:
 - no Phase 6.10 DB migration was required;
 - Production remains untouched.
 
-Device-specific PWA acceptance (Home Screen install, cold-start offline, update/reload with pending intent) remains part of Phase 6.11 full MVP acceptance.
+Device-specific PWA acceptance passed in Phase 6.11-D, including Home Screen cold-start offline and pending-intent survival across an app version update.
+
+## Phase 6.11
+
+Acceptance tracking is now recorded in `docs/phase-6.11-full-mvp-acceptance.md`.
+
+Current integrated findings:
+
+- current stacked application checks: green;
+- fresh DB / pgTAP regression: green;
+- Hosted Preview migration chain through Phase 6.9: present;
+- Phase 6.10 requires no DB migration;
+- Hosted Preview Nutrition + real-wearable Sleep state remains intact;
+- Preview runtime error/fatal review: no matching errors in the inspected 24-hour window;
+- all public user-data tables have RLS enabled;
+- anon has no SELECT/INSERT access to public user-data tables;
+- public SECURITY DEFINER RPCs are not anon-executable, reference `auth.uid()`, and set explicit `search_path`;
+- existing Security Advisor warnings are documented in the 6.11 acceptance matrix.
+
+Checkpoint status:
+
+- 6.11-A security / logs / stack integrity: PASS;
+- leaked-password protection: carried forward as a required Gate 13 Production Auth configuration check, not a Phase 6.11 implementation blocker;
+- 6.11-B automated + Hosted Preview functional regression: PASS after fixing reload-time provisional Today nutrition hydration;
+- 6.11-C Yahoo/JAN external acceptance: PASS — 20/20 samples produced exact-JAN candidates; 1 single candidate, 19 ambiguous/manual-selection cases, 0 not-found, 0 unavailable; identity-only/no-nutrition/raw-payload invariants held;
+- 6.11-D physical-device acceptance: PASS — iPhone navigation/Today/Product/OCR/Nutrition/Sleep/Settings/export, PWA offline/update recovery, and iPad responsive acceptance completed;
+- 6.11-E final blocker review: PASS — final CI/Preview green, latest deployment READY with no current error/fatal logs, Hosted Preview integrity green, no temporary acceptance runtime hooks remain.
+
+Phase 6.11 result: **COMPLETE / PASS**.
+
+Next gate:
+
+- Gate 13 Production rollout requires explicit user approval;
+- Production Auth/configuration checks first, including leaked-password protection;
+- Production migrations/deployment and non-destructive smoke only after approval;
+- explicit MVP COMPLETE decision after Production verification.
+
+Production remains untouched.
 
 ## Phase 5 relationship
 

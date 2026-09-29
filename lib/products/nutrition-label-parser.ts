@@ -31,6 +31,7 @@ type LabelAnchor = {
   code: CommercialNutrient["code"];
   parserLabel: string;
   text: string;
+  unit: string | null;
   box: OcrBox;
   confidence: number | null;
 };
@@ -40,6 +41,7 @@ type ValueCandidate = {
   unit: string;
   text: string;
   box: OcrBox;
+  amountBox: OcrBox;
   confidence: number | null;
 };
 
@@ -107,6 +109,14 @@ function labelMatches(phrase: string, label: string) {
   const normalizedLabel = normalizeToken(label);
   if (normalizedPhrase === normalizedLabel) return true;
 
+  if (normalizedPhrase.startsWith(normalizedLabel)) {
+    const suffix = normalizedPhrase.slice(normalizedLabel.length);
+    if (["g", "mg", "ug", "kcal", "kj"].includes(suffix)) return true;
+  }
+
+  const vitaminFamily = normalizedLabel.startsWith("ビタミン") || normalizedLabel.startsWith("vitamin");
+  if (vitaminFamily) return false;
+
   // Fuzzy matching is intentionally limited to longer known nutrition labels.
   // It repairs one-character OCR noise without making short labels such as 鉄 ambiguous.
   return normalizedLabel.length >= 4
@@ -164,6 +174,7 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
             code: definition.code,
             parserLabel: definition.parserLabel,
             text: phrase,
+            unit: normalizeUnit(phrase),
             box: unionBox(phraseWords.map((word) => word.box)),
             confidence: averageConfidence(phraseWords),
           });
@@ -182,7 +193,11 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
 
     const candidateWidth = candidate.box.maxX - candidate.box.minX;
     const existingWidth = existing.box.maxX - existing.box.minX;
-    if (candidateWidth < existingWidth) byCode.set(candidate.code, candidate);
+    if (candidate.unit && !existing.unit) {
+      byCode.set(candidate.code, candidate);
+    } else if (Boolean(candidate.unit) === Boolean(existing.unit) && candidateWidth < existingWidth) {
+      byCode.set(candidate.code, candidate);
+    }
   }
 
   return [...byCode.values()].sort((a, b) => centerY(a.box) - centerY(b.box));
@@ -203,6 +218,16 @@ function normalizeUnit(value: string) {
   for (const expected of ["kcal", "kj", "mg", "ug"] as const) {
     if (unit === expected) return expected;
     if (unit.length >= 2 && editDistanceAtMostOne(unit, expected)) return expected;
+
+    if (unit.endsWith(expected)) {
+      const prefix = unit.slice(0, -expected.length);
+      if (/[a-z]/.test(prefix)) return expected;
+    }
+  }
+
+  if (unit.endsWith("g")) {
+    const prefix = unit.slice(0, -1);
+    if (/[a-z]/.test(prefix)) return "g";
   }
 
   return null;
@@ -230,6 +255,83 @@ function parseNumber(value: string) {
   return Number.isFinite(amount) ? amount : null;
 }
 
+function structuralUnitRowCenters(document: OcrDocument) {
+  const numericWords = document.words.filter((word) => parseNumber(word.text) !== null);
+  if (numericWords.length === 0) return [];
+
+  const numericXs = numericWords
+    .map((word) => word.box.minX)
+    .sort((a, b) => a - b);
+  const numericColumnX = numericXs[Math.floor(numericXs.length / 2)];
+
+  const centers = document.words
+    .filter((word) =>
+      parseNumber(word.text) === null
+      && normalizeUnit(word.text) !== null
+      && word.box.maxX < numericColumnX
+    )
+    .map((word) => centerY(word.box))
+    .sort((a, b) => a - b);
+
+  const deduped: number[] = [];
+  for (const value of centers) {
+    const previous = deduped[deduped.length - 1];
+    if (previous === undefined || Math.abs(value - previous) > 6) {
+      deduped.push(value);
+    } else {
+      deduped[deduped.length - 1] = (previous + value) / 2;
+    }
+  }
+  return deduped;
+}
+
+function structuralBoundsForAnchor(
+  anchor: LabelAnchor,
+  rowCenters: number[],
+) {
+  if (rowCenters.length === 0) return null;
+  const anchorY = centerY(anchor.box);
+  let rowIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < rowCenters.length; index += 1) {
+    const distance = Math.abs(rowCenters[index] - anchorY);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      rowIndex = index;
+    }
+  }
+
+  const current = rowCenters[rowIndex];
+  const previous = rowIndex > 0 ? rowCenters[rowIndex - 1] : null;
+  const next = rowIndex + 1 < rowCenters.length ? rowCenters[rowIndex + 1] : null;
+  const fallback = Math.max(16, boxHeight(anchor.box) * 0.85);
+
+  return {
+    center: current,
+    top: previous === null ? current - fallback : (previous + current) / 2,
+    bottom: next === null ? current + fallback : (current + next) / 2,
+  };
+}
+
+function hasConflictingInlineUnit(
+  document: OcrDocument,
+  amountWord: OcrWord,
+  anchorUnit: string,
+) {
+  const amountY = centerY(amountWord.box);
+  const maxVertical = Math.max(8, boxHeight(amountWord.box) * 0.8);
+
+  return document.words.some((word) => {
+    if (word === amountWord || parseNumber(word.text) !== null) return false;
+    const unit = normalizeUnit(word.text);
+    if (!unit || unit === anchorUnit) return false;
+
+    const vertical = Math.abs(centerY(word.box) - amountY);
+    const horizontal = word.box.minX - amountWord.box.maxX;
+    return vertical <= maxVertical && horizontal >= -4 && horizontal <= 120;
+  });
+}
+
 function findValueCandidates(document: OcrDocument): ValueCandidate[] {
   const words = [...document.words].sort((a, b) => {
     const y = centerY(a.box) - centerY(b.box);
@@ -247,6 +349,7 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
         ...combined,
         text: word.text,
         box: word.box,
+        amountBox: word.box,
         confidence: word.confidence,
       });
       continue;
@@ -267,10 +370,16 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
       const maxVertical = Math.max(boxHeight(unitWord.box), boxHeight(word.box)) * 0.8;
       if (verticalDistance > maxVertical) continue;
 
-      const horizontalGap = unitWord.box.minX - word.box.maxX;
-      if (horizontalGap < -8 || horizontalGap > Math.max(160, boxHeight(word.box) * 6)) continue;
+      const gapToRight = unitWord.box.minX - word.box.maxX;
+      const gapToLeft = word.box.minX - unitWord.box.maxX;
+      const horizontalGap = gapToRight >= -8
+        ? Math.max(0, gapToRight)
+        : gapToLeft >= -8
+          ? Math.max(0, gapToLeft)
+          : Number.POSITIVE_INFINITY;
+      if (horizontalGap > Math.max(240, boxHeight(word.box) * 10)) continue;
 
-      const distance = Math.abs(horizontalGap) + verticalDistance * 2;
+      const distance = horizontalGap + verticalDistance * 2;
       if (distance < bestDistance) {
         bestDistance = distance;
         bestUnitIndex = unitIndex;
@@ -288,6 +397,7 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
       unit,
       text: `${word.text} ${unitWord.text}`,
       box: unionBox([word.box, unitWord.box]),
+      amountBox: word.box,
       confidence: averageConfidence([word, unitWord]),
     });
   }
@@ -319,24 +429,65 @@ function geometryMatches(document: OcrDocument) {
       ? currentY + Math.max(24, boxHeight(anchor.box) * 1.3)
       : (currentY + nextY) / 2;
 
-    const maxVerticalDistance = Math.max(24, boxHeight(anchor.box) * 1.5);
-    const candidates = values
+    const maxVerticalDistance = Math.max(10, boxHeight(anchor.box) * 0.8);
+
+    const anchorUnit = anchor.unit;
+    const structuralRows = structuralUnitRowCenters(document);
+    const structuralBounds = anchorUnit ? structuralBoundsForAnchor(anchor, structuralRows) : null;
+
+    const directCandidates = anchorUnit && structuralBounds
+      ? document.words
+        .map((word) => {
+          const amount = parseNumber(word.text);
+          if (amount === null) return null;
+          const valueY = centerY(word.box);
+          if (
+            valueY < structuralBounds.top
+            || valueY >= structuralBounds.bottom
+            || word.box.minX < anchor.box.maxX - 8
+            || hasConflictingInlineUnit(document, word, anchorUnit)
+          ) return null;
+
+          const candidate: ValueCandidate = {
+            amount,
+            unit: anchorUnit,
+            text: `${word.text} [unit from ${anchor.text}]`,
+            box: word.box,
+            amountBox: word.box,
+            confidence: word.confidence,
+          };
+          const nutrient = parseCandidateForAnchor(anchor, candidate);
+          if (!nutrient) return null;
+          return {
+            candidate,
+            nutrient,
+            distance: Math.abs(valueY - structuralBounds.center),
+          };
+        })
+        .filter((entry): entry is { candidate: ValueCandidate; nutrient: CommercialNutrient; distance: number } =>
+          entry !== null,
+        )
+      : [];
+
+    const genericCandidates = anchorUnit ? [] : values
       .filter((candidate) => {
-        const valueY = centerY(candidate.box);
+        const valueY = centerY(candidate.amountBox);
         return valueY >= rowTop
           && valueY < rowBottom
           && Math.abs(valueY - currentY) <= maxVerticalDistance
-          && candidate.box.minX >= anchor.box.maxX - 8;
+          && candidate.amountBox.minX >= anchor.box.maxX - 8;
       })
       .map((candidate) => ({
         candidate,
         nutrient: parseCandidateForAnchor(anchor, candidate),
-        distance: Math.abs(centerY(candidate.box) - currentY),
+        distance: Math.abs(centerY(candidate.amountBox) - currentY),
       }))
       .filter((entry): entry is { candidate: ValueCandidate; nutrient: CommercialNutrient; distance: number } =>
         entry.nutrient !== null,
-      )
-      .sort((a, b) => a.distance - b.distance || a.candidate.box.minX - b.candidate.box.minX);
+      );
+
+    const candidates = [...directCandidates, ...genericCandidates]
+      .sort((a, b) => a.distance - b.distance || a.candidate.amountBox.minX - b.candidate.amountBox.minX);
 
     const best = candidates[0];
     if (!best) continue;
