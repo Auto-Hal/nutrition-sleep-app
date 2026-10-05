@@ -116,6 +116,8 @@ If write-capable MCP/app access later becomes available, add a server-side pendi
 
 `NEXT_PUBLIC_CHATGPT_NUTRITION_URL` is intentionally public and contains no secret. Preferred values are the user's dedicated nutrition chat URL or nutrition Project URL. If absent or invalid, the UI falls back to `https://chatgpt.com/`.
 
+For Preview acceptance, the selected destination is stored as a branch-scoped Vercel Preview environment variable rather than committed to the repository. Because it is a `NEXT_PUBLIC_` value, a fresh Preview build is required after changing it.
+
 The app must never embed auth tokens or draft credentials in the ChatGPT URL.
 
 ## Acceptance
