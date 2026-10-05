@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildChatNutritionImportUrl,
+  chatNutritionImportReturnPath,
   decodeChatNutritionDraft,
   draftFromLocationHash,
   encodeChatNutritionDraft,
@@ -45,6 +46,16 @@ describe("chat nutrition import links", () => {
     expect(url.pathname).toBe("/nutrition-import");
     expect(url.search).toBe("");
     expect(url.hash.startsWith("#data=")).toBe(true);
+  });
+
+  it("returns a validated import path for post-login continuation", () => {
+    const hash = `#data=${encodeChatNutritionDraft(draft)}`;
+    expect(chatNutritionImportReturnPath(hash)).toBe(`/nutrition-import${hash}`);
+  });
+
+  it("does not preserve unrelated or malformed fragments across login", () => {
+    expect(chatNutritionImportReturnPath("#section=account")).toBeNull();
+    expect(chatNutritionImportReturnPath("#data=not-json")).toBeNull();
   });
 
   it("rejects oversized fragments", () => {
