@@ -59,13 +59,27 @@ export function catalogPayloadFromChatDraft(draft: ChatNutritionDraft) {
   };
 }
 
-export function mealPayloadFromChatDraft(draft: ChatNutritionDraft, catalogItemId: string) {
+export type ChatMealOverrides = {
+  mealDate?: string;
+  mealType?: ChatNutritionDraft["meal"]["meal_type"];
+  eatenAt?: string;
+  quantity?: number;
+};
+
+export function mealPayloadFromChatDraft(
+  draft: ChatNutritionDraft,
+  catalogItemId: string,
+  overrides: ChatMealOverrides = {},
+) {
+  const quantity = overrides.quantity ?? draft.item.serving_size;
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("量を確認してください。");
+
   return {
-    meal_date: draft.meal.meal_date,
-    meal_type: draft.meal.meal_type,
-    eaten_at: normalizedTimestamp(draft.meal.eaten_at, "食事時刻"),
+    meal_date: overrides.mealDate ?? draft.meal.meal_date,
+    meal_type: overrides.mealType ?? draft.meal.meal_type,
+    eaten_at: normalizedTimestamp(overrides.eatenAt ?? draft.meal.eaten_at, "食事時刻"),
     catalog_item_id: catalogItemId,
-    quantity: draft.item.serving_size,
+    quantity,
     quantity_unit: draft.item.serving_unit,
     idempotency_key: `chat:${draft.request_id}:meal`,
   };
