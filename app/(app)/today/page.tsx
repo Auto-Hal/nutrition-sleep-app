@@ -1,3 +1,4 @@
+import { ChatGptNutritionLink } from "@/components/chatgpt-nutrition-link";
 import { TodayInteractive } from "@/components/today-interactive";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
@@ -36,6 +37,8 @@ export default async function TodayPage() {
       </header>
 
       <div className="stack">
+        <ChatGptNutritionLink />
+
         <TodayInteractive
           date={summary?.date ?? date}
           initialItems={initialItems}
