@@ -25,9 +25,21 @@ const mealLabels = {
   custom: "間食・その他",
 } as const;
 
+type MealType = keyof typeof mealLabels;
+
 const nutrientLabels = new Map(
   NUTRIENT_DEFINITIONS.map((definition) => [definition.code, definition.label]),
 );
+
+function localTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "12:00";
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
 
 async function responseError(response: Response, fallback: string) {
   const body = await response.json().catch(() => null) as { error?: string } | null;
@@ -36,13 +48,22 @@ async function responseError(response: Response, fallback: string) {
 
 export function ChatNutritionImport() {
   const [draft, setDraft] = useState<ChatNutritionDraft | null>(null);
+  const [mealDate, setMealDate] = useState("");
+  const [mealType, setMealType] = useState<MealType>("custom");
+  const [mealTime, setMealTime] = useState("12:00");
+  const [quantity, setQuantity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
     try {
-      setDraft(draftFromLocationHash(window.location.hash));
+      const parsed = draftFromLocationHash(window.location.hash);
+      setDraft(parsed);
+      setMealDate(parsed.meal.meal_date);
+      setMealType(parsed.meal.meal_type);
+      setMealTime(localTime(parsed.meal.eaten_at));
+      setQuantity(String(parsed.item.serving_size));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "登録データを読み取れませんでした。");
     }
@@ -53,8 +74,24 @@ export function ChatNutritionImport() {
     [draft],
   );
 
+  const numericQuantity = Number(quantity);
+  const quantityScale = draft && Number.isFinite(numericQuantity) && numericQuantity > 0
+    ? numericQuantity / draft.item.serving_size
+    : 1;
+
   async function confirmDraft() {
     if (!draft || submitting || completed) return;
+    if (!mealDate || !mealTime || !Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+      setError("日付・時刻・量を確認してください。");
+      return;
+    }
+
+    const eatenAt = new Date(`${mealDate}T${mealTime}:00`);
+    if (!Number.isFinite(eatenAt.getTime())) {
+      setError("日付・時刻を確認してください。");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -75,7 +112,12 @@ export function ChatNutritionImport() {
       const mealResponse = await fetch("/api/meals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mealPayloadFromChatDraft(draft, catalogItemId)),
+        body: JSON.stringify(mealPayloadFromChatDraft(draft, catalogItemId, {
+          mealDate,
+          mealType,
+          eatenAt: eatenAt.toISOString(),
+          quantity: numericQuantity,
+        })),
       });
       if (!mealResponse.ok) {
         throw new Error(await responseError(mealResponse, "食事に追加できませんでした。"));
@@ -113,7 +155,7 @@ export function ChatNutritionImport() {
         <div>
           <p className="eyebrow">ChatGPT Import</p>
           <h1 id="chat-import-title">この内容で食事を登録しますか？</h1>
-          <p className="muted">ChatGPTが作った下書きです。確認するまで食事記録には反映しません。</p>
+          <p className="muted">ChatGPTが作った下書きです。日付や量を直してから登録できます。</p>
         </div>
 
         <div className="summary-grid">
@@ -123,20 +165,68 @@ export function ChatNutritionImport() {
             {draft.item.brand && <span className="muted">{draft.item.brand}</span>}
           </div>
           <div>
-            <span className="muted">量</span>
+            <span className="muted">基準量</span>
             <strong>{draft.item.serving_size} {draft.item.serving_unit}</strong>
           </div>
           <div>
-            <span className="muted">食事</span>
+            <span className="muted">推定元の食事</span>
             <strong>{mealLabels[draft.meal.meal_type]}</strong>
             <span className="muted">{draft.meal.meal_date}</span>
           </div>
         </div>
 
+        <fieldset>
+          <legend>登録先を確認・修正</legend>
+          <div className="inline-fields">
+            <div className="field">
+              <label htmlFor="chat-import-date">日付</label>
+              <input
+                id="chat-import-date"
+                type="date"
+                value={mealDate}
+                onChange={(event) => setMealDate(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="chat-import-time">時刻</label>
+              <input
+                id="chat-import-time"
+                type="time"
+                value={mealTime}
+                onChange={(event) => setMealTime(event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="chat-import-type">食事区分</label>
+            <select
+              id="chat-import-type"
+              value={mealType}
+              onChange={(event) => setMealType(event.target.value as MealType)}
+            >
+              {Object.entries(mealLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="chat-import-quantity">登録量（{draft.item.serving_unit}）</label>
+            <input
+              id="chat-import-quantity"
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+            />
+            <small>栄養素は基準量に対して登録量の比率で換算されます。</small>
+          </div>
+        </fieldset>
+
         {itemTypeNotice && <div className="notice"><strong>登録方法</strong><p>{itemTypeNotice}</p></div>}
 
         <div className="stack">
-          <div className="section-heading"><h2>栄養素</h2><span className="pill pending">下書き</span></div>
+          <div className="section-heading"><h2>登録される栄養素</h2><span className="pill pending">下書き</span></div>
           {draft.nutrients.length === 0 ? (
             <p className="muted">栄養素の値はありません。</p>
           ) : (
@@ -147,7 +237,11 @@ export function ChatNutritionImport() {
                   {draft.nutrients.map((nutrient) => (
                     <tr key={nutrient.code}>
                       <td>{nutrientLabels.get(nutrient.code) ?? nutrient.code}</td>
-                      <td>{nutrient.amount === null ? "不明" : `${nutrient.amount} ${nutrient.unit}`}</td>
+                      <td>
+                        {nutrient.amount === null
+                          ? "不明"
+                          : `${Math.round(nutrient.amount * quantityScale * 1000) / 1000} ${nutrient.unit}`}
+                      </td>
                       <td>{provenanceLabels[nutrient.provenance]}</td>
                     </tr>
                   ))}
@@ -161,23 +255,27 @@ export function ChatNutritionImport() {
           <div className="notice"><strong>出典・推定メモ</strong><p>{draft.source_summary}</p></div>
         )}
         {draft.notes && <p className="muted">{draft.notes}</p>}
-        {error && <div className="notice"><strong>{error}</strong></div>}
+        {error && <div className="notice warning"><strong>{error}</strong></div>}
 
         {completed ? (
           <div className="notice">
-            <strong>食事を登録しました。</strong>
+            <strong>{mealDate} に食事を登録しました。</strong>
             <p>ChatGPTから受け取ったURL内の登録データは、この画面のアドレスから取り除きました。</p>
           </div>
         ) : (
           <div className="form-actions">
-            <button className="button" type="button" disabled={submitting} onClick={confirmDraft}>
+            <button className="button" type="button" disabled={submitting} onClick={() => void confirmDraft()}>
               {submitting ? "登録中…" : "確認して登録"}
             </button>
             <a className="button secondary" href="/today">キャンセル</a>
           </div>
         )}
 
-        {completed && <a className="button" href="/today">Todayで確認する</a>}
+        {completed && (
+          <a className="button" href={`/today?date=${encodeURIComponent(mealDate)}`}>
+            {mealDate} の記録を確認する
+          </a>
+        )}
       </section>
     </div>
   );
