@@ -22,7 +22,7 @@ export function ChatGptNutritionLink() {
     <section className="notice" aria-labelledby="chatgpt-nutrition-title">
       <strong id="chatgpt-nutrition-title">外食・食材はChatGPTで調べられます。</strong>
       <p>
-        店名・料理名・食材の量を自然な文章で伝えてください。Phase 7では、計算結果をこのアプリへ下書きとして直接返す導線を追加します。
+        店名・料理名・食材の量を自然な文章で伝えてください。ChatGPTが返す登録リンクからこのアプリへ戻り、内容を確認して登録できます。
       </p>
       <div className="form-actions">
         <a
