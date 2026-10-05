@@ -1,6 +1,6 @@
 begin;
 
-select plan(11);
+select plan(13);
 
 select function_privs_are(
   'public', 'replace_meal_entry_v2',
