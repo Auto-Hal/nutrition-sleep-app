@@ -50,6 +50,16 @@ export function draftFromLocationHash(hash: string) {
   return decodeChatNutritionDraft(encoded);
 }
 
+export function chatNutritionImportReturnPath(hash: string) {
+  if (!hash) return null;
+  try {
+    draftFromLocationHash(hash);
+    return `/nutrition-import${hash.startsWith("#") ? hash : `#${hash}`}`;
+  } catch {
+    return null;
+  }
+}
+
 export function buildChatNutritionImportUrl(origin: string, draft: ChatNutritionDraft) {
   const url = new URL("/nutrition-import", origin);
   url.hash = new URLSearchParams({
