@@ -17,12 +17,16 @@ function catalogItemType(itemType: ChatNutritionDraft["item"]["item_type"]) {
   return itemType === "ingredient" ? "ingredient" : "estimated_dish";
 }
 
-function normalizedEatenAt(value: string) {
+function normalizedTimestamp(value: string, label: string) {
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) {
-    throw new Error("食事時刻を確認してください。");
+    throw new Error(`${label}を確認してください。`);
   }
   return parsed.toISOString();
+}
+
+function normalizedOptionalTimestamp(value: string | null | undefined) {
+  return value ? normalizedTimestamp(value, "出典の確認時刻") : null;
 }
 
 export function catalogPayloadFromChatDraft(draft: ChatNutritionDraft) {
@@ -40,7 +44,7 @@ export function catalogPayloadFromChatDraft(draft: ChatNutritionDraft) {
       provenance: provenanceMap[nutrient.provenance],
       quality: nutrient.provenance === "estimated" ? "unknown" : "unverified",
       source_uri: nutrient.source_uri ?? null,
-      source_observed_at: nutrient.source_observed_at ?? null,
+      source_observed_at: normalizedOptionalTimestamp(nutrient.source_observed_at),
     }];
   });
 
@@ -59,7 +63,7 @@ export function mealPayloadFromChatDraft(draft: ChatNutritionDraft, catalogItemI
   return {
     meal_date: draft.meal.meal_date,
     meal_type: draft.meal.meal_type,
-    eaten_at: normalizedEatenAt(draft.meal.eaten_at),
+    eaten_at: normalizedTimestamp(draft.meal.eaten_at, "食事時刻"),
     catalog_item_id: catalogItemId,
     quantity: draft.item.serving_size,
     quantity_unit: draft.item.serving_unit,
