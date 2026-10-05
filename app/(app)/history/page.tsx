@@ -41,7 +41,7 @@ export default async function HistoryPage() {
         <div>
           <p className="eyebrow">History</p>
           <h1>食事履歴</h1>
-          <p className="muted">過去30日の登録を確認できます。日付を開くと、追加・修正・取消ができます。</p>
+          <p className="muted">過去30日の登録を確認できます。食品ごとに修正でき、過去日への追加登録も可能です。</p>
         </div>
         <Link className="button ghost" href="/today">今日へ戻る</Link>
       </header>
@@ -51,7 +51,7 @@ export default async function HistoryPage() {
           <div>
             <p className="eyebrow">Backdate</p>
             <h2 id="history-date-title">別の日を登録・修正</h2>
-            <p className="muted">30日より前も、日付を指定してその日の記録画面を開けます。</p>
+            <p className="muted">日付を指定すると、その日の記録画面を開けます。30日より前の日付も指定できます。</p>
           </div>
           <form className="form" action="/today" method="get">
             <div className="field">
@@ -72,35 +72,47 @@ export default async function HistoryPage() {
           const dayMeals = visibleMeals.filter((meal) => meal.meal_date === date);
           const entryCount = dayMeals.reduce((sum, meal) => sum + meal.entries.length, 0);
           const skippedCount = dayMeals.filter((meal) => meal.state === "skipped").length;
-          const href = `/today?date=${encodeURIComponent(date)}` as Route;
+          const dayHref = `/today?date=${encodeURIComponent(date)}` as Route;
 
           return (
-            <Link className="card history-card" key={date} href={href}>
+            <section className="card stack" key={date}>
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">{date}</p>
                   <h2>{formatDate(date)}</h2>
                 </div>
-                <span className="pill">開く</span>
+                <Link className="button secondary" href={dayHref}>この日を開く</Link>
               </div>
+
               <div className="history-meals">
                 {dayMeals.map((meal) => (
                   <div className="history-meal" key={meal.id}>
                     <strong>{mealLabels[meal.meal_type]}</strong>
                     {meal.entries.length > 0 ? (
-                      <span className="muted">
-                        {meal.entries.map((entry) => `${entry.name} × ${entry.quantity}${entry.quantity_unit}`).join(" / ")}
-                      </span>
+                      <div className="stack">
+                        {meal.entries.map((entry) => {
+                          const editHref = `/history/edit?entry=${encodeURIComponent(entry.id)}` as Route;
+                          return (
+                            <div className="section-heading" key={entry.id}>
+                              <span className="muted">
+                                {entry.name} × {entry.quantity}{entry.quantity_unit}
+                              </span>
+                              <Link className="button ghost" href={editHref}>修正</Link>
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <span className="muted">skipped</span>
                     )}
                   </div>
                 ))}
               </div>
+
               <p className="muted history-summary">
                 {entryCount}件{skippedCount > 0 ? ` · skipped ${skippedCount}枠` : ""}
               </p>
-            </Link>
+            </section>
           );
         })}
       </div>
