@@ -118,6 +118,7 @@ export function AccountDeletion({ available }: { available: boolean }) {
         <summary>削除手続きを開く</summary>
         <div className="settings-details-body">
           <p className="muted">アカウントと、このアプリが保持する栄養・睡眠データを削除します。必要なら先にデータを書き出してください。</p>
+          <p className="muted">他端末のオフライン保存やOS・ブラウザのバックアップは別管理です。削除結果を断定できない場合は成功とも失敗とも表示せず、状態を再確認します。</p>
 
           <form className="form-grid" onSubmit={submit}>
             <label>
