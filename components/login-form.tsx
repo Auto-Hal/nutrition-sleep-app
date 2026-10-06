@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { chatNutritionImportReturnPath } from "@/lib/nutrition/chat-import-link";
 
-export function LoginForm() {
+export function LoginForm({ nextPath }: { nextPath?: string | null }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +25,7 @@ export function LoginForm() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "認証に失敗しました。");
       const importReturnPath = chatNutritionImportReturnPath(window.location.hash);
-      router.replace((importReturnPath ?? "/today") as Route);
+      router.replace((importReturnPath ?? nextPath ?? "/today") as Route);
       router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "認証に失敗しました。");
