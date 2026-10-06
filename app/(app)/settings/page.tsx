@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ProfileForm } from "@/components/profile-form";
-import { ProfileSyncRecovery } from "@/components/profile-sync-recovery";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { DataExport } from "@/components/data-export";
@@ -33,10 +32,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         />
       ) : (
         <div className="stack">
-          <ProfileSyncRecovery
-            ownerUserId={ownerUserId}
-            environmentId={environmentId}
-          />
           <ProfileForm
             initialProfile={profile}
             ownerUserId={ownerUserId}
