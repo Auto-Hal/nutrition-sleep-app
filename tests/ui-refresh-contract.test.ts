@@ -38,6 +38,18 @@ describe("app UI refresh", () => {
     expect(styles).toContain('a[href*="yahoo.co.jp"]');
   });
 
+  it("removes Yahoo branding from the Settings presentation without removing provider provenance", () => {
+    const settings = read("app/(app)/settings/page.tsx");
+    const sanitizer = read("components/provider-branding-sanitizer.tsx");
+    const provider = read("lib/products/yahoo-shopping.ts");
+    expect(settings).toContain("<ProviderBrandingSanitizer />");
+    expect(sanitizer).toContain("Webサービス");
+    expect(sanitizer).toContain("外部商品DB");
+    expect(sanitizer).toContain("yahoo_shopping");
+    expect(provider).toContain('provider: "yahoo_shopping"');
+    expect(provider).toContain("normalizeYahooShoppingHits");
+  });
+
   it("keeps nutrition detail while reducing always-visible explanation", () => {
     const nutrition = read("app/(app)/nutrition/page.tsx");
     const review = read("components/nutrition-review.tsx");
