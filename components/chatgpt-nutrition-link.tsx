@@ -20,9 +20,9 @@ export function ChatGptNutritionLink() {
 
   return (
     <section className="notice" aria-labelledby="chatgpt-nutrition-title">
-      <strong id="chatgpt-nutrition-title">外食・食材はChatGPTで調べられます。</strong>
+      <strong id="chatgpt-nutrition-title">外食・食材はChatGPTから登録できます。</strong>
       <p>
-        店名・料理名・食材の量を自然な文章で伝えてください。ChatGPTが返す登録リンクからこのアプリへ戻り、内容を確認して登録できます。
+        店名・料理名・食材の量を自然な文章で伝えてください。ChatGPTが栄養を調べ、連携中のアプリへ直接登録します。登録後は履歴から確認・修正できます。
       </p>
       <div className="form-actions">
         <a
@@ -31,7 +31,7 @@ export function ChatGptNutritionLink() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          ChatGPTで食事を調べる
+          ChatGPTで食事を登録
         </a>
       </div>
       {!configured && (
