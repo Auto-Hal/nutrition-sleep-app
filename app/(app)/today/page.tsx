@@ -23,6 +23,12 @@ const mealLabels = {
   custom: "間食・その他",
 } as const;
 
+function previousIsoDate(date: string) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() - 1);
+  return value.toISOString().slice(0, 10);
+}
+
 export default async function TodayPage({ searchParams }: TodayPageProps) {
   const session = await getAppSessionForRsc();
   const [profile, initialItems] = session
@@ -34,6 +40,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
   const timeZone = profile?.time_zone ?? "Asia/Tokyo";
   const today = localDateInTimeZone(timeZone);
+  const yesterday = previousIsoDate(today);
   const requestedDate = (await searchParams).date;
   const date = isIsoDate(requestedDate) && requestedDate <= today ? requestedDate : today;
   const historical = date !== today;
@@ -59,6 +66,11 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           </p>
         </div>
         <div className="form-actions">
+          {!historical && (
+            <Link className="button ghost" href={`/today?date=${yesterday}` as Route}>
+              昨日を見る
+            </Link>
+          )}
           {historical && <Link className="button ghost" href="/today">今日へ戻る</Link>}
           <Link className="button secondary" href={"/history" as Route}>履歴を見る</Link>
         </div>
