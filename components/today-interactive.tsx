@@ -248,7 +248,11 @@ export function TodayInteractive({
         )}
 
         {pendingCount > 0 && (
-          <p className="muted sync-status" role="status">
+          <p
+            className="muted sync-status"
+            role="status"
+            aria-label={`端末に保存・未同期 ${pendingCount}件。栄養値は暫定表示です。`}
+          >
             未同期 {pendingCount}件 · 暫定表示
           </p>
         )}
