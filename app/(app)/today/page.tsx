@@ -5,6 +5,7 @@ import { TodayInteractive } from "@/components/today-interactive";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getNutritionSummaryForDate, localDateInTimeZone } from "@/lib/nutrition/analytics";
+import { getPendingChatMealDrafts } from "@/lib/nutrition/chat-drafts";
 import { isIsoDate } from "@/lib/nutrition/meal-history";
 import { getMealLogCatalogItems, getMealsForDate } from "@/lib/nutrition/today-data";
 import { getProfile } from "@/lib/profile";
@@ -14,6 +15,13 @@ export const dynamic = "force-dynamic";
 type TodayPageProps = {
   searchParams: Promise<{ date?: string }>;
 };
+
+const mealLabels = {
+  breakfast: "朝食",
+  lunch: "昼食",
+  dinner: "夕食",
+  custom: "間食・その他",
+} as const;
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
   const session = await getAppSessionForRsc();
@@ -30,12 +38,13 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const date = isIsoDate(requestedDate) && requestedDate <= today ? requestedDate : today;
   const historical = date !== today;
 
-  const [summary, initialMeals] = session
+  const [summary, initialMeals, pendingDrafts] = session
     ? await Promise.all([
       getNutritionSummaryForDate(session.accessToken, date),
       getMealsForDate(session.accessToken, date),
+      historical ? Promise.resolve([]) : getPendingChatMealDrafts(session.accessToken, 10).catch(() => []),
     ])
-    : [null, []];
+    : [null, [], []];
 
   return (
     <main className="app-main">
@@ -56,6 +65,30 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       </header>
 
       <div className="stack">
+        {!historical && pendingDrafts.length > 0 && (
+          <section className="card stack" aria-labelledby="chat-draft-inbox-title">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">ChatGPT Inbox</p>
+                <h2 id="chat-draft-inbox-title">未確認の食事下書き</h2>
+              </div>
+              <span className="pill pending">{pendingDrafts.length}件</span>
+            </div>
+            <p className="muted">ChatGPTから直接届いた下書きです。日付・量・栄養値を確認してから食事記録へ反映します。</p>
+            <div className="stack">
+              {pendingDrafts.map((draft) => {
+                const href = `/nutrition-import?draft=${encodeURIComponent(draft.id)}` as Route;
+                return (
+                  <Link key={draft.id} className="notice" href={href}>
+                    <strong>{draft.payload.item.name}</strong>
+                    <p>{draft.payload.meal.meal_date} · {mealLabels[draft.payload.meal.meal_type]} · {draft.payload.item.serving_size} {draft.payload.item.serving_unit}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <ChatGptNutritionLink />
 
         <TodayInteractive
