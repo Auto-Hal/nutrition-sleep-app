@@ -116,7 +116,7 @@ export function TodayInteractive({
           error?: string;
         };
         if (!response.ok || !payload.summary) {
-          throw new Error(payload.error ?? "今日の栄養を更新できませんでした。");
+          throw new Error(payload.error ?? "栄養表示を更新できませんでした。");
         }
         if (refreshVersion.current === version) {
           setSummary(payload.summary);
@@ -219,6 +219,49 @@ export function TodayInteractive({
 
   return (
     <>
+      <section className="card today-summary-card" aria-labelledby="today-nutrition-title" aria-busy={refreshing || undefined}>
+        <div className="section-heading compact-heading">
+          <div>
+            <p className="eyebrow">Nutrition</p>
+            <h2 id="today-nutrition-title">{nutritionTitleForDate(date)}</h2>
+          </div>
+          <Link className="button ghost" href="/nutrition?range=7">傾向</Link>
+        </div>
+
+        {displayedSummary && (displayedSummary.entry_count > 0 || displayedSummary.record_complete) ? (
+          <div className="today-nutrition-summary compact-summary">
+            <div>
+              <span className="muted">摂取エネルギー</span>
+              <strong>{formatEnergy(displayedSummary.energy_known_amount)}{displayedSummary.energy_known_amount === null ? "" : " kcal"}</strong>
+              {displayedSummary.entry_count === 0
+                ? <small>記録項目なし</small>
+                : displayedSummary.energy_known_amount === null
+                  ? <small>エネルギー値は不明</small>
+                  : !displayedSummary.energy_coverage_complete && <small>既知分のみ</small>}
+            </div>
+            <span className={`pill ${displayedSummary.record_complete ? "" : "pending"}`}>
+              {displayedSummary.record_complete ? "完了" : "途中"}
+            </span>
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">食事を記録するとここに集計します。</div>
+        )}
+
+        {pendingCount > 0 && (
+          <p className="muted sync-status" role="status">
+            未同期 {pendingCount}件 · 暫定表示
+          </p>
+        )}
+        {refreshing && pendingCount === 0 && (
+          <p className="muted sync-status" role="status">更新中…</p>
+        )}
+
+        <details className="inline-help">
+          <summary>表示について</summary>
+          <p>未登録の栄養値は0として扱わず、日中の途中経過から不足とは判定しません。</p>
+        </details>
+      </section>
+
       <MealLog
         date={date}
         initialItems={initialItems}
@@ -227,49 +270,6 @@ export function TodayInteractive({
         onQueuedNutrition={queuePendingNutrition}
         onOutboxState={handleOutboxState}
       />
-
-      <section className="card" aria-labelledby="today-nutrition-title" aria-busy={refreshing || undefined}>
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Nutrition</p>
-            <h2 id="today-nutrition-title">{nutritionTitleForDate(date)}</h2>
-          </div>
-          <Link className="button ghost" href="/nutrition?range=7">傾向を見る</Link>
-        </div>
-
-        {displayedSummary && (displayedSummary.entry_count > 0 || displayedSummary.record_complete) ? (
-          <div className="today-nutrition-summary">
-            <div>
-              <span className="muted">既知エネルギー</span>
-              <strong>{formatEnergy(displayedSummary.energy_known_amount)}{displayedSummary.energy_known_amount === null ? "" : " kcal"}</strong>
-              {displayedSummary.entry_count === 0
-                ? <small>摂取項目なし（0 kcalとは判定しません）</small>
-                : displayedSummary.energy_known_amount === null
-                  ? <small>エネルギー値は不明</small>
-                  : !displayedSummary.energy_coverage_complete && <small>既知分のみ</small>}
-            </div>
-            <span className={`pill ${displayedSummary.record_complete ? "" : "pending"}`}>
-              {displayedSummary.record_complete ? "食事記録 完了" : "食事記録 途中"}
-            </span>
-          </div>
-        ) : (
-          <div className="empty-state">食事を記録すると、既知の栄養量をここに表示します。</div>
-        )}
-
-        {pendingCount > 0 && (
-          <p className="muted sync-status" role="status">
-            端末に保存・未同期 {pendingCount}件 · 栄養値は暫定表示です。
-          </p>
-        )}
-        {refreshing && pendingCount === 0 && (
-          <p className="muted sync-status" role="status">
-            server成功を確認済み · 最新の栄養表示を取得しています…
-          </p>
-        )}
-        <p className="muted nutrition-caption">
-          日中の途中経過から「不足」とは判定しません。未登録の栄養値も0として扱いません。
-        </p>
-      </section>
     </>
   );
 }

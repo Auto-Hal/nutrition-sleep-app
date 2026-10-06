@@ -23,10 +23,16 @@ const mealLabels = {
   custom: "間食・その他",
 } as const;
 
-function previousIsoDate(date: string) {
+function shiftIsoDate(date: string, days: number) {
   const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() - 1);
+  value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
+}
+
+function formatDateTitle(date: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return date;
+  return `${Number(match[2])}月${Number(match[3])}日`;
 }
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
@@ -40,10 +46,11 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
   const timeZone = profile?.time_zone ?? "Asia/Tokyo";
   const today = localDateInTimeZone(timeZone);
-  const yesterday = previousIsoDate(today);
   const requestedDate = (await searchParams).date;
   const date = isIsoDate(requestedDate) && requestedDate <= today ? requestedDate : today;
   const historical = date !== today;
+  const previousDate = shiftIsoDate(date, -1);
+  const nextDate = shiftIsoDate(date, 1);
 
   const [summary, initialMeals, pendingDrafts] = session
     ? await Promise.all([
@@ -53,55 +60,50 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     ])
     : [null, [], []];
 
+  const nextHref = nextDate >= today ? "/today" : `/today?date=${nextDate}`;
+
   return (
-    <main className="app-main">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">{historical ? "History" : "Today"}</p>
-          <h1>{historical ? `${date} の記録` : "今日の記録"}</h1>
-          <p className="muted">
-            {historical
-              ? "過去の食事を確認し、追加・取消して修正できます。"
-              : "朝・昼・夕を中心に、無理なく積み重ねます。"}
-          </p>
+    <main className="app-main today-page">
+      <header className="topbar today-topbar">
+        <div className="today-title-block">
+          <p className="eyebrow">{historical ? "記録" : "Today"}</p>
+          <h1>{formatDateTitle(date)}{!historical && <span className="today-label">今日</span>}</h1>
         </div>
-        <div className="form-actions">
-          {!historical && (
-            <Link className="button ghost" href={`/today?date=${yesterday}` as Route}>
-              昨日を見る
-            </Link>
-          )}
-          {historical && <Link className="button ghost" href="/today">今日へ戻る</Link>}
-          <Link className="button secondary" href={"/history" as Route}>履歴を見る</Link>
-        </div>
+        <nav className="today-date-nav" aria-label="日付と履歴">
+          <Link className="button ghost" href={`/today?date=${previousDate}` as Route}>← 前日</Link>
+          {historical && <Link className="button ghost" href={nextHref as Route}>翌日 →</Link>}
+          <Link className="button secondary" href={"/history" as Route}>履歴</Link>
+        </nav>
       </header>
 
-      <div className="stack">
+      <div className="stack today-stack">
+        <ChatGptNutritionLink />
+
         {!historical && pendingDrafts.length > 0 && (
-          <section className="card stack" aria-labelledby="chat-draft-inbox-title">
-            <div className="section-heading">
+          <section className="card chat-draft-inbox" aria-labelledby="chat-draft-inbox-title">
+            <div className="section-heading compact-heading">
               <div>
-                <p className="eyebrow">ChatGPT Inbox</p>
-                <h2 id="chat-draft-inbox-title">未確認の食事下書き</h2>
+                <p className="eyebrow">ChatGPT</p>
+                <h2 id="chat-draft-inbox-title">確認待ち</h2>
               </div>
               <span className="pill pending">{pendingDrafts.length}件</span>
             </div>
-            <p className="muted">ChatGPTから直接届いた下書きです。日付・量・栄養値を確認してから食事記録へ反映します。</p>
-            <div className="stack">
+            <div className="compact-list">
               {pendingDrafts.map((draft) => {
                 const href = `/nutrition-import?draft=${encodeURIComponent(draft.id)}` as Route;
                 return (
-                  <Link key={draft.id} className="notice" href={href}>
-                    <strong>{draft.payload.item.name}</strong>
-                    <p>{draft.payload.meal.meal_date} · {mealLabels[draft.payload.meal.meal_type]} · {draft.payload.item.serving_size} {draft.payload.item.serving_unit}</p>
+                  <Link key={draft.id} className="compact-list-row" href={href}>
+                    <span>
+                      <strong>{draft.payload.item.name}</strong>
+                      <small>{mealLabels[draft.payload.meal.meal_type]} · {draft.payload.item.serving_size} {draft.payload.item.serving_unit}</small>
+                    </span>
+                    <span aria-hidden="true">›</span>
                   </Link>
                 );
               })}
             </div>
           </section>
         )}
-
-        <ChatGptNutritionLink />
 
         <TodayInteractive
           date={summary?.date ?? date}
@@ -112,21 +114,13 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           environmentId={appEnvironmentId()}
         />
 
-        <section className="notice" aria-label="データ状態">
-          <strong>記録がない日は、摂取量を0として扱いません。</strong>
-          <p>未登録とskippedを区別し、Nutritionの期間平均には完全性を反映します。</p>
-        </section>
-
         {!historical && (
-          <section className="card" aria-labelledby="today-sleep-title">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Sleep</p>
-                <h2 id="today-sleep-title">睡眠</h2>
-              </div>
-              <Link className="button secondary" href={"/sleep" as Route}>睡眠を確認</Link>
+          <section className="card compact-action-card" aria-labelledby="today-sleep-title">
+            <div>
+              <p className="eyebrow">Sleep</p>
+              <h2 id="today-sleep-title">睡眠</h2>
             </div>
-            <p className="muted">同期済みの睡眠記録とステージはSleepで確認できます。</p>
+            <Link className="button secondary" href={"/sleep" as Route}>見る</Link>
           </section>
         )}
       </div>

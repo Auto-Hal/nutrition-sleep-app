@@ -58,7 +58,7 @@ export function DataExport({
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      setMessage("サーバー上のデータを書き出しました。");
+      setMessage("書き出しました。");
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -71,41 +71,32 @@ export function DataExport({
   }
 
   return (
-    <section className="card" aria-labelledby="data-export-title">
-      <div className="section-heading">
+    <section className="card compact-settings-card" aria-labelledby="data-export-title">
+      <div className="section-heading compact-heading">
         <div>
-          <h2 id="data-export-title">データを書き出す</h2>
-          <p className="muted">
-            Profile・栄養記録・商品情報・保存済みSleep履歴を、version付きJSONで書き出します。
-          </p>
+          <p className="eyebrow">Data</p>
+          <h2 id="data-export-title">データ書き出し</h2>
         </div>
-        <span className="pill">JSON v1</span>
-      </div>
-
-      <div className="empty-state">
-        <p>
-          エクスポートはサーバー上の1つの一貫したsnapshotです。端末に未同期の変更は含まれません。
-        </p>
-        <p className="muted">
-          このJSONには健康・栄養の機微な情報が含まれるため、安全な場所に保管してください。
-          OAuth token、provider内部ID、raw payload、mutation receiptなどの内部情報は含めません。
-          Sleepはアプリが実際に保持している正規化済み履歴のみです。
-        </p>
-      </div>
-
-      {message && <p className="muted" role="status">{message}</p>}
-      {error && <p className="error-text" role="alert">{error}</p>}
-
-      <div className="form-actions">
         <button
-          className="button"
+          className="button secondary"
           type="button"
           onClick={() => void download()}
           disabled={busy}
         >
-          {busy ? "書き出し中…" : "JSONをダウンロード"}
+          {busy ? "書き出し中…" : "JSONを保存"}
         </button>
       </div>
+
+      {message && <p className="muted profile-status" role="status">{message}</p>}
+      {error && <p className="error-text" role="alert">{error}</p>}
+
+      <details className="settings-details">
+        <summary>書き出し内容</summary>
+        <div className="settings-details-body">
+          <p>プロフィール、栄養記録、商品情報、保存済み睡眠履歴をversion付きJSONで保存します。</p>
+          <p className="muted">未同期の端末変更は含まれません。内部tokenやraw payloadは書き出しません。</p>
+        </div>
+      </details>
     </section>
   );
 }

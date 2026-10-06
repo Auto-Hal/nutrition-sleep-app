@@ -1,0 +1,419 @@
+/* UI refresh: Today + Settings. Loaded after globals.css. */
+
+.today-page,
+.settings-page {
+  padding-top: 18px;
+}
+
+.today-topbar,
+.settings-topbar {
+  margin-bottom: 16px;
+}
+
+.today-topbar {
+  align-items: flex-end;
+}
+
+.today-title-block h1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 0;
+}
+
+.today-label {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.today-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.today-date-nav .button {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.today-stack,
+.settings-stack {
+  gap: 12px;
+}
+
+.chatgpt-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #b8d9cc;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #e6f4ee 0%, #f8fbf9 100%);
+  box-shadow: 0 8px 28px rgb(33 66 53 / 6%);
+}
+
+.chatgpt-primary-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.chatgpt-primary-copy > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.chatgpt-primary-copy strong {
+  font-size: 1.02rem;
+  line-height: 1.3;
+}
+
+.chatgpt-primary-copy small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.chatgpt-mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: white;
+  font-size: 1.05rem;
+}
+
+.chatgpt-primary-button {
+  flex: 0 0 auto;
+  min-width: 68px;
+  text-align: center;
+}
+
+.chatgpt-config-warning {
+  color: var(--warning);
+  font-size: 0.72rem;
+}
+
+.compact-heading {
+  align-items: center;
+}
+
+.compact-heading h2,
+.compact-action-card h2,
+.settings-links-card h2 {
+  margin-bottom: 0;
+}
+
+.chat-draft-inbox,
+.today-summary-card,
+.compact-settings-card,
+.settings-links-card,
+.profile-card {
+  padding: 16px;
+}
+
+.compact-list {
+  display: grid;
+  margin-top: 8px;
+}
+
+.compact-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+
+.compact-list-row:first-child {
+  border-top: 0;
+}
+
+.compact-list-row > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.compact-list-row small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.today-summary-card .today-nutrition-summary {
+  margin: 10px 0 6px;
+}
+
+.compact-summary strong {
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+}
+
+.compact-empty {
+  margin-top: 10px;
+  padding: 13px;
+}
+
+.inline-help {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.inline-help summary,
+.settings-details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.inline-help p {
+  margin: 7px 0 0;
+  line-height: 1.5;
+}
+
+.compact-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Keep every MealLog capability, but reduce persistent chrome/text. */
+section.card:has(#meals-title) {
+  padding: 16px;
+}
+
+section.card:has(#meals-title) > .section-heading {
+  align-items: center;
+}
+
+section.card:has(#meals-title) > p.muted:first-of-type {
+  display: none;
+}
+
+section.card:has(#meals-title) .meal-row {
+  padding: 11px 0;
+}
+
+section.card:has(#meals-title) .meal-items {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  font-size: 0.86rem;
+}
+
+section.card:has(#meals-title) .pending-operation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+section.card:has(#meals-title) .pending-operation .button.ghost {
+  padding: 4px 6px;
+  font-size: 0.78rem;
+}
+
+section.card:has(#meals-title) .meal-actions {
+  gap: 4px;
+}
+
+section.card:has(#meals-title) .meal-actions .button {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
+  display: none;
+}
+
+/* Settings */
+.settings-topbar h1 {
+  margin-bottom: 0;
+}
+
+.settings-subnav {
+  margin-bottom: 12px;
+}
+
+.settings-subnav a {
+  flex: 1;
+  text-align: center;
+}
+
+.profile-card .section-heading {
+  margin-bottom: 14px;
+}
+
+.profile-form {
+  gap: 16px;
+}
+
+.settings-form-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-form-section h3 {
+  margin-bottom: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.settings-form-section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.profile-card .field label {
+  font-size: 0.82rem;
+}
+
+.profile-card .field input,
+.profile-card .field select,
+.profile-card .field textarea {
+  padding: 10px 11px;
+}
+
+.profile-recovery {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.profile-recovery .button {
+  flex: 0 0 auto;
+}
+
+.settings-details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.settings-details summary {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.settings-details-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.settings-details-body p {
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+
+.profile-status {
+  margin-bottom: 0;
+  font-size: 0.78rem;
+}
+
+.profile-savebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.compact-settings-card .settings-details {
+  margin-top: 12px;
+}
+
+.settings-link-list {
+  display: grid;
+  margin-top: 8px;
+}
+
+.settings-link-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.settings-link-list a:first-child {
+  border-top: 0;
+}
+
+.danger-card {
+  border-color: #ead7d9;
+}
+
+.danger-details summary {
+  color: var(--danger);
+}
+
+.danger-button {
+  background: var(--danger);
+}
+
+@media (max-width: 520px) {
+  .today-topbar {
+    display: grid;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .today-date-nav {
+    justify-content: flex-start;
+  }
+
+  .chatgpt-primary {
+    align-items: center;
+  }
+
+  .chatgpt-primary-copy small {
+    display: none;
+  }
+
+  .chatgpt-primary-button {
+    min-width: 62px;
+  }
+
+  .today-summary-card .today-nutrition-summary {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  section.card:has(#meals-title) .meal-row {
+    gap: 8px;
+  }
+
+  section.card:has(#meals-title) .meal-actions {
+    width: 100%;
+  }
+
+  .profile-recovery {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -19,25 +19,24 @@ export function ChatGptNutritionLink() {
   const href = configured ?? DEFAULT_CHATGPT_URL;
 
   return (
-    <section className="notice" aria-labelledby="chatgpt-nutrition-title">
-      <strong id="chatgpt-nutrition-title">外食・食材はChatGPTから登録できます。</strong>
-      <p>
-        店名・料理名・食材の量を自然な文章で伝えてください。ChatGPTが栄養を調べ、連携中のアプリへ直接登録します。登録後は履歴から確認・修正できます。
-      </p>
-      <div className="form-actions">
-        <a
-          className="button secondary"
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          ChatGPTで食事を登録
-        </a>
+    <section className="chatgpt-primary" aria-labelledby="chatgpt-nutrition-title">
+      <div className="chatgpt-primary-copy">
+        <span className="chatgpt-mark" aria-hidden="true">✦</span>
+        <div>
+          <strong id="chatgpt-nutrition-title">ChatGPTで食事を登録</strong>
+          <small>料理名や店名を伝えるだけ</small>
+        </div>
       </div>
+      <a
+        className="button chatgpt-primary-button"
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        開く
+      </a>
       {!configured && (
-        <small className="muted">
-          専用チャットURLは未設定です。現在はChatGPTのトップを開きます。
-        </small>
+        <small className="chatgpt-config-warning">専用チャット未設定</small>
       )}
     </section>
   );
