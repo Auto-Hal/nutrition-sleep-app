@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ProfileForm } from "@/components/profile-form";
+import { ProfileSyncRecovery } from "@/components/profile-sync-recovery";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { DataExport } from "@/components/data-export";
@@ -15,6 +16,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const view = params.view === "library" ? "library" : "settings";
   const profile = session ? await getProfile(session.accessToken) : null;
+  const ownerUserId = session?.userId ?? "";
+  const environmentId = appEnvironmentId();
 
   return (
     <main className="app-main">
@@ -25,19 +28,23 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </nav>
       {view === "library" ? (
         <CatalogLibrary
-          ownerUserId={session?.userId ?? ""}
-          environmentId={appEnvironmentId()}
+          ownerUserId={ownerUserId}
+          environmentId={environmentId}
         />
       ) : (
         <div className="stack">
+          <ProfileSyncRecovery
+            ownerUserId={ownerUserId}
+            environmentId={environmentId}
+          />
           <ProfileForm
             initialProfile={profile}
-            ownerUserId={session?.userId ?? ""}
-            environmentId={appEnvironmentId()}
+            ownerUserId={ownerUserId}
+            environmentId={environmentId}
           />
           <DataExport
-            ownerUserId={session?.userId ?? ""}
-            environmentId={appEnvironmentId()}
+            ownerUserId={ownerUserId}
+            environmentId={environmentId}
           />
           <section className="card stack">
             <div>
