@@ -13,6 +13,12 @@ function formatEnergy(value: number | null) {
   return new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
 }
 
+function nutritionTitleForDate(date: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return "栄養";
+  return `${Number(match[2])}月${Number(match[3])}日の栄養`;
+}
+
 type PendingNutritionDelta = {
   energyAmount: number | null;
   energyKnown: boolean;
@@ -208,7 +214,7 @@ export function TodayInteractive({
         <div className="section-heading">
           <div>
             <p className="eyebrow">Nutrition</p>
-            <h2 id="today-nutrition-title">今日の栄養</h2>
+            <h2 id="today-nutrition-title">{nutritionTitleForDate(date)}</h2>
           </div>
           <Link className="button ghost" href="/nutrition?range=7">傾向を見る</Link>
         </div>
