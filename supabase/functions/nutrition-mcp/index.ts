@@ -53,6 +53,12 @@ const createDraftInputSchema = z.object({
 
 type CreateDraftInput = z.infer<typeof createDraftInputSchema>;
 
+type JwtClaims = {
+  aud?: string | string[];
+  role?: string;
+  client_id?: string;
+};
+
 function endpoints(request: Request) {
   const url = new URL(request.url);
   const prefixIndex = url.pathname.indexOf(FUNCTION_SEGMENT);
@@ -90,6 +96,23 @@ function unauthorized(request: Request) {
   });
 }
 
+function verifiedOAuthClaims(token: string): JwtClaims | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(padded)) as JwtClaims;
+    const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    if (!audience.includes("authenticated")) return null;
+    if (claims.role !== "authenticated") return null;
+    if (!claims.client_id || typeof claims.client_id !== "string") return null;
+    return claims;
+  } catch {
+    return null;
+  }
+}
+
 async function authenticatedClient(request: Request) {
   const authorization = request.headers.get("Authorization") ?? "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
@@ -102,7 +125,10 @@ async function authenticatedClient(request: Request) {
   });
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) return null;
-  return { supabase, user: data.user };
+
+  const claims = verifiedOAuthClaims(token);
+  if (!claims) return null;
+  return { supabase, user: data.user, claims };
 }
 
 function draftPayload(input: CreateDraftInput) {
@@ -124,13 +150,23 @@ function draftPayload(input: CreateDraftInput) {
 
 async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<typeof authenticatedClient>>>) {
   const server = new McpServer({ name: "nutrition-sleep-app", version: "0.1.0" });
+  const oauthSecurity = [{ type: "oauth2" as const, scopes: [...OAUTH_SCOPES] }];
 
   server.registerTool(
     "create_meal_draft",
     {
       title: "Create nutrition meal draft",
-      description: "Create a pending nutrition-sleep-app meal draft for the signed-in user after researching/calculating the meal. This never creates an authoritative Meal or Catalog record; the user reviews and confirms it in the app. Use null for genuinely unknown nutrient amounts rather than zero.",
+      description: "Use this when the user asks to register a meal in nutrition-sleep-app. Create a pending draft only after researching/calculating the meal. The tool never creates an authoritative Meal or Catalog record; the user reviews and confirms it in the app. Use null for genuinely unknown nutrient amounts rather than zero.",
       inputSchema: createDraftInputSchema.shape,
+      outputSchema: {
+        draft_id: z.string().uuid(),
+        request_id: z.string().uuid(),
+        status: z.literal("pending"),
+        meal_date: z.string(),
+        meal_type: z.enum(["breakfast", "lunch", "dinner", "custom"]),
+        item_name: z.string(),
+      },
+      securitySchemes: oauthSecurity,
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -158,7 +194,7 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
       const result = {
         draft_id: draft.id,
         request_id: draft.request_id,
-        status: draft.status,
+        status: "pending" as const,
         meal_date: payload.meal.meal_date,
         meal_type: payload.meal.meal_type,
         item_name: payload.item.name,
@@ -178,14 +214,26 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
     "get_connection_profile",
     {
       title: "Get nutrition app connection profile",
-      description: "Return the currently authenticated nutrition-sleep-app account identity. Use only to verify which app account is connected.",
+      description: "Return the nutrition-sleep-app profile represented by the current authenticated OAuth credentials. Use this only to identify which app account is connected.",
       inputSchema: {},
+      outputSchema: {
+        id: z.string().min(1),
+        email: z.string().email().optional(),
+      },
+      securitySchemes: oauthSecurity,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      _meta: { "openai/profile": true },
     },
-    async () => ({
-      structuredContent: { user_id: auth.user.id, email: auth.user.email ?? null },
-      content: [{ type: "text", text: `接続中の栄養アプリアカウント: ${auth.user.email ?? auth.user.id}` }],
-    }),
+    async () => {
+      const profile = {
+        id: auth.user.id,
+        ...(auth.user.email ? { email: auth.user.email } : {}),
+      };
+      return {
+        structuredContent: profile,
+        content: [{ type: "text", text: JSON.stringify(profile) }],
+      };
+    },
   );
 
   const transport = new WebStandardStreamableHTTPServerTransport();
