@@ -18,7 +18,7 @@ describe("createJwtClockSkewRetryFetch", () => {
         headers: { "Content-Type": "application/json" },
       });
     }) as typeof fetch;
-    const sleep = vi.fn(async () => undefined);
+    const sleep = vi.fn(async (_ms: number) => undefined);
     const retryFetch = createJwtClockSkewRetryFetch(baseFetch, sleep);
 
     const response = await retryFetch("https://example.test/rest/v1/rpc/example", {
@@ -43,7 +43,7 @@ describe("createJwtClockSkewRetryFetch", () => {
       JSON.stringify({ code: "PGRST303", message: "JWT issued at future" }),
       { status: 401, headers: { "Content-Type": "application/json" } },
     )) as typeof fetch;
-    const sleep = vi.fn(async () => undefined);
+    const sleep = vi.fn(async (_ms: number) => undefined);
     const retryFetch = createJwtClockSkewRetryFetch(baseFetch, sleep);
 
     const response = await retryFetch("https://example.test/rest/v1/items");
@@ -58,7 +58,7 @@ describe("createJwtClockSkewRetryFetch", () => {
       JSON.stringify({ message: "JWT expired" }),
       { status: 401, headers: { "Content-Type": "application/json" } },
     )) as typeof fetch;
-    const sleep = vi.fn(async () => undefined);
+    const sleep = vi.fn(async (_ms: number) => undefined);
     const retryFetch = createJwtClockSkewRetryFetch(baseFetch, sleep);
 
     const response = await retryFetch("https://example.test/rest/v1/items");
@@ -70,7 +70,7 @@ describe("createJwtClockSkewRetryFetch", () => {
 
   it("does not retry successful responses", async () => {
     const baseFetch = vi.fn(async () => new Response("ok", { status: 200 })) as typeof fetch;
-    const sleep = vi.fn(async () => undefined);
+    const sleep = vi.fn(async (_ms: number) => undefined);
     const retryFetch = createJwtClockSkewRetryFetch(baseFetch, sleep);
 
     const response = await retryFetch("https://example.test/rest/v1/items");
