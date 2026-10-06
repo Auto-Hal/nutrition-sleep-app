@@ -17,6 +17,7 @@ import {
   requestOutboxDrain,
 } from "@/lib/offline/outbox-events";
 import type { OutboxDrainEvent } from "@/lib/offline/outbox-runtime";
+import { normalizeProfileOutboxPayload } from "@/lib/profile-recovery";
 
 export type Profile = {
   user_id: string;
@@ -46,11 +47,31 @@ function formFromProfile(profile: Profile | null) {
   };
 }
 
+function formFromPayload(payload: ProfileOutboxPayload) {
+  return {
+    birth_date: payload.birth_date ?? "",
+    sex: payload.sex ?? "",
+    height_cm: payload.height_cm?.toString() ?? "",
+    weight_kg: payload.weight_kg?.toString() ?? "",
+    weight_updated_on: payload.weight_updated_on ?? "",
+    activity_level: payload.activity_level ?? "",
+    nutrition_goal_note: payload.nutrition_goal_note ?? "",
+    time_zone: payload.time_zone || "Asia/Tokyo",
+  };
+}
+
 function numberOrNull(value: string) {
   if (!value.trim()) return null;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw new Error("数値を確認してください。");
   return parsed;
+}
+
+function retryableProfileStatus(status: ProfileMutation["status"]) {
+  return status === "failed"
+    || status === "paused_auth"
+    || status === "blocked"
+    || status === "expired";
 }
 
 export function ProfileForm({
@@ -93,6 +114,13 @@ export function ProfileForm({
         candidate.kind === "profile_upsert" && candidate.entity_key === "profile"
       );
       setPending(row ?? null);
+      if (row) {
+        const normalized = normalizeProfileOutboxPayload(row.payload);
+        setForm(formFromPayload(normalized));
+        if (retryableProfileStatus(row.status)) {
+          setStatus("端末に保存されたプロフィールがあります。内容を確認して再同期できます。");
+        }
+      }
       if (row?.status === "conflict") {
         void loadServerProfile().then((current) => {
           if (!cancelled) setServerConflict(current);
@@ -112,11 +140,12 @@ export function ProfileForm({
       if (detail.state === "synced") {
         setPending(null);
         setServerConflict(null);
-        setStatus("server成功を確認済み");
+        setStatus("プロフィールを同期しました。");
+        setError(null);
         void loadServerProfile().then((current) => {
           setProfile(current);
           setForm(formFromProfile(current));
-        }).catch(() => setStatus("server成功を確認済み · 最新表示は次回更新時に反映します"));
+        }).catch(() => setStatus("同期済みです。最新表示は次回更新時に反映します。"));
         return;
       }
 
@@ -125,6 +154,7 @@ export function ProfileForm({
           candidate.operation_id === detail.operation_id && candidate.kind === "profile_upsert"
         );
         setPending(row ?? null);
+        if (row) setForm(formFromPayload(normalizeProfileOutboxPayload(row.payload)));
       });
 
       if (detail.state === "conflict") {
@@ -132,12 +162,11 @@ export function ProfileForm({
         setError("プロフィールが別の状態に更新されています。内容を確認してください。");
         void loadServerProfile().then(setServerConflict).catch(() => setServerConflict(null));
       } else if (detail.state === "failed") {
-        setStatus("端末に保存済みです。接続回復後に再試行します。");
+        setStatus("端末に保存済みです。再同期できます。");
       } else if (detail.state === "paused_auth") {
-        setStatus("端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+        setStatus("端末に保存済みです。同じアカウントで再ログイン後に再同期できます。");
       } else if (detail.state === "blocked" || detail.state === "expired") {
-        setStatus(null);
-        setError("未同期プロフィールの自動適用を停止しました。");
+        setStatus("端末に保存済みです。内容を確認して再同期してください。");
       }
     };
     window.addEventListener(OUTBOX_STATE_EVENT, onState);
@@ -175,6 +204,7 @@ export function ProfileForm({
     });
     await putOutboxMutation(mutation);
     setPending(mutation);
+    setForm(formFromPayload(payload));
     setStatus("端末に保存・未同期");
     requestOutboxDrain();
   }
@@ -221,14 +251,14 @@ export function ProfileForm({
     setError(null);
     try {
       const current = serverConflict ?? await loadServerProfile();
-      const localPayload = pending.payload;
+      const localPayload = normalizeProfileOutboxPayload(pending.payload);
       await deleteOutboxMutation(pending.operation_id);
       setPending(null);
       setServerConflict(null);
       await queueProfile(localPayload, current?.revision ?? 0);
-      setStatus("現在のrevisionに対して再適用を開始しました。");
+      setStatus("端末のプロフィールを現在のrevisionへ再同期しています…");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "再適用を開始できませんでした。");
+      setError(requestError instanceof Error ? requestError.message : "再同期を開始できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -249,9 +279,9 @@ export function ProfileForm({
             端末の操作: revision {pending.expected_revision ?? "不明"} を基準に保存
           </p>
           <p className="muted">
-            端末の入力: 体重 {pending.payload.weight_kg ?? "未回答"} kg ·
-            活動レベル {pending.payload.activity_level ?? "未回答"} ·
-            メモ {pending.payload.nutrition_goal_note ?? "なし"}
+            端末の入力: 体重 {normalizeProfileOutboxPayload(pending.payload).weight_kg ?? "未回答"} kg ·
+            活動レベル {normalizeProfileOutboxPayload(pending.payload).activity_level ?? "未回答"} ·
+            メモ {normalizeProfileOutboxPayload(pending.payload).nutrition_goal_note ?? "なし"}
           </p>
           {serverConflict && (
             <p className="muted">
@@ -271,6 +301,16 @@ export function ProfileForm({
         </div>
       )}
 
+      {pending && pending.status !== "conflict" && retryableProfileStatus(pending.status) && (
+        <div className="notice" role="status">
+          <strong>端末に保存されたプロフィールを復旧できます。</strong>
+          <p>下の入力欄には端末に残っている内容を表示しています。確認後、そのまま再同期できます。</p>
+          <button className="button" type="button" onClick={() => void reapplyLocal()} disabled={busy}>
+            {busy ? "再同期中…" : "端末のプロフィールを再同期"}
+          </button>
+        </div>
+      )}
+
       <div className="form">
         <div className="field"><label htmlFor="birth_date">生年月日</label><input id="birth_date" type="date" value={form.birth_date} onChange={(event) => update("birth_date", event.target.value)} /></div>
         <div className="grid-2">
@@ -284,7 +324,7 @@ export function ProfileForm({
         <div className="field"><label htmlFor="weight_updated_on">体重更新日</label><input id="weight_updated_on" type="date" value={form.weight_updated_on} onChange={(event) => update("weight_updated_on", event.target.value)} /><small>体重と更新日は一緒に保存します。</small></div>
         <div className="field"><label htmlFor="nutrition_goal_note">栄養目標メモ</label><textarea id="nutrition_goal_note" rows={3} maxLength={500} value={form.nutrition_goal_note} onChange={(event) => update("nutrition_goal_note", event.target.value)} /></div>
         <div className="field"><label htmlFor="time_zone">タイムゾーン</label><input id="time_zone" value={form.time_zone} onChange={(event) => update("time_zone", event.target.value)} /></div>
-        {pending && pending.status !== "conflict" && (
+        {pending && pending.status !== "conflict" && !retryableProfileStatus(pending.status) && (
           <p className="muted" role="status">
             {pending.status === "in_flight" ? "同期中…" : "端末に保存・未同期"}
           </p>
