@@ -8,6 +8,7 @@ import { z } from "zod";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const FUNCTION_SEGMENT = "/functions/v1/nutrition-mcp";
+const OAUTH_SCOPES = ["email", "profile"] as const;
 
 const nutrientCodes = [
   "energy", "protein", "fat", "carbohydrate", "fiber", "calcium", "iron", "zinc",
@@ -70,7 +71,7 @@ function protectedResourceResponse(request: Request) {
   return Response.json({
     resource: mcp,
     authorization_servers: [`${SUPABASE_URL}/auth/v1`],
-    scopes_supported: ["openid", "email", "profile"],
+    scopes_supported: [...OAUTH_SCOPES],
     resource_documentation: "https://github.com/Auto-Hal/nutrition-sleep-app",
   }, {
     headers: { "Cache-Control": "public, max-age=300" },
@@ -83,7 +84,7 @@ function unauthorized(request: Request) {
     status: 401,
     headers: {
       "Content-Type": "application/json",
-      "WWW-Authenticate": `Bearer resource_metadata="${metadata}", scope="openid email profile"`,
+      "WWW-Authenticate": `Bearer resource_metadata="${metadata}", scope="${OAUTH_SCOPES.join(" ")}"`,
       "Cache-Control": "no-store",
     },
   });
