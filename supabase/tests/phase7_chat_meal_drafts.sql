@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(14);
 
 select has_table('public', 'chat_meal_drafts', 'ChatGPT draft inbox exists');
 select ok(
