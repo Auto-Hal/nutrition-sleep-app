@@ -10,9 +10,7 @@ function sanitizeText(value: string) {
   return value
     .replace(yahooAttributionPattern, "")
     .replace(yahooBrandPattern, "外部商品DB")
-    .replace(yahooProviderPattern, "外部商品DB")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+    .replace(yahooProviderPattern, "外部商品DB");
 }
 
 function sanitizeProviderBranding(root: HTMLElement) {
@@ -40,7 +38,7 @@ function sanitizeProviderBranding(root: HTMLElement) {
     }
 
     if (element instanceof HTMLAnchorElement && /yahoo\.co\.jp/i.test(element.href)) {
-      const normalized = sanitizeText(element.textContent ?? "");
+      const normalized = sanitizeText(element.textContent ?? "").trim();
       if (!normalized || /Yahoo!/i.test(element.textContent ?? "")) {
         element.textContent = "商品ページで確認";
       }
