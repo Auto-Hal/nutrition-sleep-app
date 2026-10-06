@@ -14,11 +14,11 @@ function qualityLabel(value: NutritionReviewQuality) {
 }
 
 function directionLabel(item: NutritionReviewItem) {
-  if (item.direction === "increase") return "増やす方向を確認";
-  if (item.direction === "reduce") return "減らす方向を確認";
-  if (item.direction === "mixed") return "複数の基準を確認";
+  if (item.direction === "increase") return "増やす方向";
+  if (item.direction === "reduce") return "減らす方向";
+  if (item.direction === "mixed") return "複数基準";
   if (item.direction === "indeterminate") return "判定保留";
-  return "基準範囲を確認";
+  return "基準範囲";
 }
 
 function signalFacts(signal: NutritionReviewSignal) {
@@ -60,51 +60,48 @@ function ReviewItem({
   if (!primary) return null;
 
   return (
-    <article className="nutrition-review-item">
+    <article className="nutrition-review-item compact-review-item">
       <div className="nutrition-review-item-head">
-        <div>
+        <div className="review-item-title">
           <strong>{item.label}</strong>
           <div className="nutrition-tags">
             <span className="pill">{directionLabel(item)}</span>
-            <span className="pill pending">
-              評価 {primary.evaluable_days}/{range}日
-            </span>
+            <span className="pill pending">{primary.evaluable_days}/{range}日</span>
           </div>
         </div>
         <Link
           className="button ghost"
           href={`/nutrition?range=${range}&nutrient=${encodeURIComponent(item.nutrient_code)}#detail`}
         >
-          内訳を見る
+          詳細
         </Link>
       </div>
 
       <p className="nutrition-review-summary">{primary.summary}</p>
-      {signalFacts(primary).map((fact) => (
-        <p className="nutrition-meta" key={fact}>{fact}</p>
-      ))}
-      <p className="nutrition-meta">データ品質: {qualityLabel(primary.quality)}</p>
 
-      {item.signals.length > 1 && (
-        <details className="nutrition-review-axes">
-          <summary>ほかの基準も確認</summary>
-          <div className="stack">
-            {item.signals
-              .filter((signal) => signal !== primary)
-              .map((signal) => (
-                <div key={`${signal.axis}:${signal.metric}:${signal.unit}`}>
-                  <strong>{signal.summary}</strong>
-                  <div className="nutrition-meta">
-                    評価 {signal.evaluable_days}/{range}日 · {qualityLabel(signal.quality)}
-                  </div>
-                  {signalFacts(signal).map((fact) => (
-                    <div className="nutrition-meta" key={fact}>{fact}</div>
-                  ))}
+      <details className="inline-help review-evidence">
+        <summary>根拠を見る</summary>
+        <div className="review-evidence-body">
+          {signalFacts(primary).map((fact) => (
+            <p className="nutrition-meta" key={fact}>{fact}</p>
+          ))}
+          <p className="nutrition-meta">データ品質: {qualityLabel(primary.quality)}</p>
+
+          {item.signals
+            .filter((signal) => signal !== primary)
+            .map((signal) => (
+              <div className="review-secondary-signal" key={`${signal.axis}:${signal.metric}:${signal.unit}`}>
+                <strong>{signal.summary}</strong>
+                <div className="nutrition-meta">
+                  評価 {signal.evaluable_days}/{range}日 · {qualityLabel(signal.quality)}
                 </div>
-              ))}
-          </div>
-        </details>
-      )}
+                {signalFacts(signal).map((fact) => (
+                  <div className="nutrition-meta" key={fact}>{fact}</div>
+                ))}
+              </div>
+            ))}
+        </div>
+      </details>
     </article>
   );
 }
@@ -124,19 +121,20 @@ function ReviewSection({
 }) {
   if (items.length === 0) return null;
   return (
-    <section className={`card nutrition-review-section ${tone === "warning" ? "nutrition-review-warning" : ""}`}>
-      <div className="section-heading">
-        <div>
-          <h2>{title}</h2>
-          <p className="muted nutrition-caption">{description}</p>
-        </div>
-        <span className="pill">{items.length}項目</span>
+    <section className={`card nutrition-review-section compact-review-section ${tone === "warning" ? "nutrition-review-warning" : ""}`}>
+      <div className="section-heading compact-heading">
+        <h2>{title}</h2>
+        <span className="pill">{items.length}</span>
       </div>
       <div className="nutrition-review-list">
         {items.map((item) => (
           <ReviewItem key={item.nutrient_code} item={item} range={range} />
         ))}
       </div>
+      <details className="inline-help section-help">
+        <summary>この表示について</summary>
+        <p>{description}</p>
+      </details>
     </section>
   );
 }
@@ -153,54 +151,53 @@ export function NutritionReview({
 
   return (
     <>
-      <section className="card nutrition-review-intro" aria-labelledby="nutrition-review-title">
-        <div className="section-heading">
+      <section className="card nutrition-review-intro compact-review-intro" aria-labelledby="nutrition-review-title">
+        <div className="section-heading compact-heading">
           <div>
-            <p className="eyebrow">Review order</p>
-            <h2 id="nutrition-review-title">記録から見直す項目</h2>
+            <p className="eyebrow">Priority</p>
+            <h2 id="nutrition-review-title">優先して見る</h2>
           </div>
-          <span className="pill">既定 {review.range}日</span>
+          <span className="pill">{review.range}日</span>
         </div>
-        <p className="muted">
-          記録平均と食事摂取基準を、基準ごとの意味を保ったまま並べています。
-          病気・欠乏・個人の必要量を判定するものではありません。
-        </p>
-        <p className="nutrition-meta">
-          通常の見直し表示には最低 {review.minimum_evaluable_days} 日の評価可能記録が必要です。
-          端末に未同期の値はこの根拠には含めません。
-        </p>
+        <details className="inline-help">
+          <summary>判定の見方</summary>
+          <p>
+            記録平均と食事摂取基準を基準ごとの意味を保って比較します。病気・欠乏・個人の必要量を診断するものではありません。
+            通常表示には最低 {review.minimum_evaluable_days} 日の評価可能記録が必要で、端末に未同期の値は根拠に含めません。
+          </p>
+        </details>
       </section>
 
       <ReviewSection
-        title="記録上の過剰確認"
+        title="過剰を確認"
         description="比較可能なULについて、評価可能な記録平均が上回った場合の事実表示です。"
         items={review.sections.excess_alert}
         range={review.range}
         tone="warning"
       />
       <ReviewSection
-        title="先に見直す項目"
+        title="先に見直す"
         description="記録平均がEAR未満など、表示順として先に確認する項目です。"
         items={review.sections.review_first}
         range={review.range}
       />
       <ReviewSection
-        title="見直す項目"
+        title="見直す"
         description="EAR以上RDA未満、またはDG範囲外などの記録状態です。"
         items={review.sections.review}
         range={review.range}
       />
       <ReviewSection
-        title="参考・判定保留 / データ不足"
+        title="参考・保留"
         description="AI未満や評価日数不足など、強い結論にしない参考情報です。"
         items={referenceItems}
         range={review.range}
       />
 
       {review.sections.within_reference.length > 0 && (
-        <details className="card nutrition-review-within">
+        <details className="card nutrition-review-within compact-review-within">
           <summary>
-            対象指標の範囲内・基準到達 ({review.sections.within_reference.length}項目)
+            基準到達・範囲内 <span className="pill">{review.sections.within_reference.length}</span>
           </summary>
           <div className="nutrition-review-list">
             {review.sections.within_reference.map((item) => (
