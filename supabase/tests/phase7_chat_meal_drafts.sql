@@ -1,16 +1,20 @@
 begin;
 
-select plan(14);
+select plan(17);
 
 select has_table('public', 'chat_meal_drafts', 'ChatGPT draft inbox exists');
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.chat_meal_drafts'::regclass),
   'RLS enabled on ChatGPT draft inbox'
 );
+select table_privs_are(
+  'public', 'chat_meal_drafts', 'authenticated', array['SELECT'],
+  'authenticated may read own drafts but cannot write table rows directly'
+);
 select function_privs_are(
   'public', 'create_chat_meal_draft_v1', array['uuid','jsonb'],
   'authenticated', array['EXECUTE'],
-  'authenticated may create only its own ChatGPT draft'
+  'authenticated may create only its own ChatGPT draft through RPC'
 );
 select function_privs_are(
   'public', 'create_chat_meal_draft_v1', array['uuid','jsonb'],
@@ -20,11 +24,19 @@ select function_privs_are(
 select function_privs_are(
   'public', 'set_chat_meal_draft_status_v1', array['uuid','text'],
   'authenticated', array['EXECUTE'],
-  'authenticated may terminalize its own draft'
+  'authenticated may terminalize its own draft through RPC'
 );
 select table_privs_are(
   'public', 'chat_meal_drafts', 'anon', array[]::text[],
   'anon has no draft table access'
+);
+select ok(
+  (select prosecdef from pg_proc where oid = 'public.create_chat_meal_draft_v1(uuid,jsonb)'::regprocedure),
+  'draft create RPC is SECURITY DEFINER with explicit auth.uid owner binding'
+);
+select ok(
+  (select prosecdef from pg_proc where oid = 'public.set_chat_meal_draft_status_v1(uuid,text)'::regprocedure),
+  'draft terminalization RPC is SECURITY DEFINER with explicit auth.uid owner binding'
 );
 
 insert into auth.users (id, email)
