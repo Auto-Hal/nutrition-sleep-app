@@ -13,13 +13,13 @@ create table public.chat_meal_drafts (
   consumed_at timestamptz,
   dismissed_at timestamptz,
   constraint chat_meal_drafts_user_request_unique unique (user_id, request_id),
-  constraint chat_meal_drafts_payload_object check (jsonb_typeof(payload) = 'object'),
-  constraint chat_meal_drafts_payload_schema check ((payload->>'schema_version')::integer = 1),
-  constraint chat_meal_drafts_payload_draft_only check ((payload->>'draft_only')::boolean is true),
-  constraint chat_meal_drafts_payload_request check ((payload->>'request_id')::uuid = request_id),
-  constraint chat_meal_drafts_payload_meal check (jsonb_typeof(payload->'meal') = 'object'),
-  constraint chat_meal_drafts_payload_item check (jsonb_typeof(payload->'item') = 'object'),
-  constraint chat_meal_drafts_payload_nutrients check (jsonb_typeof(payload->'nutrients') = 'array'),
+  constraint chat_meal_drafts_payload_object check (coalesce(jsonb_typeof(payload), '') = 'object'),
+  constraint chat_meal_drafts_payload_schema check (coalesce((payload->>'schema_version')::integer, 0) = 1),
+  constraint chat_meal_drafts_payload_draft_only check (coalesce((payload->>'draft_only')::boolean, false) is true),
+  constraint chat_meal_drafts_payload_request check (payload ? 'request_id' and (payload->>'request_id')::uuid = request_id),
+  constraint chat_meal_drafts_payload_meal check (coalesce(jsonb_typeof(payload->'meal'), '') = 'object'),
+  constraint chat_meal_drafts_payload_item check (coalesce(jsonb_typeof(payload->'item'), '') = 'object'),
+  constraint chat_meal_drafts_payload_nutrients check (coalesce(jsonb_typeof(payload->'nutrients'), '') = 'array'),
   constraint chat_meal_drafts_terminal_timestamps check (
     (status = 'pending' and consumed_at is null and dismissed_at is null)
     or (status = 'consumed' and consumed_at is not null and dismissed_at is null)
@@ -35,23 +35,12 @@ alter table public.chat_meal_drafts enable row level security;
 alter table public.chat_meal_drafts force row level security;
 
 revoke all on table public.chat_meal_drafts from public, anon, authenticated;
-grant select, insert, update on table public.chat_meal_drafts to authenticated;
+grant select on table public.chat_meal_drafts to authenticated;
 
 create policy chat_meal_drafts_select_own
   on public.chat_meal_drafts
   for select to authenticated
   using ((select auth.uid()) = user_id);
-
-create policy chat_meal_drafts_insert_own
-  on public.chat_meal_drafts
-  for insert to authenticated
-  with check ((select auth.uid()) = user_id and status = 'pending');
-
-create policy chat_meal_drafts_update_own
-  on public.chat_meal_drafts
-  for update to authenticated
-  using ((select auth.uid()) = user_id)
-  with check ((select auth.uid()) = user_id);
 
 create or replace function public.create_chat_meal_draft_v1(
   p_request_id uuid,
@@ -59,8 +48,8 @@ create or replace function public.create_chat_meal_draft_v1(
 )
 returns public.chat_meal_drafts
 language plpgsql
-security invoker
-set search_path = public, pg_catalog
+security definer
+set search_path = pg_catalog
 as $$
 declare
   owner_id uuid := (select auth.uid());
@@ -72,16 +61,20 @@ begin
   end if;
   if p_request_id is null
      or p_payload is null
-     or jsonb_typeof(p_payload) <> 'object'
+     or pg_catalog.jsonb_typeof(p_payload) <> 'object'
      or p_payload->>'schema_version' is distinct from '1'
      or p_payload->>'draft_only' is distinct from 'true'
      or p_payload->>'request_id' is distinct from p_request_id::text
-     or jsonb_typeof(p_payload->'meal') <> 'object'
-     or jsonb_typeof(p_payload->'item') <> 'object'
-     or jsonb_typeof(p_payload->'nutrients') <> 'array'
-     or pg_column_size(p_payload) > 65536 then
+     or pg_catalog.jsonb_typeof(p_payload->'meal') <> 'object'
+     or pg_catalog.jsonb_typeof(p_payload->'item') <> 'object'
+     or pg_catalog.jsonb_typeof(p_payload->'nutrients') <> 'array'
+     or pg_catalog.pg_column_size(p_payload) > 65536 then
     raise exception using errcode = '22023', message = 'invalid chat meal draft';
   end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(owner_id::text || ':chat-draft:' || p_request_id::text, 0)
+  );
 
   select d.* into existing
   from public.chat_meal_drafts d
@@ -101,7 +94,7 @@ begin
 end;
 $$;
 
-revoke all on function public.create_chat_meal_draft_v1(uuid, jsonb) from public, anon;
+revoke all on function public.create_chat_meal_draft_v1(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.create_chat_meal_draft_v1(uuid, jsonb) to authenticated;
 
 create or replace function public.set_chat_meal_draft_status_v1(
@@ -110,8 +103,8 @@ create or replace function public.set_chat_meal_draft_status_v1(
 )
 returns public.chat_meal_drafts
 language plpgsql
-security invoker
-set search_path = public, pg_catalog
+security definer
+set search_path = pg_catalog
 as $$
 declare
   owner_id uuid := (select auth.uid());
@@ -126,9 +119,9 @@ begin
 
   update public.chat_meal_drafts
   set status = p_status,
-      consumed_at = case when p_status = 'consumed' then timezone('utc', now()) else null end,
-      dismissed_at = case when p_status = 'dismissed' then timezone('utc', now()) else null end,
-      updated_at = timezone('utc', now())
+      consumed_at = case when p_status = 'consumed' then pg_catalog.timezone('utc', pg_catalog.now()) else null end,
+      dismissed_at = case when p_status = 'dismissed' then pg_catalog.timezone('utc', pg_catalog.now()) else null end,
+      updated_at = pg_catalog.timezone('utc', pg_catalog.now())
   where id = p_draft_id
     and user_id = owner_id
     and status = 'pending'
@@ -141,7 +134,7 @@ begin
 end;
 $$;
 
-revoke all on function public.set_chat_meal_draft_status_v1(uuid, text) from public, anon;
+revoke all on function public.set_chat_meal_draft_status_v1(uuid, text) from public, anon, authenticated;
 grant execute on function public.set_chat_meal_draft_status_v1(uuid, text) to authenticated;
 
 comment on table public.chat_meal_drafts is 'Pending ChatGPT/MCP meal drafts. External tools cannot create authoritative Meal or Catalog rows.';
