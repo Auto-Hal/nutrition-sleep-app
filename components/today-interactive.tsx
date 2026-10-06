@@ -138,6 +138,24 @@ export function TodayInteractive({
       });
   }, [date]);
 
+  useEffect(() => {
+    // ChatGPT can register meals outside this PWA. Reconcile with the server
+    // when Today mounts and whenever the installed app becomes active again.
+    refreshSummary();
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") refreshSummary();
+    };
+    const refreshOnFocus = () => refreshSummary();
+
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, [refreshSummary]);
+
   const queuePendingNutrition = useCallback((
     operationId: string,
     delta: PendingNutritionDelta,
