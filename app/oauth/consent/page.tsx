@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getOAuthAuthorizationDetails, safeOAuthNextPath } from "@/lib/auth/oauth-server";
@@ -13,6 +14,12 @@ const scopeLabels: Record<string, string> = {
   email: "メールアドレスの確認",
   profile: "基本プロフィールの確認",
 };
+
+function trustedOAuthRedirect(value: string) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") throw new Error("OAuthの戻り先がHTTPSではありません。");
+  return url.toString();
+}
 
 export default async function OAuthConsentPage({ searchParams }: ConsentPageProps) {
   const authorizationId = (await searchParams).authorization_id;
@@ -30,7 +37,7 @@ export default async function OAuthConsentPage({ searchParams }: ConsentPageProp
   const session = await getAppSessionForRsc();
   if (!session) {
     const next = safeOAuthNextPath(`/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`);
-    redirect(`/login?next=${encodeURIComponent(next ?? "/oauth/consent")}`);
+    redirect(`/login?next=${encodeURIComponent(next ?? "/oauth/consent")}` as Route);
   }
 
   let details;
@@ -47,7 +54,9 @@ export default async function OAuthConsentPage({ searchParams }: ConsentPageProp
     );
   }
 
-  if ("redirect_url" in details) redirect(details.redirect_url);
+  if ("redirect_url" in details) {
+    redirect(trustedOAuthRedirect(details.redirect_url) as Route);
+  }
 
   const scopes = (details.scope ?? "").split(/\s+/u).filter(Boolean);
   return (
