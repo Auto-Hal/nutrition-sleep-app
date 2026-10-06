@@ -119,8 +119,14 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
         {!historical && (
           <section className="card" aria-labelledby="today-sleep-title">
-            <div className="section-heading"><h2 id="today-sleep-title">睡眠</h2><span className="pill pending">未接続</span></div>
-            <div className="empty-state">Fitbit / Google Health providerはCR-001の審議後に接続します。</div>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Sleep</p>
+                <h2 id="today-sleep-title">睡眠</h2>
+              </div>
+              <Link className="button secondary" href={"/sleep" as Route}>睡眠を確認</Link>
+            </div>
+            <p className="muted">同期済みの睡眠記録とステージはSleepで確認できます。</p>
           </section>
         )}
       </div>
