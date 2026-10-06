@@ -74,6 +74,13 @@ function retryableProfileStatus(status: ProfileMutation["status"]) {
     || status === "expired";
 }
 
+function syncLabel(pending: ProfileMutation | null) {
+  if (!pending) return "同期済み";
+  if (pending.status === "in_flight") return "同期中";
+  if (pending.status === "conflict") return "確認が必要";
+  return "未同期";
+}
+
 export function ProfileForm({
   initialProfile,
   ownerUserId,
@@ -118,7 +125,7 @@ export function ProfileForm({
         const normalized = normalizeProfileOutboxPayload(row.payload);
         setForm(formFromPayload(normalized));
         if (retryableProfileStatus(row.status)) {
-          setStatus("端末に保存されたプロフィールがあります。内容を確認して再同期できます。");
+          setStatus("端末に保存されたプロフィールがあります。再同期できます。");
         }
       }
       if (row?.status === "conflict") {
@@ -140,7 +147,7 @@ export function ProfileForm({
       if (detail.state === "synced") {
         setPending(null);
         setServerConflict(null);
-        setStatus("プロフィールを同期しました。");
+        setStatus("同期しました。");
         setError(null);
         void loadServerProfile().then((current) => {
           setProfile(current);
@@ -164,7 +171,7 @@ export function ProfileForm({
       } else if (detail.state === "failed") {
         setStatus("端末に保存済みです。再同期できます。");
       } else if (detail.state === "paused_auth") {
-        setStatus("端末に保存済みです。同じアカウントで再ログイン後に再同期できます。");
+        setStatus("端末に保存済みです。再ログイン後に再同期できます。");
       } else if (detail.state === "blocked" || detail.state === "expired") {
         setStatus("端末に保存済みです。内容を確認して再同期してください。");
       }
@@ -256,7 +263,7 @@ export function ProfileForm({
       setPending(null);
       setServerConflict(null);
       await queueProfile(localPayload, current?.revision ?? 0);
-      setStatus("端末のプロフィールを現在のrevisionへ再同期しています…");
+      setStatus("再同期しています…");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "再同期を開始できませんでした。");
     } finally {
@@ -265,10 +272,13 @@ export function ProfileForm({
   }
 
   return (
-    <section className="card" aria-labelledby="profile-title">
-      <div className="section-heading">
-        <div><h2 id="profile-title">Profile</h2><p className="muted">未入力は未回答のまま保存されます。</p></div>
-        <span className="pill">revision {profile?.revision ?? 0}</span>
+    <section className="card profile-card" aria-labelledby="profile-title">
+      <div className="section-heading compact-heading">
+        <div>
+          <p className="eyebrow">Profile</p>
+          <h2 id="profile-title">プロフィール</h2>
+        </div>
+        <span className={`pill ${pending ? "pending" : ""}`}>{syncLabel(pending)}</span>
       </div>
 
       {pending?.status === "conflict" && (
@@ -276,64 +286,101 @@ export function ProfileForm({
           <strong>プロフィールの競合を確認してください。</strong>
           <p>
             サーバー: revision {serverConflict?.revision ?? "取得中"} ／
-            端末の操作: revision {pending.expected_revision ?? "不明"} を基準に保存
+            端末: revision {pending.expected_revision ?? "不明"} を基準
           </p>
           <p className="muted">
-            端末の入力: 体重 {normalizeProfileOutboxPayload(pending.payload).weight_kg ?? "未回答"} kg ·
-            活動レベル {normalizeProfileOutboxPayload(pending.payload).activity_level ?? "未回答"} ·
-            メモ {normalizeProfileOutboxPayload(pending.payload).nutrition_goal_note ?? "なし"}
+            端末: 体重 {normalizeProfileOutboxPayload(pending.payload).weight_kg ?? "未回答"} kg ·
+            活動 {normalizeProfileOutboxPayload(pending.payload).activity_level ?? "未回答"}
           </p>
           {serverConflict && (
             <p className="muted">
-              サーバー現在値: 体重 {serverConflict.weight_kg ?? "未回答"} kg ·
-              活動レベル {serverConflict.activity_level ?? "未回答"} ·
-              メモ {serverConflict.nutrition_goal_note ?? "なし"}
+              サーバー: 体重 {serverConflict.weight_kg ?? "未回答"} kg ·
+              活動 {serverConflict.activity_level ?? "未回答"}
             </p>
           )}
           <div className="form-actions">
             <button className="button secondary" type="button" onClick={() => void adoptServer()} disabled={busy}>
-              サーバー状態を採用
+              サーバーを採用
             </button>
             <button className="button" type="button" onClick={() => void reapplyLocal()} disabled={busy || !serverConflict}>
-              端末の入力を現在revisionへ再適用
+              端末の入力を再適用
             </button>
           </div>
         </div>
       )}
 
       {pending && pending.status !== "conflict" && retryableProfileStatus(pending.status) && (
-        <div className="notice" role="status">
-          <strong>端末に保存されたプロフィールを復旧できます。</strong>
-          <p>下の入力欄には端末に残っている内容を表示しています。確認後、そのまま再同期できます。</p>
+        <div className="notice profile-recovery" role="status">
+          <strong>未同期のプロフィールがあります。</strong>
           <button className="button" type="button" onClick={() => void reapplyLocal()} disabled={busy}>
-            {busy ? "再同期中…" : "端末のプロフィールを再同期"}
+            {busy ? "再同期中…" : "再同期"}
           </button>
         </div>
       )}
 
-      <div className="form">
-        <div className="field"><label htmlFor="birth_date">生年月日</label><input id="birth_date" type="date" value={form.birth_date} onChange={(event) => update("birth_date", event.target.value)} /></div>
-        <div className="grid-2">
-          <div className="field"><label htmlFor="sex">性別</label><select id="sex" value={form.sex} onChange={(event) => update("sex", event.target.value)}><option value="">未回答</option><option value="female">女性</option><option value="male">男性</option></select></div>
-          <div className="field"><label htmlFor="activity_level">活動レベル</label><select id="activity_level" value={form.activity_level} onChange={(event) => update("activity_level", event.target.value)}><option value="">未回答</option><option value="low">低い</option><option value="moderate">ふつう</option><option value="high">高い</option></select></div>
-        </div>
-        <div className="grid-2">
-          <div className="field"><label htmlFor="height_cm">身長（cm）</label><input id="height_cm" type="number" min="1" step="0.1" value={form.height_cm} onChange={(event) => update("height_cm", event.target.value)} /></div>
-          <div className="field"><label htmlFor="weight_kg">体重（kg）</label><input id="weight_kg" type="number" min="0.1" step="0.1" value={form.weight_kg} onChange={(event) => update("weight_kg", event.target.value)} /></div>
-        </div>
-        <div className="field"><label htmlFor="weight_updated_on">体重更新日</label><input id="weight_updated_on" type="date" value={form.weight_updated_on} onChange={(event) => update("weight_updated_on", event.target.value)} /><small>体重と更新日は一緒に保存します。</small></div>
-        <div className="field"><label htmlFor="nutrition_goal_note">栄養目標メモ</label><textarea id="nutrition_goal_note" rows={3} maxLength={500} value={form.nutrition_goal_note} onChange={(event) => update("nutrition_goal_note", event.target.value)} /></div>
-        <div className="field"><label htmlFor="time_zone">タイムゾーン</label><input id="time_zone" value={form.time_zone} onChange={(event) => update("time_zone", event.target.value)} /></div>
-        {pending && pending.status !== "conflict" && !retryableProfileStatus(pending.status) && (
-          <p className="muted" role="status">
-            {pending.status === "in_flight" ? "同期中…" : "端末に保存・未同期"}
-          </p>
-        )}
+      <div className="form profile-form">
+        <section className="settings-form-section" aria-labelledby="profile-basic-title">
+          <h3 id="profile-basic-title">基本情報</h3>
+          <div className="field">
+            <label htmlFor="birth_date">生年月日</label>
+            <input id="birth_date" type="date" value={form.birth_date} onChange={(event) => update("birth_date", event.target.value)} />
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="sex">性別</label>
+              <select id="sex" value={form.sex} onChange={(event) => update("sex", event.target.value)}>
+                <option value="">未回答</option><option value="female">女性</option><option value="male">男性</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="activity_level">活動レベル</label>
+              <select id="activity_level" value={form.activity_level} onChange={(event) => update("activity_level", event.target.value)}>
+                <option value="">未回答</option><option value="low">低い</option><option value="moderate">ふつう</option><option value="high">高い</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="height_cm">身長（cm）</label>
+              <input id="height_cm" type="number" min="1" step="0.1" value={form.height_cm} onChange={(event) => update("height_cm", event.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="weight_kg">体重（kg）</label>
+              <input id="weight_kg" type="number" min="0.1" step="0.1" value={form.weight_kg} onChange={(event) => update("weight_kg", event.target.value)} />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="weight_updated_on">体重更新日</label>
+            <input id="weight_updated_on" type="date" value={form.weight_updated_on} onChange={(event) => update("weight_updated_on", event.target.value)} />
+          </div>
+        </section>
+
+        <section className="settings-form-section" aria-labelledby="profile-goal-title">
+          <h3 id="profile-goal-title">目標</h3>
+          <div className="field">
+            <label htmlFor="nutrition_goal_note">栄養目標メモ</label>
+            <textarea id="nutrition_goal_note" rows={3} maxLength={500} value={form.nutrition_goal_note} onChange={(event) => update("nutrition_goal_note", event.target.value)} />
+          </div>
+        </section>
+
+        <details className="settings-details">
+          <summary>その他の設定</summary>
+          <div className="settings-details-body">
+            <div className="field">
+              <label htmlFor="time_zone">タイムゾーン</label>
+              <input id="time_zone" value={form.time_zone} onChange={(event) => update("time_zone", event.target.value)} />
+            </div>
+            <small className="muted">同期 revision {profile?.revision ?? 0}</small>
+          </div>
+        </details>
+
         {error && <p className="error-text" role="alert">{error}</p>}
-        {status && <p className="muted" role="status">{status}</p>}
-        <div className="form-actions">
+        {status && <p className="muted profile-status" role="status">{status}</p>}
+
+        <div className="profile-savebar">
+          <span className={`pill ${pending ? "pending" : ""}`}>{syncLabel(pending)}</span>
           <button className="button" type="button" onClick={() => void save()} disabled={busy || pending !== null}>
-            {busy ? "保存中…" : pending ? "未同期変更あり" : "保存"}
+            {busy ? "保存中…" : pending ? "同期待ち" : "保存"}
           </button>
         </div>
       </div>

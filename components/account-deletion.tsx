@@ -12,7 +12,7 @@ type DeleteResult = {
 
 function providerWarning(status: string | null | undefined) {
   if (status === "timeout" || status === "failed") {
-    return "Google側のアクセス権取り消しは確認できませんでした。アプリ側の削除結果とは分けて扱います。";
+    return "外部サービス側のアクセス権取り消しは確認できませんでした。アプリ側の削除結果とは分けて扱います。";
   }
   return null;
 }
@@ -105,96 +105,84 @@ export function AccountDeletion({ available }: { available: boolean }) {
   const warning = providerWarning(result?.provider_revoke_status);
 
   return (
-    <section className="card" aria-labelledby="account-deletion-title">
-      <div className="section-heading">
+    <section className="card compact-settings-card danger-card" aria-labelledby="account-deletion-title">
+      <div className="section-heading compact-heading">
         <div>
-          <p className="eyebrow">Danger zone</p>
-          <h2 id="account-deletion-title">アカウントとアプリデータを削除</h2>
+          <p className="eyebrow">Account</p>
+          <h2 id="account-deletion-title">アカウント削除</h2>
         </div>
         <span className="pill pending">取り消し不可</span>
       </div>
 
-      <div className="empty-state">
-        <p>
-          Supabase上のアカウントと、このアプリが保持する栄養・睡眠データを削除します。
-          実行前に上の「データを書き出す」からJSONを保存することを推奨します。
-        </p>
-        <p className="muted">
-          Google Health元データ、すでに保存したexportファイル、他端末のオフライン保存やOS/ブラウザのバックアップを
-          この操作だけで消すことはできません。
-        </p>
-      </div>
+      <details className="settings-details danger-details">
+        <summary>削除手続きを開く</summary>
+        <div className="settings-details-body">
+          <p className="muted">アカウントと、このアプリが保持する栄養・睡眠データを削除します。必要なら先にデータを書き出してください。</p>
+          <p className="muted">他端末のオフライン保存やOS・ブラウザのバックアップは別管理です。削除結果を断定できない場合は成功とも失敗とも表示せず、状態を再確認します。</p>
 
-      <form className="form-grid" onSubmit={submit}>
-        <label>
-          <span>現在のパスワード</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            disabled={busy}
-          />
-        </label>
+          <form className="form-grid" onSubmit={submit}>
+            <label>
+              <span>現在のパスワード</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={busy}
+              />
+            </label>
 
-        <label>
-          <span>確認のため「削除」と入力</span>
-          <input
-            type="text"
-            autoComplete="off"
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            disabled={busy}
-          />
-        </label>
+            <label>
+              <span>確認のため「削除」と入力</span>
+              <input
+                type="text"
+                autoComplete="off"
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                disabled={busy}
+              />
+            </label>
 
-        {!available && (
-          <p className="muted">
-            この環境ではサーバー側の削除用Admin設定がまだ有効化されていません。
-          </p>
-        )}
-        {available && !prepared && !result?.error && (
-          <p className="muted">削除結果を安全に再確認できるよう準備しています。</p>
-        )}
+            {!available && <p className="muted">この環境では削除機能を利用できません。</p>}
+            {available && !prepared && !result?.error && <p className="muted">削除準備中…</p>}
 
-        <div className="form-actions">
-          <button
-            className="button"
-            type="submit"
-            disabled={!available || !prepared || busy || !password || confirmation !== "削除"}
-          >
-            {busy ? "処理中…" : "アカウントを削除"}
-          </button>
+            <div className="form-actions">
+              <button
+                className="button danger-button"
+                type="submit"
+                disabled={!available || !prepared || busy || !password || confirmation !== "削除"}
+              >
+                {busy ? "処理中…" : "アカウントを削除"}
+              </button>
+            </div>
+          </form>
+
+          {result?.error && <p className="error-text" role="alert">{result.error}</p>}
+
+          {result?.status === "auth_delete_failed" && (
+            <div className="notice warning">
+              <strong>サーバー削除は完了していません。</strong>
+              <p>パスワードを再入力して削除を再試行できます。</p>
+            </div>
+          )}
+
+          {(result?.status === "deletion_outcome_unknown" || result?.error_code === "network_result_unknown") && (
+            <div className="notice warning">
+              <strong>削除結果を確認できません。</strong>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => void checkStatus()}
+              >
+                削除状態を再確認
+              </button>
+            </div>
+          )}
+
+          {warning && <p className="muted">{warning}</p>}
         </div>
-      </form>
-
-      {result?.error && (
-        <p className="error-text" role="alert">{result.error}</p>
-      )}
-
-      {result?.status === "auth_delete_failed" && (
-        <div className="notice warning">
-          <strong>サーバー削除は完了していません。</strong>
-          <p>新しい書き込みは停止した状態です。パスワードを再入力して削除を再試行できます。</p>
-        </div>
-      )}
-
-      {(result?.status === "deletion_outcome_unknown" || result?.error_code === "network_result_unknown") && (
-        <div className="notice warning">
-          <strong>削除結果を断定できません。</strong>
-          <p>成功とも失敗とも表示せず、サーバーの短期statusを再確認します。</p>
-          <button
-            className="button secondary"
-            type="button"
-            disabled={busy}
-            onClick={() => void checkStatus()}
-          >
-            削除状態を再確認
-          </button>
-        </div>
-      )}
-
-      {warning && <p className="muted">{warning}</p>}
+      </details>
     </section>
   );
 }

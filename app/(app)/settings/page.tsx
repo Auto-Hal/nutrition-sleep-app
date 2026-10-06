@@ -4,6 +4,7 @@ import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { DataExport } from "@/components/data-export";
 import { AccountDeletion } from "@/components/account-deletion";
+import { ProviderBrandingSanitizer } from "@/components/provider-branding-sanitizer";
 import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
@@ -19,11 +20,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const environmentId = appEnvironmentId();
 
   return (
-    <main className="app-main">
-      <header className="topbar"><div><p className="eyebrow">Settings</p><h1>設定</h1><p className="muted">プロフィールは参照値として保存します。</p></div></header>
-      <nav className="subnav" aria-label="Settings navigation">
-        <Link href="/settings" aria-current={view === "settings" ? "page" : undefined}>Settings</Link>
-        <Link href="/settings?view=library" aria-current={view === "library" ? "page" : undefined}>Library</Link>
+    <main className="app-main settings-page">
+      <ProviderBrandingSanitizer />
+      <header className="topbar settings-topbar">
+        <div>
+          <p className="eyebrow">Settings</p>
+          <h1>設定</h1>
+        </div>
+      </header>
+      <nav className="subnav settings-subnav" aria-label="設定メニュー">
+        <Link href="/settings" aria-current={view === "settings" ? "page" : undefined}>プロフィール</Link>
+        <Link href="/settings?view=library" aria-current={view === "library" ? "page" : undefined}>ライブラリ</Link>
       </nav>
       {view === "library" ? (
         <CatalogLibrary
@@ -31,7 +38,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           environmentId={environmentId}
         />
       ) : (
-        <div className="stack">
+        <div className="stack settings-stack">
           <ProfileForm
             initialProfile={profile}
             ownerUserId={ownerUserId}
@@ -41,18 +48,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             ownerUserId={ownerUserId}
             environmentId={environmentId}
           />
-          <section className="card stack">
-            <div>
-              <p className="eyebrow">Privacy & legal</p>
-              <h2>データの取り扱い</h2>
-              <p className="muted">
-                Google Healthを含むデータの利用目的・保存・削除について確認できます。
-              </p>
-            </div>
-            <nav className="subnav" aria-label="Privacy and legal">
-              <Link href="/privacy">プライバシーポリシー</Link>
-              <Link href="/terms">利用規約</Link>
-              <Link href="/about">アプリについて</Link>
+          <section className="card settings-links-card" aria-labelledby="settings-info-title">
+            <h2 id="settings-info-title">アプリ情報</h2>
+            <nav className="settings-link-list" aria-label="プライバシーとアプリ情報">
+              <Link href="/privacy"><span>プライバシー</span><span aria-hidden="true">›</span></Link>
+              <Link href="/terms"><span>利用規約</span><span aria-hidden="true">›</span></Link>
+              <Link href="/about"><span>このアプリについて</span><span aria-hidden="true">›</span></Link>
             </nav>
           </section>
           <AccountDeletion available={Boolean(accountDeletionAdminEnv())} />

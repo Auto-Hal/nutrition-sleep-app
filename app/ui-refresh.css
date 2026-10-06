@@ -1,0 +1,755 @@
+/* UI refresh: Today, Settings, Nutrition and Sleep. Loaded after globals.css. */
+
+.today-page,
+.settings-page,
+.nutrition-page,
+.sleep-page {
+  padding-top: 18px;
+}
+
+.today-topbar,
+.settings-topbar,
+.nutrition-topbar,
+.sleep-topbar {
+  margin-bottom: 16px;
+}
+
+.today-topbar {
+  align-items: flex-end;
+}
+
+.nutrition-topbar,
+.sleep-topbar {
+  align-items: center;
+}
+
+.today-title-block h1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 0;
+}
+
+.today-label {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.today-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.today-date-nav .button {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.today-stack,
+.settings-stack,
+.nutrition-stack,
+.sleep-stack {
+  gap: 12px;
+}
+
+.chatgpt-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #b8d9cc;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #e6f4ee 0%, #f8fbf9 100%);
+  box-shadow: 0 8px 28px rgb(33 66 53 / 6%);
+}
+
+.chatgpt-primary-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.chatgpt-primary-copy > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.chatgpt-primary-copy strong {
+  font-size: 1.02rem;
+  line-height: 1.3;
+}
+
+.chatgpt-primary-copy small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.chatgpt-mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: white;
+  font-size: 1.05rem;
+}
+
+.chatgpt-primary-button {
+  flex: 0 0 auto;
+  min-width: 68px;
+  text-align: center;
+}
+
+.chatgpt-config-warning {
+  color: var(--warning);
+  font-size: 0.72rem;
+}
+
+.compact-heading {
+  align-items: center;
+}
+
+.compact-heading h2,
+.compact-action-card h2,
+.settings-links-card h2 {
+  margin-bottom: 0;
+}
+
+.chat-draft-inbox,
+.today-summary-card,
+.compact-settings-card,
+.settings-links-card,
+.profile-card,
+.compact-status-card,
+.nutrition-overview-card,
+.nutrient-detail-card,
+.nutrient-day-detail-card,
+.sleep-summary-card,
+.sleep-stage-card,
+.sleep-daily-card {
+  padding: 16px;
+}
+
+.compact-list {
+  display: grid;
+  margin-top: 8px;
+}
+
+.compact-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+
+.compact-list-row:first-child {
+  border-top: 0;
+}
+
+.compact-list-row > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.compact-list-row small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.today-summary-card .today-nutrition-summary {
+  margin: 10px 0 6px;
+}
+
+.compact-summary strong {
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+}
+
+.compact-empty {
+  margin-top: 10px;
+  padding: 13px;
+}
+
+.inline-help {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.inline-help summary,
+.settings-details summary,
+.compact-policy-card summary,
+.sleep-provider-card > summary,
+.compact-review-within > summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.inline-help p {
+  margin: 7px 0 0;
+  line-height: 1.5;
+}
+
+.compact-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Keep every MealLog capability, but reduce persistent chrome/text. */
+section.card:has(#meals-title) {
+  padding: 16px;
+}
+
+section.card:has(#meals-title) > .section-heading {
+  align-items: center;
+}
+
+section.card:has(#meals-title) > p.muted:first-of-type {
+  display: none;
+}
+
+section.card:has(#meals-title) .meal-row {
+  padding: 11px 0;
+}
+
+section.card:has(#meals-title) .meal-items {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  font-size: 0.86rem;
+}
+
+section.card:has(#meals-title) .pending-operation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+section.card:has(#meals-title) .pending-operation .button.ghost {
+  padding: 4px 6px;
+  font-size: 0.78rem;
+}
+
+section.card:has(#meals-title) .meal-actions {
+  gap: 4px;
+}
+
+section.card:has(#meals-title) .meal-actions .button {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
+  display: none;
+}
+
+/* Settings */
+.settings-topbar h1 {
+  margin-bottom: 0;
+}
+
+.settings-subnav {
+  margin-bottom: 12px;
+}
+
+.settings-subnav a {
+  flex: 1;
+  text-align: center;
+}
+
+.profile-card .section-heading {
+  margin-bottom: 14px;
+}
+
+.profile-form {
+  gap: 16px;
+}
+
+.settings-form-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-form-section h3 {
+  margin-bottom: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.settings-form-section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.profile-card .field label {
+  font-size: 0.82rem;
+}
+
+.profile-card .field input,
+.profile-card .field select,
+.profile-card .field textarea {
+  padding: 10px 11px;
+}
+
+.profile-recovery {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.profile-recovery .button {
+  flex: 0 0 auto;
+}
+
+.settings-details {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.settings-details summary {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.settings-details-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.settings-details-body p {
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+
+.profile-status {
+  margin-bottom: 0;
+  font-size: 0.78rem;
+}
+
+.profile-savebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.compact-settings-card .settings-details {
+  margin-top: 12px;
+}
+
+.settings-link-list {
+  display: grid;
+  margin-top: 8px;
+}
+
+.settings-link-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.settings-link-list a:first-child {
+  border-top: 0;
+}
+
+.danger-card {
+  border-color: #ead7d9;
+}
+
+.danger-details summary {
+  color: var(--danger);
+}
+
+.danger-button {
+  background: var(--danger);
+}
+
+/* Keep Yahoo search functionality/provenance, but do not surface provider branding in Library UI. */
+.settings-page a[href*="yahoo.co.jp"],
+.settings-page a[href*="yahooapis.jp"],
+.settings-page a[href*="developer.yahoo"],
+.settings-page img[alt*="Yahoo"],
+.settings-page [aria-label*="Yahoo"] {
+  display: none !important;
+}
+
+.settings-page .catalog-row:has(a[href*="yahoo.co.jp"]) .muted,
+.settings-page .stack:has(> .catalog-row a[href*="yahoo.co.jp"]) > p.muted,
+.settings-page .catalog-row .muted + .muted {
+  display: none;
+}
+
+/* Shared Nutrition / Sleep information hierarchy */
+.range-nav {
+  margin-bottom: 12px;
+}
+
+.range-nav a {
+  flex: 1;
+  text-align: center;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metric-tile {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface-soft, #f5f7f4);
+}
+
+.metric-tile span {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.metric-tile strong {
+  font-size: 1.05rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.primary-metric strong {
+  font-size: 1.25rem;
+}
+
+.compact-policy-card {
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.compact-policy-card summary {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.compact-policy-card p {
+  margin: 10px 0 0;
+  line-height: 1.55;
+}
+
+.detail-copy-stack {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.detail-copy-stack p {
+  margin: 0;
+}
+
+/* Nutrition */
+.compact-review-intro,
+.compact-review-section,
+.compact-review-within {
+  padding: 16px;
+}
+
+.compact-review-intro .section-heading,
+.compact-review-section .section-heading {
+  margin-bottom: 8px;
+}
+
+.compact-review-section .nutrition-review-list,
+.compact-review-within .nutrition-review-list {
+  gap: 0;
+}
+
+.compact-review-item {
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+
+.compact-review-item:first-child {
+  border-top: 0;
+}
+
+.compact-review-item .nutrition-review-item-head {
+  gap: 8px;
+}
+
+.review-item-title {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.compact-review-item .button {
+  padding: 7px 9px;
+  font-size: 0.78rem;
+}
+
+.compact-review-item .nutrition-review-summary {
+  margin: 7px 0 0;
+  font-size: 0.86rem;
+}
+
+.review-evidence-body {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.review-secondary-signal {
+  display: grid;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.section-help {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.compact-review-within > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.compact-nutrient-list .nutrition-row,
+.compact-day-list .nutrition-day {
+  padding-block: 11px;
+}
+
+.compact-nutrient-row .nutrition-value {
+  margin-top: 4px;
+  font-size: 1.05rem;
+}
+
+.compact-tags {
+  margin-top: 5px;
+  gap: 4px;
+}
+
+.compact-tags .pill {
+  font-size: 0.68rem;
+}
+
+.nutrient-metric-grid {
+  margin: 10px 0 4px;
+}
+
+.nutrient-method-details {
+  margin-bottom: 8px;
+}
+
+.compact-drilldown-stack {
+  gap: 8px;
+}
+
+.compact-nutrition-meal {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.compact-nutrition-meal:first-child {
+  border-top: 0;
+}
+
+.source-details {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.source-details summary {
+  cursor: pointer;
+}
+
+.source-details small {
+  display: block;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+
+/* Sleep */
+.sleep-summary-card .section-heading,
+.sleep-stage-card .section-heading,
+.sleep-daily-card .section-heading {
+  margin-bottom: 10px;
+}
+
+.sleep-summary-details {
+  margin-top: 10px;
+}
+
+.detail-stat-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin-top: 10px;
+}
+
+.detail-stat-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-stat-list span {
+  color: var(--muted);
+}
+
+.stage-grid {
+  margin-top: 4px;
+}
+
+.compact-sleep-day {
+  padding-block: 11px;
+}
+
+.sleep-provider-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sleep-provider-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 16px;
+  list-style: none;
+}
+
+.sleep-provider-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sleep-provider-summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.sleep-provider-summary small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 400;
+}
+
+.sleep-provider-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.sleep-provider-body > :first-child {
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .today-topbar {
+    display: grid;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .today-date-nav {
+    justify-content: flex-start;
+  }
+
+  .chatgpt-primary {
+    align-items: center;
+  }
+
+  .chatgpt-primary-copy small {
+    display: none;
+  }
+
+  .chatgpt-primary-button {
+    min-width: 62px;
+  }
+
+  .today-summary-card .today-nutrition-summary {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  section.card:has(#meals-title) .meal-row {
+    gap: 8px;
+  }
+
+  section.card:has(#meals-title) .meal-actions {
+    width: 100%;
+  }
+
+  .profile-recovery {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nutrition-topbar,
+  .sleep-topbar {
+    align-items: center;
+  }
+
+  .metric-tile {
+    padding: 10px;
+  }
+
+  .detail-stat-list {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-review-item .nutrition-review-item-head {
+    align-items: flex-start;
+  }
+
+  .nutrition-day-value {
+    min-width: 82px;
+  }
+}

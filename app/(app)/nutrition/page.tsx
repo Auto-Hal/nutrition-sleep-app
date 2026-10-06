@@ -32,7 +32,7 @@ function formatAmount(value: number | null, unit: string) {
 
 function qualityLabel(value: string) {
   if (value === "user_verified") return "確認済み";
-  if (value === "contains_unverified") return "未確認値を含む";
+  if (value === "contains_unverified") return "未確認値あり";
   if (value === "not_applicable") return "評価対象なし";
   return "不完全";
 }
@@ -57,10 +57,10 @@ function driLabels(nutrient: Awaited<ReturnType<typeof getNutritionAnalytics>>["
   if (nutrient.dri.upper_limit) labels.push(describeDriPosition(nutrient.dri.upper_limit));
 
   const energy = nutrient.dri.references.find((reference) => reference.metric === "EER_REFERENCE");
-  if (energy?.value !== undefined) labels.push(`EER参考 ${formatAmount(energy.value, energy.unit)}`);
+  if (energy?.value !== undefined) labels.push(`EER ${formatAmount(energy.value, energy.unit)}`);
 
   if (labels.length === 0 && nutrient.dri.references.some((reference) => !reference.comparable)) {
-    labels.push("基準比較対象外");
+    labels.push("比較対象外");
   }
   return labels;
 }
@@ -116,17 +116,16 @@ export default async function NutritionPage({
     : null;
 
   return (
-    <main className="app-main">
-      <header className="topbar">
+    <main className="app-main nutrition-page">
+      <header className="topbar nutrition-topbar">
         <div>
           <p className="eyebrow">Nutrition</p>
-          <h1>栄養の傾向</h1>
-          <p className="muted">食事摂取基準と記録の確かさを分けて確認します。</p>
+          <h1>栄養</h1>
         </div>
         <span className="pill">DRI 2025</span>
       </header>
 
-      <nav className="subnav" aria-label="集計期間">
+      <nav className="subnav range-nav" aria-label="集計期間">
         {[7, 30, 90].map((days) => (
           <Link
             key={days}
@@ -138,37 +137,40 @@ export default async function NutritionPage({
         ))}
       </nav>
 
-      <div className="stack">
+      <div className="stack nutrition-stack">
         <NutritionReview review={review} />
 
-        <section className="card">
-          <div className="section-heading">
+        <section className="card compact-status-card" aria-labelledby="nutrition-record-status-title">
+          <div className="section-heading compact-heading">
             <div>
-              <h2>記録の状態</h2>
+              <h2 id="nutrition-record-status-title">記録</h2>
               <p className="muted nutrition-caption">{analytics.start_date}〜{analytics.end_date}</p>
             </div>
-            <span className="pill">{analytics.record_complete_days}/{analytics.total_days}日 完全</span>
+            <span className="pill">{analytics.record_complete_days}/{analytics.total_days}日</span>
           </div>
-          <p className="muted">
-            朝・昼・夕が「記録済み」または「スキップ」の日だけを完全日として扱います。
-            栄養素が未登録の食品を含む日は、その栄養素の平均から除外します。
-          </p>
+          <details className="inline-help">
+            <summary>集計ルール</summary>
+            <p>
+              朝・昼・夕が「記録済み」または「スキップ」の日だけを完全日として扱います。
+              栄養素が未登録の食品を含む日は、その栄養素の平均から除外します。
+            </p>
+          </details>
         </section>
 
-        <section className="card">
-          <div className="section-heading">
+        <section className="card nutrition-overview-card">
+          <div className="section-heading compact-heading">
             <h2>栄養素</h2>
             <span className="muted">{range}日平均</span>
           </div>
 
-          <div className="nutrition-list">
+          <div className="nutrition-list compact-nutrient-list">
             {analytics.nutrients.map((nutrient) => {
               const labels = driLabels(nutrient);
               const incomplete = nutrient.eligible_days < analytics.record_complete_days;
               return (
                 <Link
                   key={nutrient.code}
-                  className="nutrition-row"
+                  className="nutrition-row compact-nutrient-row"
                   href={hrefFor(range, nutrient.code)}
                   aria-current={selectedCode === nutrient.code ? "page" : undefined}
                 >
@@ -182,48 +184,11 @@ export default async function NutritionPage({
                     <div className="nutrition-value">
                       {formatAmount(nutrient.average_known_amount, nutrient.unit)}
                     </div>
-                    <div className="nutrition-meta">
-                      食品 {formatAmount(nutrient.average_food_amount, nutrient.unit)}
-                      <span aria-hidden="true"> · </span>
-                      サプリ {formatAmount(nutrient.average_supplement_amount, nutrient.unit)}
-                      {nutrient.average_unclassified_amount !== null && nutrient.average_unclassified_amount > 0 && (
-                        <>
-                          <span aria-hidden="true"> · </span>
-                          由来内訳未確定 {formatAmount(nutrient.average_unclassified_amount, nutrient.unit)}
-                        </>
-                      )}
-                    </div>
-                    <div className="nutrition-meta">
-                      平均のデータ品質 {qualityLabel(nutrient.quality)}
-                      {nutrient.excluded_coverage_days > 0 && (
-                        <> · 栄養値欠損で除外 {nutrient.excluded_coverage_days}日</>
-                      )}
-                      {nutrient.empty_complete_days > 0 && (
-                        <> · 摂取項目なしで比較対象外 {nutrient.empty_complete_days}日</>
-                      )}
-                    </div>
-                    {nutrient.percent_energy !== null && (
-                      <div className="nutrition-meta">
-                        エネルギー比 {new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(nutrient.percent_energy)}%
-                        <span aria-hidden="true"> · </span>
-                        評価 {nutrient.percent_energy_eligible_days}日
-                        <span aria-hidden="true"> · </span>
-                        品質 {qualityLabel(nutrient.percent_energy_quality)}
-                      </div>
-                    )}
                     {labels.length > 0 && (
-                      <div className="nutrition-tags">
+                      <div className="nutrition-tags compact-tags">
                         {labels.map((label) => <span className="pill" key={label}>{label}</span>)}
                       </div>
                     )}
-                    {nutrient.dri.unavailable_reason && (
-                      <div className="nutrition-meta">{nutrient.dri.unavailable_reason}</div>
-                    )}
-                    {nutrient.dri.references.filter((reference) => !reference.comparable && reference.caveat).map((reference) => (
-                      <div className="nutrition-meta" key={`${reference.metric}-${reference.caveat}`}>
-                        {reference.metric}: {reference.caveat}
-                      </div>
-                    ))}
                   </div>
                   <span className="nutrition-chevron" aria-hidden="true">›</span>
                 </Link>
@@ -233,20 +198,58 @@ export default async function NutritionPage({
         </section>
 
         {selected && (
-          <section className="card" id="detail">
-            <div className="section-heading">
+          <section className="card nutrient-detail-card" id="detail">
+            <div className="section-heading compact-heading">
               <div>
-                <p className="eyebrow">Nutrient detail</p>
+                <p className="eyebrow">Detail</p>
                 <h2>{selected.label}</h2>
               </div>
               <Link className="button ghost" href={hrefFor(range)}>閉じる</Link>
             </div>
 
-            <p className="muted">
-              完全日でも、この栄養素が不明な食品を含む日は基準比較の平均から除外します。
-            </p>
+            <div className="metric-grid nutrient-metric-grid">
+              <div className="metric-tile">
+                <span>平均</span>
+                <strong>{formatAmount(selected.average_known_amount, selected.unit)}</strong>
+              </div>
+              <div className="metric-tile">
+                <span>食品</span>
+                <strong>{formatAmount(selected.average_food_amount, selected.unit)}</strong>
+              </div>
+              <div className="metric-tile">
+                <span>サプリ</span>
+                <strong>{formatAmount(selected.average_supplement_amount, selected.unit)}</strong>
+              </div>
+              <div className="metric-tile">
+                <span>評価日</span>
+                <strong>{selected.eligible_days}日</strong>
+              </div>
+            </div>
 
-            <div className="nutrition-days">
+            <details className="inline-help nutrient-method-details">
+              <summary>平均の詳細</summary>
+              <div className="detail-copy-stack">
+                <p>データ品質: {qualityLabel(selected.quality)}</p>
+                {selected.average_unclassified_amount !== null && selected.average_unclassified_amount > 0 && (
+                  <p>由来内訳未確定: {formatAmount(selected.average_unclassified_amount, selected.unit)}</p>
+                )}
+                {selected.excluded_coverage_days > 0 && <p>栄養値欠損で除外: {selected.excluded_coverage_days}日</p>}
+                {selected.empty_complete_days > 0 && <p>摂取項目なしで比較対象外: {selected.empty_complete_days}日</p>}
+                {selected.percent_energy !== null && (
+                  <p>
+                    エネルギー比 {new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(selected.percent_energy)}%
+                    · 評価 {selected.percent_energy_eligible_days}日 · {qualityLabel(selected.percent_energy_quality)}
+                  </p>
+                )}
+                {selected.dri.unavailable_reason && <p>{selected.dri.unavailable_reason}</p>}
+                {selected.dri.references.filter((reference) => !reference.comparable && reference.caveat).map((reference) => (
+                  <p key={`${reference.metric}-${reference.caveat}`}>{reference.metric}: {reference.caveat}</p>
+                ))}
+                <p>完全日でも、この栄養素が不明な食品を含む日は基準比較の平均から除外します。</p>
+              </div>
+            </details>
+
+            <div className="nutrition-days compact-day-list">
               {[...selected.daily].reverse().map((day) => (
                 <Link
                   key={day.meal_date}
@@ -257,17 +260,17 @@ export default async function NutritionPage({
                   <div>
                     <strong>{day.meal_date}</strong>
                     <div className="nutrition-meta">
-                      {day.record_complete ? "食事記録 完全" : "食事記録 不完全"}
+                      {day.record_complete ? "記録 完全" : "記録 不完全"}
                       <span aria-hidden="true"> · </span>
                       {day.entry_count === 0
-                        ? "摂取項目なし"
+                        ? "項目なし"
                         : day.coverage_complete ? "栄養値 完全" : "栄養値 不完全"}
                     </div>
                   </div>
                   <div className="nutrition-day-value">
                     <strong>{formatAmount(dailyDisplayAmount(day), day.unit)}</strong>
                     {dailyDisplayAmount(day) === null
-                      ? <small>{day.entry_count === 0 ? "0摂取とは判定しません" : "栄養値不明"}</small>
+                      ? <small>{day.entry_count === 0 ? "0とは判定しない" : "値不明"}</small>
                       : !day.coverage_complete && <small>既知分のみ</small>}
                   </div>
                 </Link>
@@ -277,22 +280,22 @@ export default async function NutritionPage({
         )}
 
         {selected && selectedDay && drilldown && (
-          <section className="card" id="day-detail">
-            <div className="section-heading">
+          <section className="card nutrient-day-detail-card" id="day-detail">
+            <div className="section-heading compact-heading">
               <div>
-                <p className="eyebrow">Day detail</p>
+                <p className="eyebrow">Day</p>
                 <h2>{selectedDay}</h2>
               </div>
-              <Link className="button ghost" href={hrefFor(range, selected.code)}>日別へ戻る</Link>
+              <Link className="button ghost" href={hrefFor(range, selected.code)}>戻る</Link>
             </div>
 
-            <div className="stack">
+            <div className="stack compact-drilldown-stack">
               {drilldown.meals.length === 0 && (
-                <div className="empty-state">この日の食事記録はありません。</div>
+                <div className="empty-state compact-empty">この日の食事記録はありません。</div>
               )}
               {drilldown.meals.map((meal) => (
-                <div className="nutrition-meal" key={meal.id}>
-                  <div className="section-heading">
+                <div className="nutrition-meal compact-nutrition-meal" key={meal.id}>
+                  <div className="section-heading compact-heading">
                     <strong>{mealTypeLabel(meal.meal_type)}</strong>
                     <span className="pill">{mealStateLabel(meal.state)}</span>
                   </div>
@@ -311,10 +314,15 @@ export default async function NutritionPage({
                           </div>
                           <div className="nutrition-day-value">
                             <strong>{formatAmount(entry.amount, entry.unit)}</strong>
-                            <small>{entry.amount === null ? "栄養値不明" : qualityLabel(entry.quality)}</small>
-                            {entry.provenance && <small>由来: {entry.provenance}</small>}
-                            {entry.source_uri && <small>出典: {entry.source_uri}</small>}
-                            {entry.source_observed_at && <small>確認時点: {entry.source_observed_at}</small>}
+                            <small>{entry.amount === null ? "値不明" : qualityLabel(entry.quality)}</small>
+                            {(entry.provenance || entry.source_uri || entry.source_observed_at) && (
+                              <details className="source-details">
+                                <summary>出典</summary>
+                                {entry.provenance && <small>由来: {entry.provenance}</small>}
+                                {entry.source_uri && <small>URL: {entry.source_uri}</small>}
+                                {entry.source_observed_at && <small>確認時点: {entry.source_observed_at}</small>}
+                              </details>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -326,13 +334,13 @@ export default async function NutritionPage({
           </section>
         )}
 
-        <section className="notice" aria-label="栄養評価について">
-          <strong>食事摂取基準は診断ではありません。</strong>
+        <details className="card compact-policy-card" aria-label="栄養評価について">
+          <summary>栄養評価の見方</summary>
           <p>
-            EAR・RDA・AI・DG・ULは意味が異なります。AI未満を不足とは判定せず、
-            未登録の栄養値を0として扱いません。
+            食事摂取基準は診断ではありません。EAR・RDA・AI・DG・ULは意味が異なります。
+            AI未満を不足とは判定せず、未登録の栄養値を0として扱いません。
           </p>
-        </section>
+        </details>
       </div>
     </main>
   );
