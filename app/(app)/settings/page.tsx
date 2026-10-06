@@ -4,6 +4,7 @@ import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
 import { DataExport } from "@/components/data-export";
 import { AccountDeletion } from "@/components/account-deletion";
+import { ProviderBrandingSanitizer } from "@/components/provider-branding-sanitizer";
 import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
@@ -20,6 +21,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <main className="app-main settings-page">
+      <ProviderBrandingSanitizer />
       <header className="topbar settings-topbar">
         <div>
           <p className="eyebrow">Settings</p>
