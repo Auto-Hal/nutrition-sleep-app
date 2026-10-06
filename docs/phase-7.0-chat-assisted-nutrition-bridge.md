@@ -4,146 +4,167 @@
 
 Make restaurant meals, prepared foods, loose ingredients, and incomplete labels quick to record without requiring the nutrition app itself to call a paid LLM API.
 
-The target UX is:
+The current preferred Preview UX is:
 
-1. Open ChatGPT from Today with one tap.
-2. Describe the meal in natural language.
-3. ChatGPT searches/calculates as needed and prepares `ChatNutritionDraft` v1.
-4. ChatGPT returns a one-tap nutrition-sleep-app import link.
-5. The app validates and previews the draft.
-6. Only the signed-in user can confirm it into the existing Catalog/Meal model.
+1. Open the dedicated nutrition Project chat from Today with one tap.
+2. Describe the meal in natural language, including a past date when needed.
+3. ChatGPT researches/calculates the meal and preserves nutrient-level provenance.
+4. ChatGPT uses the connected Supabase workspace to call the **single dedicated Preview registration function** `private.register_meal_from_chat_v1`.
+5. The meal is recorded immediately in Preview.
+6. The user verifies it in Today/History and can correct it later using the existing immutable-history edit flow.
 
-A future MCP/app integration may replace step 4 with background delivery when write-capable custom ChatGPT integrations are available for the user's plan. The app-side draft contract remains reusable for that upgrade.
+The app does not call a paid LLM API in this workflow.
 
-## Security invariant
+## Current primary route — Phase 7.0E direct Preview registration
 
-External AI integrations are **draft creators only**.
+### Formal write boundary
 
-They must not be able to:
+Chat-assisted meal writes must use only:
 
-- confirm a meal,
-- edit or void an already confirmed meal,
-- delete catalog or meal data,
-- read unrelated health/sleep data,
-- receive Supabase service-role credentials, provider tokens, raw health payloads, or export secrets.
+```sql
+select private.register_meal_from_chat_v1(
+  'primary',
+  :request_id,
+  :payload::jsonb
+);
+```
 
-The contract therefore requires `draft_only: true`. Confirmation remains an authenticated same-origin app action.
+The connected ChatGPT/Supabase workflow must **not** directly `INSERT`, `UPDATE`, or `DELETE` nutrition tables. It must not call the lower-level Catalog/Meal RPCs separately for a chat registration.
 
-## Phase 7.0A — ChatGPT entry point and contract
+During Preview acceptance:
 
-7.0A is deliberately migration-free:
+- target alias is `primary`;
+- `primary` is bound privately to the Preview app user;
+- the user UUID is never accepted from ChatGPT input;
+- the direct-registration function exists only in `nutrition-sleep-preview`;
+- Production does not receive this Phase 7.0E function until an explicit Production rollout approval.
 
-- add a Today shortcut to ChatGPT,
-- make the destination configurable with `NEXT_PUBLIC_CHATGPT_NUTRITION_URL`,
-- restrict configured destinations to `https://chatgpt.com/`,
-- define and test `ChatNutritionDraft` schema v1,
-- preserve nutrient-level provenance and quality,
-- represent unknown nutrient amounts as `null`, never implicit zero.
+The current Supabase management connector itself has broader project privileges than this application-level contract. Therefore the dedicated RPC is the **required workflow boundary**, not a claim that the management connector is technically incapable of other database operations. A future purpose-built connector should enforce that least-privilege boundary at the connector level as well.
 
-## Draft schema v1
+### Registration contract v1
 
-Top-level requirements:
+Top-level payload:
 
-- `schema_version = 1`
-- `draft_only = true`
-- UUID `request_id` for idempotency
-- meal date/type/time
-- one normalized catalog-like item
-- zero or more unique nutrient codes
-- provenance per nutrient
-- optional source URI and observation time
+```json
+{
+  "schema_version": 1,
+  "registration_mode": "direct",
+  "request_id": "UUID",
+  "meal": {
+    "meal_date": "YYYY-MM-DD",
+    "meal_type": "breakfast | lunch | dinner | custom",
+    "eaten_at": "ISO-8601 timestamp with offset, or null for normal meal slots"
+  },
+  "items": []
+}
+```
 
-Supported provenance values:
+Each item contains:
 
-- `official` — restaurant/manufacturer official value
-- `database` — structured food composition database
-- `label` — package nutrition label / OCR-derived value
-- `estimated` — model/recipe/portion estimate
-- `user_reported` — quantity or value explicitly supplied by the user
+- `name`
+- optional `brand`
+- `item_type`: `ingredient | product | supplement | estimated_dish`
+- positive `serving_size`
+- `serving_unit`
+- optional positive `quantity` (defaults to `serving_size`)
+- zero or more nutrients, with at most one value per nutrient code
 
-Supported quality values:
+Each nutrient contains:
 
-- `verified`
-- `computed`
-- `estimated`
+- `code`
+- `amount`: number or `null`
+- canonical `unit`
+- `provenance`: `official | database | label | estimated | user_reported`
+- optional `source_uri`
+- optional `source_observed_at`
 
-Official and estimated nutrients may coexist in one draft. Estimated fields must never be promoted to verified values implicitly.
+Unknown nutrients stay `null`; they are never silently converted to zero.
 
-## Phase 7.0B — one-tap return bridge
+### Provenance mapping into the existing MVP model
 
-7.0B also requires no DB migration.
+- `official` → `approved_external_db`
+- `database` → `approved_external_db`
+- `label` → `product_label`
+- `estimated` → `estimated_dish`
+- `user_reported` → `user_entered`
 
-The import URL uses:
+External non-estimated values remain `unverified`. Estimated values remain `unknown` quality.
+
+Chat inputs labelled `product` or `supplement` are intentionally stored as meal-oriented `estimated_dish` catalog rows. They do **not** bypass the formal JAN/OCR product-identity pipeline.
+
+### Request-id / duplicate semantics
+
+`request_id` represents one user registration intent.
+
+- Initial registration: generate a new UUID.
+- Transport retry / uncertain response: reuse the **same** UUID and identical payload.
+- Same UUID + identical payload: return the stored receipt with `duplicate=true`; do not add another meal entry.
+- Same UUID + changed payload: reject with `request_id already used with different payload`.
+- Explicit user request such as 「もう一度同内容を登録して」: this is a **new intent**, so generate a new UUID and register another set intentionally.
+
+The function stores one private receipt per intentional request and applies all items atomically in one database transaction.
+
+### Date/time rules
+
+The Preview user's application time zone is `Asia/Tokyo`.
+
+ChatGPT must resolve relative expressions such as 「今日」「昨日」 in Japan time and always send an explicit `meal_date`.
+
+For `custom` meals, `eaten_at` is required and must contain `Z` or an explicit UTC offset such as `+09:00`. Breakfast/lunch/dinner may omit `eaten_at` when the exact time is unknown.
+
+Past dates are valid. Later correction uses History; the app does not mutate the old nutrient snapshot in place, but voids the old entry and creates the corrected entry through the existing history-edit transaction.
+
+## Safety and authority rules
+
+The direct registration workflow may create meal/catalog rows only through the dedicated function. It must not:
+
+- edit or void an existing record directly from chat;
+- delete meal/catalog data;
+- read unrelated health or sleep data for registration;
+- store missing nutrients as zero;
+- claim estimated nutrients are official;
+- promote chat-entered commercial products into trusted JAN identity;
+- target Production while Phase 7.0E is in Preview acceptance.
+
+History/edit remains the user-facing correction surface.
+
+## Earlier/fallback routes retained
+
+### Phase 7.0A — ChatGPT entry point
+
+Today contains a configurable ChatGPT shortcut using `NEXT_PUBLIC_CHATGPT_NUTRITION_URL`. Only `https://chatgpt.com/` destinations are accepted; invalid/missing configuration falls back safely to the ChatGPT top page.
+
+The selected destination for Preview is the user's dedicated Project chat URL and contains no credential.
+
+### Phase 7.0B — one-tap import fallback
+
+The prior link bridge remains available as a fallback:
 
 `/nutrition-import#data=<base64url UTF-8 JSON>`
 
-The fragment is intentionally used instead of a query string. URL fragments are not sent in the HTTP request to Vercel, so the structured meal draft does not appear in the app server request or access-log URL.
+It validates `ChatNutritionDraft` v1 in the browser and requires explicit confirmation before the normal Catalog/Meal APIs are called. URL fragments are not sent in the HTTP request URL.
 
-The protected `/nutrition-import` page:
+This fallback remains useful when the Supabase connector is unavailable.
 
-1. reads the fragment in the browser,
-2. enforces a maximum encoded payload length,
-3. decodes and validates `ChatNutritionDraft` v1,
-4. shows nutrient values and `official / database / label / estimated / user_reported` provenance,
-5. performs no write until the user presses **確認して登録**,
-6. then uses the existing same-origin `/api/catalog` and `/api/meals` APIs,
-7. uses request-id-derived idempotency keys,
-8. removes the fragment from the address after successful registration.
+### Phase 7.0D — OAuth/MCP draft inbox
 
-Unknown (`null`) nutrients are omitted from the Catalog nutrient write and are never converted to zero.
+The Preview OAuth/MCP draft infrastructure remains experimental/fallback infrastructure. It creates pending drafts only and does not replace the Phase 7.0E direct-registration workflow in the user's current environment.
 
-### Mapping into the existing MVP model
+## Preview acceptance gates
 
-The current authoritative MVP schema is retained:
+Phase 7.0E is acceptable only when all of the following pass:
 
-- `ingredient` remains `ingredient`.
-- Chat-imported restaurant meals are `estimated_dish`.
-- `product` / `supplement` drafts are intentionally not promoted into the JAN/OCR product-identity path; they are recorded as a meal-oriented `estimated_dish` with an explanatory review notice.
-- `official` and `database` provenance map to `approved_external_db`.
-- `label` maps to `product_label`.
-- `estimated` maps to `estimated_dish`.
-- `user_reported` maps to `user_entered`.
-
-A ChatGPT source claim does not automatically become `user_verified`; external non-estimated values remain `unverified`, while estimated values remain `unknown` quality until the existing model is expanded deliberately.
-
-## Why 7.0B does not use a ChatGPT write connector yet
-
-As of October 2026, write-capable custom MCP integrations are not a dependable baseline for the user's current ChatGPT plan. A URL-return bridge therefore provides the no-copy/paste experience now, without an OpenAI API bill or a new credential exposed to ChatGPT.
-
-If write-capable MCP/app access later becomes available, add a server-side pending-draft endpoint and OAuth-scoped tool while preserving the same `ChatNutritionDraft` contract and app-side confirmation requirement.
-
-## ChatGPT entry-link behavior
-
-`NEXT_PUBLIC_CHATGPT_NUTRITION_URL` is intentionally public and contains no secret. Preferred values are the user's dedicated nutrition chat URL or nutrition Project URL. If absent or invalid, the UI falls back to `https://chatgpt.com/`.
-
-For Preview acceptance, the selected destination is stored as a branch-scoped Vercel Preview environment variable rather than committed to the repository. Because it is a `NEXT_PUBLIC_` value, a fresh Preview build is required after changing it.
-
-The app must never embed auth tokens or draft credentials in the ChatGPT URL.
-
-## Acceptance
-
-### 7.0A
-
-- lint passes
-- typecheck/build pass
-- unit tests pass
-- Today renders the ChatGPT shortcut
-- invalid/non-ChatGPT configured URLs fall back safely
-- contract accepts mixed official + estimated nutrients
-- contract rejects `draft_only: false`
-- contract rejects duplicate nutrient codes
-- contract rejects undeclared confirmation instructions
-
-### 7.0B
-
-- UTF-8 draft round-trips through base64url
-- import data lives in the URL fragment, not the query string
-- oversized/malformed payloads fail closed
-- import route is inside the authenticated app layout
-- preview shows nutrient-level provenance
-- no Catalog/Meal write occurs before explicit confirmation
-- unit mismatches fail before write
-- unknown nutrient amounts are not written as zero
-- repeated requests use stable idempotency keys
-- successful confirmation clears the fragment from browser history
-- no DB migration and no Production DB mutation
+- migration applies cleanly to a fresh database;
+- pgTAP proves private tables/functions are not available to `anon` or `authenticated`;
+- the registration target user comes from the private alias binding, not request payload;
+- a multi-item meal registers atomically;
+- unknown nutrients remain `NULL`;
+- provenance mapping is retained;
+- `product` chat input remains `estimated_dish`;
+- identical request replay creates no duplicate entries;
+- changed content with the same request ID is rejected;
+- a new request ID can intentionally register the same meal again;
+- History displays the resulting records and supports correction;
+- lint, typecheck, unit tests, build, fresh DB migration, and all pgTAP tests pass;
+- Preview deployment is READY;
+- no Phase 7.0E schema/function is deployed to Production without explicit approval.
