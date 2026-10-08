@@ -1,6 +1,7 @@
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { evaluateDriSet } from "@/lib/nutrition/dri/evaluate";
 import { DRI_2025_SOURCE } from "@/lib/nutrition/dri/2025";
+import { summarizeKnownIntake } from "@/lib/nutrition/known-intake";
 import { resolveDri2025 } from "@/lib/nutrition/dri/resolve";
 import type { DriProfile, DriReference } from "@/lib/nutrition/dri/types";
 import { createUserClient } from "@/lib/supabase/user";
@@ -224,6 +225,7 @@ export async function getNutritionAnalytics(
     const nutrientRows = rows.filter((row) => row.nutrient_code === definition.code);
     const eligibleRows = nutrientRows.filter((row) => row.eligible_for_reference);
     const recordCompleteRows = nutrientRows.filter((row) => row.record_complete);
+    const knownIntake = summarizeKnownIntake(nutrientRows);
     const eligibleDates = eligibleRows.map((row) => row.meal_date);
     const percentEnergyResult = calculatePercentEnergy(definition.code, nutrientRows, energyRows);
     const directDri = stableReferences(profile, definition.code, eligibleDates, definition.unit);
@@ -232,7 +234,7 @@ export async function getNutritionAnalytics(
     const percentReferences = percentDri.references;
     const references = [...directReferences, ...percentReferences];
 
-    const avg = average(eligibleRows.map((row) => row.known_amount));
+    const avg = knownIntake.evaluation_average;
     const directEvaluation = avg === null ? null : evaluateDriSet(directReferences, avg);
     const percentEvaluation = percentEnergyResult.value === null
       ? null
@@ -243,6 +245,12 @@ export async function getNutritionAnalytics(
       label: definition.label,
       unit: definition.unit,
       eligible_days: eligibleRows.length,
+      observed_days: knownIntake.observed_days,
+      recorded_days: knownIntake.recorded_days,
+      partial_known_days: knownIntake.partial_days,
+      record_average_known_amount: knownIntake.known_average,
+      record_average_food_amount: knownIntake.food_average,
+      record_average_supplement_amount: knownIntake.supplement_average,
       average_known_amount: avg,
       average_food_amount: average(eligibleRows.map((row) => row.food_amount)),
       average_supplement_amount: average(eligibleRows.map((row) => row.supplement_amount)),
