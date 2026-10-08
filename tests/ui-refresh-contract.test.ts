@@ -55,6 +55,8 @@ describe("app UI refresh", () => {
     const review = read("components/nutrition-review.tsx");
     expect(nutrition).toContain("compact-nutrient-list");
     expect(nutrition).toContain("平均の詳細");
+    expect(nutrition).toContain("既知分平均");
+    expect(nutrition).toContain("評価 {nutrient.eligible_days}/{nutrient.recorded_days}日");
     expect(nutrition).toContain("source-details");
     expect(nutrition).toContain("栄養評価の見方");
     expect(review).toContain("優先して見る");

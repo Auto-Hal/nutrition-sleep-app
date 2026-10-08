@@ -24,7 +24,7 @@ function directionLabel(item: NutritionReviewItem) {
 function signalFacts(signal: NutritionReviewSignal) {
   const facts: string[] = [];
   if (signal.metric === "EAR_RDA" && signal.rda_ratio_percent !== null) {
-    facts.push(`記録平均：RDAの${new Intl.NumberFormat("ja-JP", {
+    facts.push(`評価平均：RDAの${new Intl.NumberFormat("ja-JP", {
       maximumFractionDigits: 1,
     }).format(signal.rda_ratio_percent)}%`);
   }
@@ -162,7 +162,7 @@ export function NutritionReview({
         <details className="inline-help">
           <summary>判定の見方</summary>
           <p>
-            記録平均と食事摂取基準を基準ごとの意味を保って比較します。病気・欠乏・個人の必要量を診断するものではありません。
+            評価可能日の平均と食事摂取基準を基準ごとの意味を保って比較します。病気・欠乏・個人の必要量を診断するものではありません。
             通常表示には最低 {review.minimum_evaluable_days} 日の評価可能記録が必要で、端末に未同期の値は根拠に含めません。
           </p>
         </details>

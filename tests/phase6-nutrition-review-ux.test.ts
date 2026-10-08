@@ -26,7 +26,7 @@ describe("Phase 6.7 Nutrition review UX", () => {
   });
 
   it("shows factual RDA percentage and axis-specific evidence details", () => {
-    expect(component).toContain("記録平均：RDAの");
+    expect(component).toContain("評価平均：RDAの");
     expect(component).toContain("{primary.evaluable_days}/{range}日");
     expect(component).toContain("データ品質:");
     expect(component).toContain("複数基準");

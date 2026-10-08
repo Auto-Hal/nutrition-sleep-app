@@ -223,8 +223,8 @@ function makeDirectSignals(
       concern_day_ratio: concern.ratio,
       concern_evaluable_dates: concern.dates,
       summary: state === "above_ul"
-        ? `記録平均がULを上回っています`
-        : `記録平均がUL以下`,
+        ? `評価可能日の平均がULを上回っています`
+        : `評価可能日の平均がUL以下`,
     });
   }
 
@@ -271,10 +271,10 @@ function makeDirectSignals(
       concern_day_ratio: concern.ratio,
       concern_evaluable_dates: concern.dates,
       summary: state === "below_ear"
-        ? "記録平均がEAR未満"
+        ? "評価可能日の平均がEAR未満"
         : state === "ear_to_rda"
-          ? "記録平均がEAR以上・RDA未満"
-          : "記録平均がRDA以上",
+          ? "評価可能日の平均がEAR以上・RDA未満"
+          : "評価可能日の平均がRDA以上",
     });
   } else if (ai?.value !== undefined) {
     const state = value >= ai.value ? "at_or_above_ai" : "below_ai_indeterminate";
@@ -300,8 +300,8 @@ function makeDirectSignals(
       concern_day_ratio: null,
       concern_evaluable_dates: null,
       summary: state === "at_or_above_ai"
-        ? "記録平均がAI以上"
-        : "記録平均がAI未満（不足とは判定できません）",
+        ? "評価可能日の平均がAI以上"
+        : "評価可能日の平均がAI未満（不足とは判定できません）",
     });
   }
 
@@ -338,10 +338,10 @@ function makeDirectSignals(
       concern_day_ratio: concern.ratio,
       concern_evaluable_dates: concern.dates,
       summary: state === "below_dg"
-        ? "記録平均がDG範囲より低い"
+        ? "評価可能日の平均がDG範囲より低い"
         : state === "above_dg"
-          ? "記録平均がDG範囲より高い"
-          : "記録平均がDG範囲内",
+          ? "評価可能日の平均がDG範囲より高い"
+          : "評価可能日の平均がDG範囲内",
     });
   }
 
@@ -383,10 +383,10 @@ function makePercentEnergySignals(
     concern_day_ratio: null,
     concern_evaluable_dates: null,
     summary: state === "below_dg"
-      ? "記録平均のエネルギー比がDG範囲より低い"
+      ? "評価可能日の平均のエネルギー比がDG範囲より低い"
       : state === "above_dg"
-        ? "記録平均のエネルギー比がDG範囲より高い"
-        : "記録平均のエネルギー比がDG範囲内",
+        ? "評価可能日の平均のエネルギー比がDG範囲より高い"
+        : "評価可能日の平均のエネルギー比がDG範囲内",
   }];
 }
 
