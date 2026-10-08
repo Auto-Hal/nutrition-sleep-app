@@ -151,8 +151,8 @@ export default async function NutritionPage({
           <details className="inline-help">
             <summary>集計ルール</summary>
             <p>
-              朝・昼・夕が「記録済み」または「スキップ」の日だけを完全日として扱います。
-              栄養素が未登録の食品を含む日は、その栄養素の平均から除外します。
+              朝・昼・夕が「記録済み」または「スキップ」の日を記録完了日として扱います。
+              栄養値が一部不明でも既知分は平均に残し、不明値を0にはしません。DRIとの基準評価だけ完全データ日に限定します。
             </p>
           </details>
         </section>
@@ -166,7 +166,8 @@ export default async function NutritionPage({
           <div className="nutrition-list compact-nutrient-list">
             {analytics.nutrients.map((nutrient) => {
               const labels = driLabels(nutrient);
-              const incomplete = nutrient.eligible_days < analytics.record_complete_days;
+              const incomplete = nutrient.eligible_days < nutrient.recorded_days;
+              const displayAmount = nutrient.record_average_known_amount;
               return (
                 <Link
                   key={nutrient.code}
@@ -178,13 +179,16 @@ export default async function NutritionPage({
                     <div className="nutrition-row-title">
                       <strong>{nutrient.label}</strong>
                       <span className={`pill ${incomplete ? "pending" : ""}`}>
-                        {nutrient.eligible_days}日
+                        既知 {nutrient.observed_days}日
                       </span>
                     </div>
                     <div className="nutrition-value">
-                      {formatAmount(nutrient.average_known_amount, nutrient.unit)}
+                      {displayAmount === null ? "データ不足" : formatAmount(displayAmount, nutrient.unit)}
                     </div>
-                    {labels.length > 0 && (
+                    <div className="nutrition-meta">
+                      {displayAmount !== null ? "既知分平均" : "既知データなし"} · 評価 {nutrient.eligible_days}/{nutrient.recorded_days}日
+                    </div>
+                    {labels.length > 0 && nutrient.eligible_days > 0 && (
                       <div className="nutrition-tags compact-tags">
                         {labels.map((label) => <span className="pill" key={label}>{label}</span>)}
                       </div>
@@ -209,20 +213,20 @@ export default async function NutritionPage({
 
             <div className="metric-grid nutrient-metric-grid">
               <div className="metric-tile">
-                <span>平均</span>
-                <strong>{formatAmount(selected.average_known_amount, selected.unit)}</strong>
+                <span>既知分平均</span>
+                <strong>{formatAmount(selected.record_average_known_amount, selected.unit)}</strong>
               </div>
               <div className="metric-tile">
-                <span>食品</span>
-                <strong>{formatAmount(selected.average_food_amount, selected.unit)}</strong>
+                <span>食品（既知分）</span>
+                <strong>{formatAmount(selected.record_average_food_amount, selected.unit)}</strong>
               </div>
               <div className="metric-tile">
-                <span>サプリ</span>
-                <strong>{formatAmount(selected.average_supplement_amount, selected.unit)}</strong>
+                <span>サプリ（既知分）</span>
+                <strong>{formatAmount(selected.record_average_supplement_amount, selected.unit)}</strong>
               </div>
               <div className="metric-tile">
-                <span>評価日</span>
-                <strong>{selected.eligible_days}日</strong>
+                <span>基準評価</span>
+                <strong>{selected.eligible_days}/{selected.recorded_days}日</strong>
               </div>
             </div>
 
@@ -233,7 +237,8 @@ export default async function NutritionPage({
                 {selected.average_unclassified_amount !== null && selected.average_unclassified_amount > 0 && (
                   <p>由来内訳未確定: {formatAmount(selected.average_unclassified_amount, selected.unit)}</p>
                 )}
-                {selected.excluded_coverage_days > 0 && <p>栄養値欠損で除外: {selected.excluded_coverage_days}日</p>}
+                {selected.partial_known_days > 0 && <p>一部の食品で値不明: {selected.partial_known_days}日（既知分平均には含め、基準評価からは除外）</p>}
+                {selected.excluded_coverage_days > 0 && <p>基準評価から除外: {selected.excluded_coverage_days}日</p>}
                 {selected.empty_complete_days > 0 && <p>摂取項目なしで比較対象外: {selected.empty_complete_days}日</p>}
                 {selected.percent_energy !== null && (
                   <p>
@@ -245,7 +250,7 @@ export default async function NutritionPage({
                 {selected.dri.references.filter((reference) => !reference.comparable && reference.caveat).map((reference) => (
                   <p key={`${reference.metric}-${reference.caveat}`}>{reference.metric}: {reference.caveat}</p>
                 ))}
-                <p>完全日でも、この栄養素が不明な食品を含む日は基準比較の平均から除外します。</p>
+                <p>不明な食品を含む日も、分かっている量は「既知分平均」に残します。不明値を0にはせず、DRIとの不足・適正判定だけ完全データ日に限定します。</p>
               </div>
             </details>
 
