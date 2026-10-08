@@ -160,7 +160,7 @@ export default async function NutritionPage({
         <section className="card nutrition-overview-card">
           <div className="section-heading compact-heading">
             <h2>栄養素</h2>
-            <span className="muted">{range}日平均</span>
+            <span className="muted">直近{range}日</span>
           </div>
 
           <div className="nutrition-list compact-nutrient-list">
