@@ -111,7 +111,7 @@ describe("Phase 6 EAR/RDA review semantics", () => {
     expect(signal?.state).toBe("below_ear");
     expect(signal?.band).toBe("review_first");
     expect(signal?.rda_ratio_percent).toBe(62.5);
-    expect(signal?.summary).toBe("記録平均がEAR未満");
+    expect(signal?.summary).toBe("評価可能日の平均がEAR未満");
     expect(result.items[0].direction).toBe("increase");
   });
 
