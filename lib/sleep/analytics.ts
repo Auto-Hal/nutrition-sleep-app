@@ -1,9 +1,11 @@
 import { createUserClient } from "@/lib/supabase/user";
 import { readAllPages } from "@/lib/supabase/pagination";
+import { sleepSessionDetails, type SleepStageType } from "@/lib/sleep/details";
+import type { NormalizedSleepStageInterval } from "@/lib/health/google-health-types";
 
 export type SleepRange = 7 | 30 | 90;
 
-type RawSleepSession = {
+export type RawSleepSession = {
   id: string;
   sleep_date: string;
   start_at: string;
@@ -12,6 +14,10 @@ type RawSleepSession = {
   end_utc_offset_seconds: number | string | null;
   sleep_type: "stages" | "classic" | "unknown";
   provider_nap: boolean | null;
+  provider_processed?: boolean | null;
+  provider_stages_status?: string | null;
+  provider_manually_edited?: boolean | null;
+  short_awakenings?: NormalizedSleepStageInterval[] | null;
   minutes_asleep: number | string | null;
   time_in_bed_minutes: number | string | null;
   efficiency: number | string | null;
@@ -21,14 +27,14 @@ type RawSleepSession = {
   superseded_at: string | null;
 };
 
-type RawStageInterval = {
+export type RawStageInterval = {
   sleep_session_id: string;
   stage_type: "awake" | "light" | "deep" | "rem" | "asleep" | "restless" | "unknown";
   start_at: string;
   end_at: string;
 };
 
-type RawOutOfBed = {
+export type RawOutOfBed = {
   sleep_session_id: string;
   start_at: string;
   end_at: string;
@@ -156,8 +162,7 @@ function clockLabel(minutes: number | null) {
 function chooseMainSession(rows: NumericSleepSession[]) {
   if (rows.length === 0) return null;
   const nonNaps = rows.filter((row) => row.provider_nap !== true);
-  const candidates = nonNaps.length > 0 ? nonNaps : rows;
-  return [...candidates].sort(
+  return [...nonNaps].sort(
     (a, b) => durationMinutes(b.start_at, b.end_at) - durationMinutes(a.start_at, a.end_at),
   )[0] ?? null;
 }
@@ -192,6 +197,12 @@ export function summarizeSleepData(options: {
   const daily = dates.map((date) => {
     const rows = sessions.filter((row) => row.sleep_date === date);
     const main = chooseMainSession(rows);
+    const sessionDetails = rows.map((row) => ({
+      ...sleepSessionDetails(row, stagesBySession.get(row.id) ?? [], outOfBedBySession.get(row.id) ?? [], options.timeZone),
+      main: row.id === main?.id,
+    }));
+    const mainDetails = sessionDetails.find((row) => row.main) ?? null;
+    const processing = rows.some((row) => row.provider_processed === false);
     const minutesAsleepValues = rows.map((row) => row.minutes_asleep);
     const timeInBedValues = rows.map((row) => row.time_in_bed_minutes);
     const totalMinutesAsleep = completeSum(minutesAsleepValues);
@@ -203,24 +214,18 @@ export function summarizeSleepData(options: {
         ? (totalMinutesAsleep / totalTimeInBed) * 100
         : null;
 
-    const stageDurations = {
-      awake: 0,
-      light: 0,
-      deep: 0,
-      rem: 0,
-      asleep: 0,
-      restless: 0,
-      unknown: 0,
-    };
+    const stageDurations: Record<SleepStageType, number | null> = { awake: null, light: null, deep: null, rem: null, asleep: null, restless: null, unknown: null };
     let stageIntervalCount = 0;
     let outOfBedCount = 0;
     let outOfBedMinutes = 0;
 
     for (const row of rows) {
-      for (const stage of stagesBySession.get(row.id) ?? []) {
-        stageDurations[stage.stage_type] += durationMinutes(stage.start_at, stage.end_at);
-        stageIntervalCount += 1;
+      const detail = sessionDetails.find((detail) => detail.id === row.id)!;
+      for (const stage of Object.keys(stageDurations) as SleepStageType[]) {
+        const value = detail.stage_minutes[stage];
+        if (value !== null && detail.processed !== false && !detail.timeline_overlaps) stageDurations[stage] = (stageDurations[stage] ?? 0) + value;
       }
+      stageIntervalCount += (stagesBySession.get(row.id) ?? []).length;
       for (const segment of outOfBedBySession.get(row.id) ?? []) {
         outOfBedCount += 1;
         outOfBedMinutes += durationMinutes(segment.start_at, segment.end_at);
@@ -231,13 +236,18 @@ export function summarizeSleepData(options: {
       date,
       observed: rows.length > 0,
       session_count: rows.length,
+      sessions: sessionDetails,
+      main_session: mainDetails,
+      processing,
+      nap_count: rows.filter((row) => row.provider_nap === true).length,
+      nap_minutes_asleep: completeSum(rows.filter((row) => row.provider_nap === true).map((row) => row.minutes_asleep)),
       minutes_asleep: totalMinutesAsleep,
       known_minutes_asleep: knownMinutesAsleep,
-      minutes_asleep_complete: rows.length > 0 && totalMinutesAsleep !== null,
+      minutes_asleep_complete: rows.length > 0 && totalMinutesAsleep !== null && !processing,
       time_in_bed_minutes: totalTimeInBed,
       known_time_in_bed_minutes: knownTimeInBed,
-      time_in_bed_complete: rows.length > 0 && totalTimeInBed !== null,
-      efficiency,
+      time_in_bed_complete: rows.length > 0 && totalTimeInBed !== null && !processing,
+      efficiency: processing ? null : efficiency,
       main_start_minutes: main
         ? formatCivilMinutes(main.start_at, main.start_utc_offset_seconds, options.timeZone)
         : null,
@@ -263,7 +273,7 @@ export function summarizeSleepData(options: {
   const efficiencyEligible = daily.filter((day) => day.efficiency !== null);
   const stageEligible = daily.filter((day) => day.stage_data_available);
   const timingEligible = daily.filter(
-    (day) => day.main_start_minutes !== null && day.main_end_minutes !== null,
+    (day) => !day.processing && day.main_start_minutes !== null && day.main_end_minutes !== null,
   );
 
   const bedtimeMinutes = timingEligible.map((day) => {
@@ -272,8 +282,11 @@ export function summarizeSleepData(options: {
   });
   const wakeMinutes = timingEligible.map((day) => day.main_end_minutes ?? 0);
 
-  const stageAverage = (stage: keyof (typeof daily)[number]["stage_durations"]) =>
-    average(stageEligible.map((day) => day.stage_durations[stage]));
+  const stageValues = (stage: SleepStageType) => stageEligible.map((day) => day.stage_durations[stage]).filter((value): value is number => value !== null);
+  const stageAverage = (stage: SleepStageType) => average(stageValues(stage));
+  const mainSessions = daily.flatMap((day) => day.main_session && day.main_session.processed !== false ? [day.main_session] : []);
+  const detailValues = (field: "minutes_awake" | "minutes_after_wakeup" | "minutes_asleep") => mainSessions.map((session) => session[field]).filter((value): value is number => value !== null);
+  const latencyValues = mainSessions.filter((session) => session.latency_comparable).map((session) => session.minutes_to_fall_asleep!);
 
   return {
     range: options.range,
@@ -292,6 +305,15 @@ export function summarizeSleepData(options: {
     bedtime_variability_minutes: standardDeviation(bedtimeMinutes),
     wake_variability_minutes: standardDeviation(wakeMinutes),
     timing_eligible_days: timingEligible.length,
+    average_main_minutes_asleep: average(detailValues("minutes_asleep")),
+    main_sleep_eligible_days: detailValues("minutes_asleep").length,
+    average_minutes_to_fall_asleep: average(latencyValues),
+    latency_eligible_days: latencyValues.length,
+    average_main_minutes_awake: average(detailValues("minutes_awake")),
+    awake_eligible_days: detailValues("minutes_awake").length,
+    average_minutes_after_wakeup: average(detailValues("minutes_after_wakeup")),
+    after_wakeup_eligible_days: detailValues("minutes_after_wakeup").length,
+    nap_days: daily.filter((day) => day.nap_count > 0).length,
     stage_eligible_days: stageEligible.length,
     average_stage_minutes: {
       awake: stageAverage("awake"),
@@ -299,6 +321,7 @@ export function summarizeSleepData(options: {
       deep: stageAverage("deep"),
       rem: stageAverage("rem"),
     },
+    stage_eligible_days_by_type: { awake: stageValues("awake").length, light: stageValues("light").length, deep: stageValues("deep").length, rem: stageValues("rem").length },
     average_out_of_bed_segments: average(
       observedDays.map((day) => day.out_of_bed_count ?? 0),
     ),
@@ -322,7 +345,7 @@ export async function getSleepAnalytics(
   const sessionData = await readAllPages<RawSleepSession>((from, to) => client
     .from("sleep_sessions")
     .select(
-      "id,sleep_date,start_at,end_at,start_utc_offset_seconds,end_utc_offset_seconds,sleep_type,provider_nap,minutes_asleep,time_in_bed_minutes,efficiency,minutes_to_fall_asleep,minutes_after_wakeup,minutes_awake,superseded_at", { count: "exact" },
+      "id,sleep_date,start_at,end_at,start_utc_offset_seconds,end_utc_offset_seconds,sleep_type,provider_nap,provider_processed,provider_stages_status,provider_manually_edited,short_awakenings,minutes_asleep,time_in_bed_minutes,efficiency,minutes_to_fall_asleep,minutes_after_wakeup,minutes_awake,superseded_at", { count: "exact" },
     )
     .gte("sleep_date", startDate)
     .lte("sleep_date", endDate)

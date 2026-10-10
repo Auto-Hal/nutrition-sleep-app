@@ -15,8 +15,8 @@ function formatEnergy(value: number | null) {
 
 function nutritionTitleForDate(date: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!match) return "栄養";
-  return `${Number(match[2])}月${Number(match[3])}日の栄養`;
+  if (!match) return "食事の集計";
+  return `${Number(match[2])}月${Number(match[3])}日の集計`;
 }
 
 type PendingNutritionDelta = {
@@ -232,10 +232,9 @@ export function TodayInteractive({
       <section className="card today-summary-card" aria-labelledby="today-nutrition-title" aria-busy={refreshing || undefined}>
         <div className="section-heading compact-heading">
           <div>
-            <p className="eyebrow">Nutrition</p>
             <h2 id="today-nutrition-title">{nutritionTitleForDate(date)}</h2>
           </div>
-          <Link className="button ghost" href="/nutrition?range=7">食事の見直しへ →</Link>
+          <Link className="button ghost" href="/nutrition?range=7">7日平均を見る →</Link>
         </div>
 
         {displayedSummary && (displayedSummary.entry_count > 0 || displayedSummary.record_complete) ? (
@@ -272,7 +271,7 @@ export function TodayInteractive({
 
         <details className="inline-help">
           <summary>表示について</summary>
-          <p>未登録の栄養値は0として扱わず、日中の途中経過から不足とは判定しません。</p>
+          <p>エネルギー値が不明な項目は合計に含めません。未同期の記録は同期後に確定します。</p>
         </details>
       </section>
 

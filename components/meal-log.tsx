@@ -57,7 +57,7 @@ type MealEntryVoidMutation = Extract<PendingMutation, { kind: "meal_entry_void" 
 type OutboxUiState = PendingMutationStatus | "synced" | "discarded";
 
 function stateLabel(state: MealState | undefined) {
-  if (state === "skipped") return "skipped";
+  if (state === "skipped") return "食べていない";
   if (state === "recorded") return "登録済み";
   return "未登録";
 }
@@ -842,7 +842,7 @@ export function MealLog({
                     {fixedStateOperation && (
                       <div className="pending-operation">
                         <span>
-                          状態変更 → {fixedStateOperation.payload.state === "skipped" ? "skipped" : "未登録"}
+                          状態変更 → {fixedStateOperation.payload.state === "skipped" ? "食べていない" : "未登録"}
                         </span>
                         <span className="pill pending">{operationLabel(fixedStateOperation.status)}</span>
                         {fixedStateOperation.status === "conflict" && (
@@ -916,7 +916,7 @@ export function MealLog({
                       onClick={() => void queueFixedMealState(type, "skipped")}
                       disabled={busy}
                     >
-                      skipped
+                      食べていない
                     </button>
                   )}
                   {(meal?.entries.length ?? 0) === 0

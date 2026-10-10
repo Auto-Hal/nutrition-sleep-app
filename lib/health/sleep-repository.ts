@@ -24,7 +24,7 @@ async function upsertSession(
        provider_nap, provider_manually_edited, provider_external_id,
        minutes_asleep, time_in_bed_minutes, efficiency, minutes_to_fall_asleep,
        minutes_after_wakeup, minutes_awake, provider_payload_hash, provider_observed_at,
-       synced_at, superseded_at
+       short_awakenings, sleep_details_version, synced_at, superseded_at
      ) values (
        $1, 'google_health', $2, $3,
        $4, $5, $6, $7, $8,
@@ -32,7 +32,7 @@ async function upsertSession(
        $13, $14, $15,
        $16, $17, $18, $19,
        $20, $21, $22, $23,
-       now(), null
+       $24::jsonb, 1, now(), null
      )
      on conflict (user_id, provider, provider_resource_name) do update
        set provider_data_source_family = excluded.provider_data_source_family,
@@ -56,10 +56,13 @@ async function upsertSession(
            minutes_awake = excluded.minutes_awake,
            provider_payload_hash = excluded.provider_payload_hash,
            provider_observed_at = excluded.provider_observed_at,
+           short_awakenings = excluded.short_awakenings,
+           sleep_details_version = excluded.sleep_details_version,
            synced_at = now(),
            superseded_at = null
      where public.sleep_sessions.provider_payload_hash is distinct from excluded.provider_payload_hash
         or public.sleep_sessions.superseded_at is not null
+        or public.sleep_sessions.sleep_details_version < excluded.sleep_details_version
      returning id`,
     [
       userId,
@@ -85,6 +88,7 @@ async function upsertSession(
       session.minutesAwake,
       session.providerPayloadHash,
       session.providerObservedAt,
+      session.shortAwakenings === null ? null : JSON.stringify(session.shortAwakenings),
     ],
   );
 

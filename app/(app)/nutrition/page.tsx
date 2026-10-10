@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
-import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
+import { NutrientAverages, formatNutrientAmount as formatAmount } from "@/components/nutrient-averages";
 import { dailyDisplayAmount } from "@/lib/nutrition/presentation";
 import { deriveNutritionReview } from "@/lib/nutrition/review-priority";
 import { NutritionReview } from "@/components/nutrition-review";
@@ -18,18 +18,12 @@ const VALID_RANGES = new Set([7, 30, 90]);
 const NUTRIENT_CODES = new Set(NUTRIENT_DEFINITIONS.map((definition) => definition.code));
 
 function parseRange(value: string | undefined): NutritionRange {
-  const numeric = Number(value ?? "30");
-  return VALID_RANGES.has(numeric) ? numeric as NutritionRange : 30;
+  const numeric = Number(value ?? "7");
+  return VALID_RANGES.has(numeric) ? numeric as NutritionRange : 7;
 }
 
 function parseNutrient(value: string | undefined): NutrientCode | null {
   return value && NUTRIENT_CODES.has(value as NutrientCode) ? value as NutrientCode : null;
-}
-
-function formatAmount(value: number | null, unit: string) {
-  if (value === null) return "—";
-  const maximumFractionDigits = Math.abs(value) < 10 ? 2 : 1;
-  return `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits }).format(value)} ${unit}`;
 }
 
 function qualityLabel(value: string) {
@@ -50,21 +44,6 @@ function mealTypeLabel(value: string) {
   if (value === "lunch") return "昼食";
   if (value === "dinner") return "夕食";
   return "追加";
-}
-
-function driLabels(nutrient: Awaited<ReturnType<typeof getNutritionAnalytics>>["nutrients"][number]) {
-  const labels: string[] = [];
-  if (nutrient.dri.adequacy) labels.push(describeDriPosition(nutrient.dri.adequacy));
-  if (nutrient.dri.target) labels.push(describeDriPosition(nutrient.dri.target));
-  if (nutrient.dri.upper_limit) labels.push(describeDriPosition(nutrient.dri.upper_limit));
-
-  const energy = nutrient.dri.references.find((reference) => reference.metric === "EER_REFERENCE");
-  if (energy?.value !== undefined) labels.push(`EER ${formatAmount(energy.value, energy.unit)}`);
-
-  if (labels.length === 0 && nutrient.dri.references.some((reference) => !reference.comparable)) {
-    labels.push("比較対象外");
-  }
-  return labels;
 }
 
 function hrefFor(range: NutritionRange, nutrient?: NutrientCode | null, day?: string | null) {
@@ -141,6 +120,7 @@ export default async function NutritionPage({
       </nav>
 
       <div className="stack nutrition-stack">
+        <NutrientAverages nutrients={analytics.nutrients} range={range} selectedCode={selectedCode} />
         <ActionGuide guide={nutritionGuide(review)} />
         <NutritionReview review={review} />
 
@@ -161,49 +141,6 @@ export default async function NutritionPage({
           </details>
         </section>
 
-        <section className="card nutrition-overview-card">
-          <div className="section-heading compact-heading">
-            <h2>栄養素</h2>
-            <span className="muted">直近{range}日</span>
-          </div>
-
-          <div className="nutrition-list compact-nutrient-list">
-            {analytics.nutrients.map((nutrient) => {
-              const labels = driLabels(nutrient);
-              const incomplete = nutrient.eligible_days < nutrient.recorded_days;
-              const displayAmount = nutrient.record_average_known_amount;
-              return (
-                <Link
-                  key={nutrient.code}
-                  className="nutrition-row compact-nutrient-row"
-                  href={hrefFor(range, nutrient.code)}
-                  aria-current={selectedCode === nutrient.code ? "page" : undefined}
-                >
-                  <div className="nutrition-row-main">
-                    <div className="nutrition-row-title">
-                      <strong>{nutrient.label}</strong>
-                      <span className={`pill ${incomplete ? "pending" : ""}`}>
-                        既知 {nutrient.observed_days}日
-                      </span>
-                    </div>
-                    <div className="nutrition-value">
-                      {displayAmount === null ? "データ不足" : formatAmount(displayAmount, nutrient.unit)}
-                    </div>
-                    <div className="nutrition-meta">
-                      {displayAmount !== null ? "既知分平均" : "既知データなし"} · 評価 {nutrient.eligible_days}/{nutrient.recorded_days}日
-                    </div>
-                    {labels.length > 0 && nutrient.eligible_days > 0 && (
-                      <div className="nutrition-tags compact-tags">
-                        {labels.map((label) => <span className="pill" key={label}>{label}</span>)}
-                      </div>
-                    )}
-                  </div>
-                  <span className="nutrition-chevron" aria-hidden="true">›</span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
 
         {selected && (
           <section className="card nutrient-detail-card" id="detail">

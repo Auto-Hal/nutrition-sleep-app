@@ -14,6 +14,8 @@ describe("Google Health sleep persistence contract", () => {
   it("does not rewrite child rows when the provider payload is unchanged", () => {
     expect(source).toContain("provider_payload_hash is distinct from excluded.provider_payload_hash");
     expect(source).toContain("if (stored.changed)");
+    expect(source).toContain("sleep_details_version < excluded.sleep_details_version");
+    expect(source).toContain("session.shortAwakenings === null ? null : JSON.stringify(session.shortAwakenings)");
   });
 
   it("marks records missing from a refreshed authoritative window as superseded rather than deleting them", () => {

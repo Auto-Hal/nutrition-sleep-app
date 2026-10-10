@@ -129,6 +129,13 @@ export function normalizeGoogleHealthSleep(
   const outOfBedSegments = (sleep.outOfBedSegments ?? []).map((segment, index) =>
     normalizeInterval(segment, index + 1),
   );
+  // These intervals overlap the primary stage timeline. Keep them separate.
+  // An omitted field is unknown, whereas an explicit empty array has no segments.
+  const shortAwakenings = sleep.shortAwakenings?.map((stage, index) => ({
+    ...normalizeInterval(stage, index + 1),
+    stageType: normalizeStage(stage.type),
+    providerStageType: stage.type ?? null,
+  })) ?? null;
 
   const minutesAsleep = int64(sleep.summary?.minutesAsleep);
   const timeInBedMinutes = int64(sleep.summary?.minutesInSleepPeriod);
@@ -168,5 +175,6 @@ export function normalizeGoogleHealthSleep(
     providerObservedAt: sleep.updateTime ? parseTimestamp(sleep.updateTime, "updateTime") : null,
     stages,
     outOfBedSegments,
+    shortAwakenings,
   };
 }
