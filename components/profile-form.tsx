@@ -67,6 +67,28 @@ function numberOrNull(value: string) {
   return parsed;
 }
 
+function localToday(timeZone: string) {
+  const format = (zone: string) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  try {
+    return format(timeZone);
+  } catch {
+    return format("Asia/Tokyo");
+  }
+}
+
+function withConsistentWeightDate(payload: ProfileOutboxPayload): ProfileOutboxPayload {
+  if (payload.weight_kg === null) return { ...payload, weight_updated_on: null };
+  return {
+    ...payload,
+    weight_updated_on: payload.weight_updated_on || localToday(payload.time_zone),
+  };
+}
+
 function retryableProfileStatus(status: ProfileMutation["status"]) {
   return status === "failed"
     || status === "paused_auth"
@@ -103,7 +125,16 @@ export function ProfileForm({
   const [busy, setBusy] = useState(false);
 
   function update(name: string, value: string) {
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === "weight_kg") {
+        if (!value.trim()) next.weight_updated_on = "";
+        else if (!current.weight_updated_on.trim()) {
+          next.weight_updated_on = localToday(current.time_zone || "Asia/Tokyo");
+        }
+      }
+      return next;
+    });
   }
 
   const loadServerProfile = useCallback(async () => {
@@ -181,7 +212,7 @@ export function ProfileForm({
   }, [binding, loadServerProfile]);
 
   function payloadFromForm(): ProfileOutboxPayload {
-    return {
+    return withConsistentWeightDate({
       birth_date: form.birth_date || null,
       sex: form.sex === "male" || form.sex === "female" ? form.sex : null,
       height_cm: numberOrNull(form.height_cm),
@@ -195,7 +226,7 @@ export function ProfileForm({
           : null,
       nutrition_goal_note: form.nutrition_goal_note.trim() || null,
       time_zone: form.time_zone.trim() || "Asia/Tokyo",
-    };
+    });
   }
 
   async function queueProfile(payload: ProfileOutboxPayload, expectedRevision: number) {
@@ -258,7 +289,9 @@ export function ProfileForm({
     setError(null);
     try {
       const current = serverConflict ?? await loadServerProfile();
-      const localPayload = normalizeProfileOutboxPayload(pending.payload);
+      const localPayload = withConsistentWeightDate(
+        normalizeProfileOutboxPayload(pending.payload),
+      );
       await deleteOutboxMutation(pending.operation_id);
       setPending(null);
       setServerConflict(null);
@@ -387,3 +420,4 @@ export function ProfileForm({
     </section>
   );
 }
+
