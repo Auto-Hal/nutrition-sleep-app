@@ -24,7 +24,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <ProviderBrandingSanitizer />
       <header className="topbar settings-topbar">
         <div>
-          <p className="eyebrow">Settings</p>
+          <p className="eyebrow">プロフィールとデータの管理</p>
           <h1>設定</h1>
         </div>
       </header>

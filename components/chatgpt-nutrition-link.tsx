@@ -1,3 +1,5 @@
+import { AppIcon } from "@/components/app-icon";
+
 const DEFAULT_CHATGPT_URL = "https://chatgpt.com/";
 
 function configuredChatGptUrl() {
@@ -21,7 +23,7 @@ export function ChatGptNutritionLink() {
   return (
     <section className="chatgpt-primary" aria-labelledby="chatgpt-nutrition-title">
       <div className="chatgpt-primary-copy">
-        <span className="chatgpt-mark" aria-hidden="true">✦</span>
+        <span className="chatgpt-mark" aria-hidden="true"><AppIcon name="sparkles" /></span>
         <div>
           <strong id="chatgpt-nutrition-title">ChatGPTで食事を登録</strong>
           <small>料理名や店名を伝えるだけ</small>
@@ -33,7 +35,7 @@ export function ChatGptNutritionLink() {
         target="_blank"
         rel="noopener noreferrer"
       >
-        開く
+        開く <AppIcon name="arrow-up-right" />
       </a>
       {!configured && (
         <small className="chatgpt-config-warning">専用チャット未設定</small>

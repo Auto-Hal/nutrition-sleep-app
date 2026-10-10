@@ -6,15 +6,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useState, useTransition } from "react";
 import { OutboxRuntime } from "@/components/outbox-runtime";
 import { ConnectivityBoundary } from "@/components/connectivity-boundary";
+import { AccountHeader } from "@/components/account-header";
+import { AppIcon, type AppIconName } from "@/components/app-icon";
 import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 import { countUnsyncedOutbox, pauseOutboxForBinding } from "@/lib/offline/outbox-idb";
 
 const tabs = [
-  { href: "/today", label: "今日", icon: "◷" },
-  { href: "/nutrition", label: "栄養", icon: "◌" },
-  { href: "/sleep", label: "睡眠", icon: "☾" },
-  { href: "/settings", label: "設定", icon: "⚙" },
-] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: string }>;
+  { href: "/today", label: "今日", icon: "today" },
+  { href: "/nutrition", label: "栄養", icon: "nutrition" },
+  { href: "/sleep", label: "睡眠", icon: "sleep" },
+  { href: "/settings", label: "設定", icon: "settings" },
+] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: AppIconName }>;
 
 export function AppShell({
   children,
@@ -86,17 +88,13 @@ export function AppShell({
 
   return (
     <div className="app-frame" aria-busy={isNavigating || undefined}>
-      <div className="app-main" style={{ paddingBottom: 0 }}>
-        <div className="topbar" style={{ marginBottom: 0 }}>
-          <span className="eyebrow">{email ?? "アカウント"}</span>
-          <button className="button ghost" type="button" onClick={logout}>ログアウト</button>
-        </div>
-      </div>
+      <AccountHeader email={email} onLogout={() => void logout()} />
       <ConnectivityBoundary binding={binding}>
         {children}
       </ConnectivityBoundary>
       <OutboxRuntime binding={binding} />
       <div
+        className="provider-attribution"
         dangerouslySetInnerHTML={{
           __html: '<!-- Begin Yahoo! JAPAN Web Services Attribution Snippet --><span style="margin:15px 15px 15px 15px"><a href="https://developer.yahoo.co.jp/sitemap/">Webサービス by Yahoo! JAPAN</a></span><!-- End Yahoo! JAPAN Web Services Attribution Snippet -->',
         }}
@@ -118,7 +116,7 @@ export function AppShell({
               onPointerEnter={() => router.prefetch(tab.href)}
               onTouchStart={() => router.prefetch(tab.href)}
             >
-              <span className="nav-icon" aria-hidden="true">{pending ? "•" : tab.icon}</span>
+              <span className="nav-icon" aria-hidden="true"><AppIcon name={tab.icon} /></span>
               <span>{tab.label}</span>
             </Link>
           );
