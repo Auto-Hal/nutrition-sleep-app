@@ -6,6 +6,8 @@ import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
 import { SleepStaleSync } from "@/components/sleep-stale-sync";
+import { ActionGuide } from "@/components/action-guide";
+import { sleepGuide } from "@/lib/wellbeing/guide";
 import {
   getGoogleHealthConnectionSummary,
   getSleepAnalytics,
@@ -78,13 +80,14 @@ export default async function SleepPage({
 
       <header className="topbar sleep-topbar">
         <div>
-          <p className="eyebrow">Sleep</p>
+          <p className="eyebrow">睡眠の時間と、生活のリズム</p>
           <h1>睡眠</h1>
         </div>
         <span className={`pill ${connection?.status === "connected" ? "" : "pending"}`}>
           {connectionLabel(connection?.status)}
         </span>
       </header>
+      <p className="page-purpose">睡眠時間と就寝・起床のばらつきを確認し、今夜からの過ごし方を見直します。</p>
 
       <nav className="subnav range-nav" aria-label="睡眠集計期間">
         {[7, 30, 90].map((days) => (
@@ -99,10 +102,11 @@ export default async function SleepPage({
       </nav>
 
       <div className="stack sleep-stack">
+        <ActionGuide guide={sleepGuide(analytics, connection ?? { status: "not_connected" })} />
         <section className="card sleep-summary-card" aria-labelledby="sleep-summary-title">
           <div className="section-heading compact-heading">
             <div>
-              <h2 id="sleep-summary-title">サマリー</h2>
+              <h2 id="sleep-summary-title">時間とリズム</h2>
               <p className="muted nutrition-caption">{analytics.start_date}〜{analytics.end_date}</p>
             </div>
             <span className="pill">{analytics.observed_days}/{analytics.total_days}日</span>
@@ -114,7 +118,7 @@ export default async function SleepPage({
               <strong>{durationLabel(analytics.average_minutes_asleep)}</strong>
             </div>
             <div className="metric-tile">
-              <span>効率</span>
+              <span>在床中に眠った割合</span>
               <strong>{percentLabel(analytics.average_efficiency)}</strong>
             </div>
             <div className="metric-tile">
@@ -157,10 +161,10 @@ export default async function SleepPage({
             <div className="empty-state compact-empty">ステージデータはまだありません。</div>
           ) : (
             <div className="metric-grid stage-grid">
-              <div className="metric-tile"><span>Awake</span><strong>{durationLabel(analytics.average_stage_minutes.awake)}</strong></div>
-              <div className="metric-tile"><span>Light</span><strong>{durationLabel(analytics.average_stage_minutes.light)}</strong></div>
-              <div className="metric-tile"><span>Deep</span><strong>{durationLabel(analytics.average_stage_minutes.deep)}</strong></div>
-              <div className="metric-tile"><span>REM</span><strong>{durationLabel(analytics.average_stage_minutes.rem)}</strong></div>
+              <div className="metric-tile"><span>覚醒</span><strong>{durationLabel(analytics.average_stage_minutes.awake)}</strong></div>
+              <div className="metric-tile"><span>浅い睡眠</span><strong>{durationLabel(analytics.average_stage_minutes.light)}</strong></div>
+              <div className="metric-tile"><span>深い睡眠</span><strong>{durationLabel(analytics.average_stage_minutes.deep)}</strong></div>
+              <div className="metric-tile"><span>レム睡眠</span><strong>{durationLabel(analytics.average_stage_minutes.rem)}</strong></div>
             </div>
           )}
         </section>

@@ -8,6 +8,8 @@ import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 import { dailyDisplayAmount } from "@/lib/nutrition/presentation";
 import { deriveNutritionReview } from "@/lib/nutrition/review-priority";
 import { NutritionReview } from "@/components/nutrition-review";
+import { ActionGuide } from "@/components/action-guide";
+import { nutritionGuide } from "@/lib/wellbeing/guide";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
@@ -119,11 +121,12 @@ export default async function NutritionPage({
     <main className="app-main nutrition-page">
       <header className="topbar nutrition-topbar">
         <div>
-          <p className="eyebrow">Nutrition</p>
+          <p className="eyebrow">食事の傾向と、見直すポイント</p>
           <h1>栄養</h1>
         </div>
         <span className="pill">DRI 2025</span>
       </header>
+      <p className="page-purpose">何がどの食品から摂れているかを確認し、次の献立で見直す点を1つ選びます。</p>
 
       <nav className="subnav range-nav" aria-label="集計期間">
         {[7, 30, 90].map((days) => (
@@ -138,6 +141,7 @@ export default async function NutritionPage({
       </nav>
 
       <div className="stack nutrition-stack">
+        <ActionGuide guide={nutritionGuide(review)} />
         <NutritionReview review={review} />
 
         <section className="card compact-status-card" aria-labelledby="nutrition-record-status-title">

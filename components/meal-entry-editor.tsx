@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CatalogItem, MealType } from "@/lib/nutrition/catalog";
 import type { MealEntryEditTarget } from "@/lib/nutrition/meal-history";
 
@@ -55,6 +55,8 @@ export function MealEntryEditor({
   const [quantity, setQuantity] = useState(String(target.entry.quantity));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingRequest = useRef<{ body: string; mealDate: string; operationId: string } | null>(null);
+  const [outcomeUnknown, setOutcomeUnknown] = useState(false);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === itemId) ?? null,
@@ -62,7 +64,8 @@ export function MealEntryEditor({
   );
 
   async function submit() {
-    if (!selectedItem?.reference_fingerprint || submitting) {
+    if (submitting) return;
+    if (!pendingRequest.current && !selectedItem?.reference_fingerprint) {
       setError("修正に使える食品を選択してください。");
       return;
     }
@@ -80,11 +83,11 @@ export function MealEntryEditor({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/meal-entries/replace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          operation_id: crypto.randomUUID(),
+      if (!pendingRequest.current) {
+        if (!selectedItem?.reference_fingerprint) throw new Error("修正に使える食品を選択してください。");
+        const operationId = crypto.randomUUID();
+        pendingRequest.current = { operationId, mealDate, body: JSON.stringify({
+          operation_id: operationId,
           intent_created_at: new Date().toISOString(),
           entry_id: target.entry.id,
           expected_source_meal_revision: target.meal.revision,
@@ -95,12 +98,37 @@ export function MealEntryEditor({
           quantity: numericQuantity,
           quantity_unit: selectedItem.serving_unit,
           reference_fingerprint: selectedItem.reference_fingerprint,
-        }),
+        }) };
+      }
+      const response = await fetch("/api/meal-entries/replace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: pendingRequest.current.body,
       });
-      if (!response.ok) throw new Error(await responseError(response));
-      window.location.assign(`/today?date=${encodeURIComponent(mealDate)}`);
+      if (!response.ok) {
+        const message = await responseError(response);
+        if (!outcomeUnknown && [400, 401, 403, 404, 409, 422].includes(response.status)) {
+          pendingRequest.current = null;
+          setOutcomeUnknown(false);
+        }
+        throw new Error(message);
+      }
+      window.location.assign(`/today?date=${encodeURIComponent(pendingRequest.current.mealDate)}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "食事記録を修正できませんでした。");
+      if (pendingRequest.current) {
+        setOutcomeUnknown(true);
+        try {
+          const receipt = await fetch(`/api/mutations/${pendingRequest.current.operationId}`, { cache: "no-store" });
+          const payload = await receipt.json() as { result?: { status?: string; operation_kind?: string } | null };
+          if (receipt.ok && payload.result?.status === "applied" && payload.result.operation_kind === "meal_entry_replace") {
+            window.location.assign(`/today?date=${encodeURIComponent(pendingRequest.current.mealDate)}`);
+            return;
+          }
+        } catch { /* Keep the same request until its outcome can be recovered. */ }
+        setError("保存結果を確認できません。同じ内容で再試行するか、記録を確認してください。");
+      } else {
+        setError(cause instanceof Error ? cause.message : "食事記録を修正できませんでした。");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -116,7 +144,8 @@ export function MealEntryEditor({
         </p>
       </div>
 
-      <div className="form">
+      <fieldset className="form" disabled={submitting || outcomeUnknown}>
+        <legend className="visually-hidden">修正内容</legend>
         <div className="inline-fields">
           <div className="field">
             <label htmlFor="edit-meal-date">日付</label>
@@ -181,15 +210,17 @@ export function MealEntryEditor({
           />
         </div>
 
+      </fieldset>
+      <div className="stack">
         <div className="notice warning">
           <strong>修正はオンライン時に確定します。</strong>
-          <p>通信に失敗した場合は元の記録を変更せず、再度この画面から実行できます。</p>
+          <p>通信が途切れても保存済みの場合があります。結果を確認し、同じ操作として再試行します。</p>
         </div>
         {error && <p className="error-text" role="alert">{error}</p>}
         <div className="form-actions">
           <a className="button secondary" href={`/today?date=${encodeURIComponent(target.meal.meal_date)}`}>キャンセル</a>
           <button className="button" type="button" disabled={submitting || !selectedItem} onClick={() => void submit()}>
-            {submitting ? "修正中…" : "修正を保存"}
+            {submitting ? "修正中…" : outcomeUnknown ? "同じ内容で再試行" : "修正を保存"}
           </button>
         </div>
       </div>

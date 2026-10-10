@@ -1,4 +1,5 @@
 import { createUserClient } from "@/lib/supabase/user";
+import { readAllPages } from "@/lib/supabase/pagination";
 
 export type SleepRange = 7 | 30 | 90;
 
@@ -318,17 +319,17 @@ export async function getSleepAnalytics(
   const startDate = shiftIsoDate(endDate, -(range - 1));
   const client = createUserClient(accessToken);
 
-  const { data: sessionData, error: sessionError } = await client
+  const sessionData = await readAllPages<RawSleepSession>((from, to) => client
     .from("sleep_sessions")
     .select(
-      "id,sleep_date,start_at,end_at,start_utc_offset_seconds,end_utc_offset_seconds,sleep_type,provider_nap,minutes_asleep,time_in_bed_minutes,efficiency,minutes_to_fall_asleep,minutes_after_wakeup,minutes_awake,superseded_at",
+      "id,sleep_date,start_at,end_at,start_utc_offset_seconds,end_utc_offset_seconds,sleep_type,provider_nap,minutes_asleep,time_in_bed_minutes,efficiency,minutes_to_fall_asleep,minutes_after_wakeup,minutes_awake,superseded_at", { count: "exact" },
     )
     .gte("sleep_date", startDate)
     .lte("sleep_date", endDate)
     .is("superseded_at", null)
     .order("sleep_date", { ascending: true })
-    .order("start_at", { ascending: true });
-  if (sessionError) throw new Error(sessionError.message);
+    .order("start_at", { ascending: true })
+    .order("id", { ascending: true }).range(from, to));
 
   const sessionIds = (sessionData ?? []).map((row) => row.id);
   let stages: RawStageInterval[] = [];
@@ -336,21 +337,21 @@ export async function getSleepAnalytics(
 
   if (sessionIds.length > 0) {
     const [stageResult, segmentResult] = await Promise.all([
-      client
+      readAllPages<RawStageInterval>((from, to) => client
         .from("sleep_stage_intervals")
-        .select("sleep_session_id,stage_type,start_at,end_at")
+        .select("sleep_session_id,stage_type,start_at,end_at", { count: "exact" })
         .in("sleep_session_id", sessionIds)
-        .order("sequence", { ascending: true }),
-      client
+        .order("sleep_session_id", { ascending: true })
+        .order("sequence", { ascending: true }).order("id", { ascending: true }).range(from, to)),
+      readAllPages<RawOutOfBed>((from, to) => client
         .from("sleep_out_of_bed_segments")
-        .select("sleep_session_id,start_at,end_at")
+        .select("sleep_session_id,start_at,end_at", { count: "exact" })
         .in("sleep_session_id", sessionIds)
-        .order("sequence", { ascending: true }),
+        .order("sleep_session_id", { ascending: true })
+        .order("sequence", { ascending: true }).order("id", { ascending: true }).range(from, to)),
     ]);
-    if (stageResult.error) throw new Error(stageResult.error.message);
-    if (segmentResult.error) throw new Error(segmentResult.error.message);
-    stages = stageResult.data ?? [];
-    outOfBedSegments = segmentResult.data ?? [];
+    stages = stageResult;
+    outOfBedSegments = segmentResult;
   }
 
   return summarizeSleepData({

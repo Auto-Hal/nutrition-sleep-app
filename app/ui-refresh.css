@@ -1,5 +1,32 @@
 /* UI refresh: Today, Settings, Nutrition and Sleep. Loaded after globals.css. */
 
+/* Shared hierarchy: purpose → observation → next action → source records. */
+:root { --muted: #526960; }
+body { line-height: 1.65; }
+.page-purpose { color: var(--muted); max-width: 60ch; margin-bottom: 20px; }
+.daily-guide { padding: 12px 0; }
+.daily-guide > .section-heading { align-items: center; }
+.daily-guide > .section-heading h2 { margin: 0; }
+.daily-guide > .page-purpose { margin: 8px 0 16px; }
+.guide-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.action-guide { display: flex; flex-direction: column; gap: 10px; box-shadow: none; }
+.action-guide .section-heading { align-items: center; gap: 8px; flex-wrap: wrap; }
+.action-guide .eyebrow, .action-guide h2, .action-guide p { margin: 0; }
+.action-guide h2 { line-height: 1.5; }
+.guide-observation { line-height: 1.65; }
+.guide-next { display: grid; gap: 9px; margin-top: auto; padding: 14px; background: var(--accent-soft); border-radius: 12px; }
+.guide-next .button { text-align: center; align-self: start; justify-self: start; }
+.guide-steps ol { margin: 12px 0 0; padding-left: 22px; }
+.action-guide .guide-steps { font-size: 0.9rem; color: var(--ink); }
+.guide-steps li + li { margin-top: 10px; }
+.guide-boundary { font-size: 0.82rem; color: var(--muted); margin: 12px 0 0; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.bottom-nav .nav-link { min-height: 48px; font-size: 0.82rem; }
+@media (max-width: 600px) {
+  .guide-grid { grid-template-columns: 1fr; }
+  .daily-guide > .section-heading { flex-wrap: wrap; }
+}
+
 .today-page,
 .settings-page,
 .nutrition-page,

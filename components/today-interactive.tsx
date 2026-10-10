@@ -65,6 +65,8 @@ export function TodayInteractive({
   const [refreshing, setRefreshing] = useState(false);
   const [pendingNutrition, setPendingNutrition] = useState<Record<string, PendingNutritionDelta>>({});
   const refreshVersion = useRef(0);
+  const confirmedOperations = useRef(new Set<string>());
+  const settledOperations = useRef(new Set<string>());
   const binding = useMemo<OutboxBinding>(
     () => ({ ownerUserId, environmentId }),
     [ownerUserId, environmentId],
@@ -83,6 +85,7 @@ export function TodayInteractive({
             row.kind !== "meal_entry_create"
             || row.payload.meal_date !== date
             || !PROVISIONAL_OUTBOX_STATUSES.has(row.status)
+            || settledOperations.current.has(row.operation_id)
           ) {
             continue;
           }
@@ -92,7 +95,7 @@ export function TodayInteractive({
           );
         }
 
-        setPendingNutrition(restored);
+        setPendingNutrition((current) => ({ ...restored, ...current }));
       })
       .catch(() => {
         // MealLog surfaces IndexedDB read errors. Keep server summary unchanged here.
@@ -104,6 +107,10 @@ export function TodayInteractive({
   }, [binding, date, initialItems]);
 
   const refreshSummary = useCallback((operationIdToClear?: string) => {
+    if (operationIdToClear) confirmedOperations.current.add(operationIdToClear);
+    // All operations confirmed before this request are covered by its snapshot.
+    // Keep confirmations even when an earlier response is superseded or fails.
+    const coveredOperations = [...confirmedOperations.current];
     const version = ++refreshVersion.current;
     setRefreshing(true);
 
@@ -120,12 +127,14 @@ export function TodayInteractive({
         }
         if (refreshVersion.current === version) {
           setSummary(payload.summary);
-          if (operationIdToClear) {
+          if (coveredOperations.length > 0) {
             setPendingNutrition((current) => {
               const next = { ...current };
-              delete next[operationIdToClear];
+              for (const operationId of coveredOperations) delete next[operationId];
               return next;
             });
+            for (const operationId of coveredOperations) confirmedOperations.current.delete(operationId);
+            for (const operationId of coveredOperations) settledOperations.current.add(operationId);
           }
         }
       })
@@ -180,6 +189,7 @@ export function TodayInteractive({
       || state === "blocked"
       || state === "discarded"
     ) {
+      settledOperations.current.add(operationId);
       setPendingNutrition((current) => {
         const next = { ...current };
         delete next[operationId];
@@ -225,7 +235,7 @@ export function TodayInteractive({
             <p className="eyebrow">Nutrition</p>
             <h2 id="today-nutrition-title">{nutritionTitleForDate(date)}</h2>
           </div>
-          <Link className="button ghost" href="/nutrition?range=7">傾向</Link>
+          <Link className="button ghost" href="/nutrition?range=7">食事の見直しへ →</Link>
         </div>
 
         {displayedSummary && (displayedSummary.entry_count > 0 || displayedSummary.record_complete) ? (
@@ -240,7 +250,7 @@ export function TodayInteractive({
                   : !displayedSummary.energy_coverage_complete && <small>既知分のみ</small>}
             </div>
             <span className={`pill ${displayedSummary.record_complete ? "" : "pending"}`}>
-              {displayedSummary.record_complete ? "完了" : "途中"}
+              {displayedSummary.record_complete ? "記録完了" : "記録途中"}
             </span>
           </div>
         ) : (

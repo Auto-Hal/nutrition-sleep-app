@@ -6,7 +6,7 @@ import { appBuildVersion } from "@/lib/app-version";
 
 export const metadata: Metadata = {
   title: "栄養・睡眠管理",
-  description: "食事と睡眠を低負担で記録するための基盤",
+  description: "食事と睡眠を記録し、傾向を確認して次の行動につなげる",
   applicationName: "栄養・睡眠管理",
   manifest: "/manifest.webmanifest",
   icons: {

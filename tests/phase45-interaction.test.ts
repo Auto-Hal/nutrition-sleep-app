@@ -159,6 +159,6 @@ describe("Phase 4.5 optimistic Today energy", () => {
     expect(source).toContain("row.payload.meal_date !== date");
     expect(source).toContain("PROVISIONAL_OUTBOX_STATUSES.has(row.status)");
     expect(source).toContain('"paused_auth"');
-    expect(source).toContain("setPendingNutrition(restored)");
+    expect(source).toContain("setPendingNutrition((current) => ({ ...restored, ...current }))");
   });
 });

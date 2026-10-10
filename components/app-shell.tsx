@@ -10,10 +10,10 @@ import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 import { countUnsyncedOutbox, pauseOutboxForBinding } from "@/lib/offline/outbox-idb";
 
 const tabs = [
-  { href: "/today", label: "Today", icon: "◷" },
-  { href: "/nutrition", label: "Nutrition", icon: "◌" },
-  { href: "/sleep", label: "Sleep", icon: "☾" },
-  { href: "/settings", label: "Settings", icon: "⚙" },
+  { href: "/today", label: "今日", icon: "◷" },
+  { href: "/nutrition", label: "栄養", icon: "◌" },
+  { href: "/sleep", label: "睡眠", icon: "☾" },
+  { href: "/settings", label: "設定", icon: "⚙" },
 ] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: string }>;
 
 export function AppShell({
