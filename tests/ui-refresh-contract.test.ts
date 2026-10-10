@@ -18,7 +18,10 @@ describe("app UI refresh", () => {
     const todayInteractive = read("components/today-interactive.tsx");
     const today = read("app/(app)/today/page.tsx");
     expect(todayInteractive).toContain('<details className="inline-help">');
-    expect(todayInteractive).toContain("未登録の栄養値は0として扱わず");
+    expect(todayInteractive).toContain("エネルギー値が不明な項目は合計に含めません");
+    expect(todayInteractive).toContain("7日平均を見る");
+    expect(today).not.toContain("DailyGuide");
+    expect(todayInteractive).not.toContain("不足");
     expect(today).not.toContain("記録がない日は、摂取量を0として扱いません");
   });
 
@@ -52,11 +55,13 @@ describe("app UI refresh", () => {
 
   it("keeps nutrition detail while reducing always-visible explanation", () => {
     const nutrition = read("app/(app)/nutrition/page.tsx");
+    const averages = read("components/nutrient-averages.tsx");
     const review = read("components/nutrition-review.tsx");
-    expect(nutrition).toContain("compact-nutrient-list");
+    expect(averages).toContain("compact-nutrient-list");
+    expect(nutrition.indexOf("<NutrientAverages")).toBeLessThan(nutrition.indexOf("<ActionGuide"));
     expect(nutrition).toContain("平均の詳細");
     expect(nutrition).toContain("既知分平均");
-    expect(nutrition).toContain("評価 {nutrient.eligible_days}/{nutrient.recorded_days}日");
+    expect(averages).toContain("評価 {nutrient.eligible_days}/{nutrient.recorded_days}日");
     expect(nutrition).toContain("source-details");
     expect(nutrition).toContain("栄養評価の見方");
     expect(review).toContain("優先して見る");
@@ -65,8 +70,10 @@ describe("app UI refresh", () => {
 
   it("keeps sleep sync and analytics while removing the long Google Health notice", () => {
     const sleep = read("app/(app)/sleep/page.tsx");
-    expect(sleep).toContain("sleep-summary-card");
-    expect(sleep).toContain("睡眠ステージ");
+    const overview = read("components/sleep-overview.tsx");
+    expect(overview).toContain("sleep-summary-card");
+    expect(overview).toContain("睡眠ステージ");
+    expect(sleep).toContain("<SleepNightDetails");
     expect(sleep).toContain("日別");
     expect(sleep).toContain("/api/health/google/sync");
     expect(sleep).toContain("/api/health/google/disconnect");

@@ -66,7 +66,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     <main className="app-main today-page">
       <header className="topbar today-topbar">
         <div className="today-title-block">
-          <p className="eyebrow">{historical ? "記録" : "Today"}</p>
+          <p className="eyebrow">{historical ? "過去の記録" : "今日の記録"}</p>
           <h1>{formatDateTitle(date)}{!historical && <span className="today-label">今日</span>}</h1>
         </div>
         <nav className="today-date-nav" aria-label="日付と履歴">
@@ -106,6 +106,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
         )}
 
         <TodayInteractive
+          key={date}
           date={summary?.date ?? date}
           initialItems={initialItems}
           initialMeals={initialMeals}
@@ -114,15 +115,6 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           environmentId={appEnvironmentId()}
         />
 
-        {!historical && (
-          <section className="card compact-action-card" aria-labelledby="today-sleep-title">
-            <div>
-              <p className="eyebrow">Sleep</p>
-              <h2 id="today-sleep-title">睡眠</h2>
-            </div>
-            <Link className="button secondary" href={"/sleep" as Route}>見る</Link>
-          </section>
-        )}
       </div>
     </main>
   );

@@ -41,6 +41,7 @@ export type GoogleHealthSleep = {
   interval?: GoogleHealthInterval;
   type?: string;
   stages?: GoogleHealthSleepStage[];
+  shortAwakenings?: GoogleHealthSleepStage[];
   outOfBedSegments?: GoogleHealthOutOfBedSegment[];
   metadata?: {
     stagesStatus?: string;
@@ -119,4 +120,5 @@ export type NormalizedSleepSession = {
   providerObservedAt: string | null;
   stages: NormalizedSleepStageInterval[];
   outOfBedSegments: NormalizedSleepInterval[];
+  shortAwakenings: NormalizedSleepStageInterval[] | null;
 };

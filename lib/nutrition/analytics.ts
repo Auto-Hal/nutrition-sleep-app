@@ -207,13 +207,28 @@ export async function getNutritionAnalytics(
   const endDate = localDateInTimeZone(profile.timeZone, now);
   const startDate = shiftIsoDate(endDate, -(range - 1));
 
-  const { data, error } = await createUserClient(accessToken).rpc("get_nutrition_daily_summary", {
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-  if (error) throw new Error(error.message);
-
-  const rows = normalizeDailyRows(data);
+  const client = createUserClient(accessToken);
+  const periods: { start: string; end: string }[] = [];
+  for (let start = startDate; start <= endDate; start = shiftIsoDate(start, 28)) {
+    const end = shiftIsoDate(start, 27);
+    periods.push({ start, end: end < endDate ? end : endDate });
+  }
+  const chunks = await Promise.all(periods.map(async (period) => {
+    const { data, error } = await client.rpc("get_nutrition_daily_summary", {
+      p_start_date: period.start,
+      p_end_date: period.end,
+    });
+    if (error) throw new Error(error.message);
+    const rows = normalizeDailyRows(data);
+    const keys = new Set(rows.map((row) => `${row.meal_date}:${row.nutrient_code}`));
+    for (let day = period.start; day <= period.end; day = shiftIsoDate(day, 1)) {
+      if (NUTRIENT_DEFINITIONS.some((nutrient) => !keys.has(`${day}:${nutrient.code}`))) {
+        throw new Error("栄養集計の取得範囲が不完全です。APIの取得上限を確認してください。");
+      }
+    }
+    return rows;
+  }));
+  const rows = chunks.flat();
 
   const energyRows = new Map(
     rows.filter((row) => row.nutrient_code === "energy").map((row) => [row.meal_date, row]),

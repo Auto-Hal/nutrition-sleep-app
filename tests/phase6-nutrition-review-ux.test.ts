@@ -9,8 +9,9 @@ const component = read("components/nutrition-review.tsx");
 const css = read("app/globals.css") + read("app/ui-refresh.css");
 
 describe("Phase 6.7 Nutrition review UX", () => {
-  it("keeps 30 days as the default review period", () => {
-    expect(page).toContain('Number(value ?? "30")');
+  it("shows seven-day averages first and keeps longer review periods", () => {
+    expect(page).toContain('Number(value ?? "7")');
+    expect(page).toContain("[7, 30, 90]");
     expect(page).toContain("deriveNutritionReview({");
     expect(page).toContain("<NutritionReview review={review} />");
   });

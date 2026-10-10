@@ -6,6 +6,10 @@ import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
 import { SleepStaleSync } from "@/components/sleep-stale-sync";
+import { SleepOverview, sleepDurationLabel as durationLabel } from "@/components/sleep-overview";
+import { SleepNightDetails } from "@/components/sleep-night-details";
+import { ActionGuide } from "@/components/action-guide";
+import { sleepGuide } from "@/lib/wellbeing/guide";
 import {
   getGoogleHealthConnectionSummary,
   getSleepAnalytics,
@@ -17,29 +21,12 @@ export const dynamic = "force-dynamic";
 const VALID_RANGES = new Set([7, 30, 90]);
 
 function parseRange(value: string | undefined): SleepRange {
-  const numeric = Number(value ?? "30");
-  return VALID_RANGES.has(numeric) ? numeric as SleepRange : 30;
+  const numeric = Number(value ?? "7");
+  return VALID_RANGES.has(numeric) ? numeric as SleepRange : 7;
 }
 
 function rangeHref(range: SleepRange) {
   return `/sleep?range=${range}` as Route;
-}
-
-function durationLabel(value: number | null) {
-  if (value === null) return "—";
-  const rounded = Math.round(value);
-  const hours = Math.floor(rounded / 60);
-  const minutes = rounded % 60;
-  if (hours === 0) return `${minutes}分`;
-  return `${hours}時間${minutes > 0 ? ` ${minutes}分` : ""}`;
-}
-
-function percentLabel(value: number | null) {
-  return value === null ? "—" : `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(value)}%`;
-}
-
-function variabilityLabel(value: number | null) {
-  return value === null ? "—" : `${Math.round(value)}分`;
 }
 
 function connectionLabel(status: string | undefined) {
@@ -53,7 +40,7 @@ function connectionLabel(status: string | undefined) {
 export default async function SleepPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; google?: string; sync?: string }>;
+  searchParams: Promise<{ range?: string; day?: string; google?: string; sync?: string }>;
 }) {
   const session = await getAppSessionForRsc();
   if (!session) redirect("/login");
@@ -67,6 +54,7 @@ export default async function SleepPage({
     getSleepAnalytics(session.accessToken, timeZone, range),
     getGoogleHealthConnectionSummary(session.accessToken),
   ]);
+  const selectedDay = analytics.daily.find((day) => day.date === params.day) ?? [...analytics.daily].reverse().find((day) => day.observed) ?? null;
   const providerNeedsAttention = connection?.status !== "connected" || Boolean(params.google || params.sync);
 
   return (
@@ -78,13 +66,14 @@ export default async function SleepPage({
 
       <header className="topbar sleep-topbar">
         <div>
-          <p className="eyebrow">Sleep</p>
+          <p className="eyebrow">睡眠の時間と、生活のリズム</p>
           <h1>睡眠</h1>
         </div>
         <span className={`pill ${connection?.status === "connected" ? "" : "pending"}`}>
           {connectionLabel(connection?.status)}
         </span>
       </header>
+      <p className="page-purpose">睡眠時間と就寝・起床のばらつき、眠りの経過を確認し、今夜からの過ごし方を見直します。</p>
 
       <nav className="subnav range-nav" aria-label="睡眠集計期間">
         {[7, 30, 90].map((days) => (
@@ -99,71 +88,9 @@ export default async function SleepPage({
       </nav>
 
       <div className="stack sleep-stack">
-        <section className="card sleep-summary-card" aria-labelledby="sleep-summary-title">
-          <div className="section-heading compact-heading">
-            <div>
-              <h2 id="sleep-summary-title">サマリー</h2>
-              <p className="muted nutrition-caption">{analytics.start_date}〜{analytics.end_date}</p>
-            </div>
-            <span className="pill">{analytics.observed_days}/{analytics.total_days}日</span>
-          </div>
-
-          <div className="metric-grid sleep-metric-grid">
-            <div className="metric-tile primary-metric">
-              <span>平均睡眠</span>
-              <strong>{durationLabel(analytics.average_minutes_asleep)}</strong>
-            </div>
-            <div className="metric-tile">
-              <span>効率</span>
-              <strong>{percentLabel(analytics.average_efficiency)}</strong>
-            </div>
-            <div className="metric-tile">
-              <span>就寝</span>
-              <strong>{analytics.average_main_bedtime ?? "—"}</strong>
-            </div>
-            <div className="metric-tile">
-              <span>起床</span>
-              <strong>{analytics.average_main_wake_time ?? "—"}</strong>
-            </div>
-          </div>
-
-          <details className="inline-help sleep-summary-details">
-            <summary>その他の指標</summary>
-            <div className="detail-stat-list">
-              <div><span>平均在床</span><strong>{durationLabel(analytics.average_time_in_bed_minutes)}</strong></div>
-              <div><span>平均離床</span><strong>{durationLabel(analytics.average_out_of_bed_minutes)}</strong></div>
-              <div>
-                <span>離床回数</span>
-                <strong>
-                  {analytics.average_out_of_bed_segments === null
-                    ? "—"
-                    : `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(analytics.average_out_of_bed_segments)}回`}
-                </strong>
-              </div>
-              <div><span>就寝のばらつき</span><strong>{variabilityLabel(analytics.bedtime_variability_minutes)}</strong></div>
-              <div><span>起床のばらつき</span><strong>{variabilityLabel(analytics.wake_variability_minutes)}</strong></div>
-              <div><span>睡眠時間の評価日</span><strong>{analytics.sleep_average_eligible_days}日</strong></div>
-              <div><span>効率の評価日</span><strong>{analytics.efficiency_eligible_days}日</strong></div>
-            </div>
-          </details>
-        </section>
-
-        <section className="card sleep-stage-card">
-          <div className="section-heading compact-heading">
-            <h2>睡眠ステージ</h2>
-            <span className="pill">{analytics.stage_eligible_days}日</span>
-          </div>
-          {analytics.stage_eligible_days === 0 ? (
-            <div className="empty-state compact-empty">ステージデータはまだありません。</div>
-          ) : (
-            <div className="metric-grid stage-grid">
-              <div className="metric-tile"><span>Awake</span><strong>{durationLabel(analytics.average_stage_minutes.awake)}</strong></div>
-              <div className="metric-tile"><span>Light</span><strong>{durationLabel(analytics.average_stage_minutes.light)}</strong></div>
-              <div className="metric-tile"><span>Deep</span><strong>{durationLabel(analytics.average_stage_minutes.deep)}</strong></div>
-              <div className="metric-tile"><span>REM</span><strong>{durationLabel(analytics.average_stage_minutes.rem)}</strong></div>
-            </div>
-          )}
-        </section>
+        <ActionGuide guide={sleepGuide(analytics, connection ?? { status: "not_connected" })} />
+        <SleepOverview analytics={analytics} />
+        <SleepNightDetails day={selectedDay} timeZone={timeZone} />
 
         <section className="card sleep-daily-card">
           <div className="section-heading compact-heading">
@@ -172,18 +99,19 @@ export default async function SleepPage({
           </div>
           <div className="nutrition-list compact-sleep-days">
             {[...analytics.daily].reverse().map((day) => (
-              <div className="nutrition-row compact-sleep-day" key={day.date}>
+              <Link className="nutrition-row compact-sleep-day" key={day.date} href={`/sleep?range=${range}&day=${day.date}#night-detail` as Route} aria-current={selectedDay?.date === day.date ? "page" : undefined}>
                 <div className="nutrition-row-main">
                   <div className="nutrition-row-title">
                     <strong>{day.date}</strong>
                     {!day.observed && <span className="pill pending">未観測</span>}
-                    {day.stage_data_available && <span className="pill">STAGES</span>}
+                    {day.processing && <span className="pill pending">処理中</span>}
+                    {day.stage_data_available && <span className="pill">ステージあり</span>}
                   </div>
                   <div className="nutrition-meta">
                     {day.main_start_label && day.main_end_label
                       ? `${day.main_start_label} → ${day.main_end_label}`
                       : "時刻 —"}
-                    {day.observed && <> · 離床 {day.out_of_bed_count ?? 0}回</>}
+                    {day.observed && <> · 離床記録 {day.out_of_bed_count ?? 0}区間</>}
                   </div>
                 </div>
                 <div className="nutrition-day-value">
@@ -197,14 +125,14 @@ export default async function SleepPage({
                   <small>
                     {!day.observed
                       ? "未観測"
-                      : day.minutes_asleep_complete
+                      : day.processing ? "処理中の参考値" : day.minutes_asleep_complete
                         ? `${day.session_count}セッション`
                         : day.known_minutes_asleep !== null
                           ? "既知分のみ"
                           : "時間不明"}
                   </small>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>

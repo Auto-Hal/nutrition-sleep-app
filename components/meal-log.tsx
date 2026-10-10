@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { localDateTimeInput } from "@/lib/nutrition/local-time";
 import type { CatalogItem, Meal, MealState, MealType } from "@/lib/nutrition/catalog";
 import {
   applyMealEntryWrite,
@@ -56,7 +57,7 @@ type MealEntryVoidMutation = Extract<PendingMutation, { kind: "meal_entry_void" 
 type OutboxUiState = PendingMutationStatus | "synced" | "discarded";
 
 function stateLabel(state: MealState | undefined) {
-  if (state === "skipped") return "skipped";
+  if (state === "skipped") return "食べていない";
   if (state === "recorded") return "登録済み";
   return "未登録";
 }
@@ -116,7 +117,8 @@ export function MealLog({
   const [composer, setComposer] = useState<MealType | null>(null);
   const [itemId, setItemId] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [customAt, setCustomAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [customAt, setCustomAt] = useState(() => localDateTimeInput(new Date(), date));
+  const mealsRefreshVersion = useRef(0);
   const [busy, setBusy] = useState(false);
   const [pendingMealType, setPendingMealType] = useState<MealType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -131,6 +133,7 @@ export function MealLog({
   }, [initialMeals]);
 
   const refreshMeals = useCallback(async () => {
+    const version = ++mealsRefreshVersion.current;
     const response = await fetch(`/api/meals?date=${encodeURIComponent(date)}`, {
       cache: "no-store",
     });
@@ -138,9 +141,23 @@ export function MealLog({
     if (!response.ok || !payload.meals) {
       throw new Error("食事状態を更新できませんでした。");
     }
-    setMeals(payload.meals);
+    if (mealsRefreshVersion.current === version) setMeals(payload.meals);
     return payload.meals;
   }, [date]);
+
+  useEffect(() => {
+    const refresh = () => { void refreshMeals().catch(() => setError("食事一覧を更新できませんでした。接続を確認して画面に戻ってください。")); };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", visible);
+    const invalidate = () => { mealsRefreshVersion.current++; };
+    return () => {
+      invalidate();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [refreshMeals]);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,7 +166,7 @@ export function MealLog({
         if (cancelled) return;
         setLocalOperations(
           rows
-            .filter((row) => row.kind === "meal_entry_create")
+            .filter((row): row is Extract<PendingMutation, { kind: "meal_entry_create" }> => row.kind === "meal_entry_create" && row.payload.meal_date === date)
             .map((row) => ({
               operationId: row.operation_id,
               mealType: row.payload.meal_type,
@@ -162,10 +179,10 @@ export function MealLog({
             })),
         );
         setFixedStateOperations(
-          rows.filter((row): row is FixedMealStateMutation => row.kind === "fixed_meal_state"),
+          rows.filter((row): row is FixedMealStateMutation => row.kind === "fixed_meal_state" && row.payload.meal_date === date),
         );
         setVoidOperations(
-          rows.filter((row): row is MealEntryVoidMutation => row.kind === "meal_entry_void"),
+          rows.filter((row): row is MealEntryVoidMutation => row.kind === "meal_entry_void" && initialMeals.some((meal) => meal.id === row.payload.meal_id)),
         );
       })
       .catch(() => {
@@ -176,12 +193,17 @@ export function MealLog({
     return () => {
       cancelled = true;
     };
-  }, [outboxBinding]);
+  }, [outboxBinding, date, initialMeals]);
 
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
       if (!detail) return;
+      if ("meal_date" in detail.payload && detail.payload.meal_date !== date) return;
+      if (detail.kind === "meal_entry_void" && "meal_id" in detail.payload) {
+        const mealId = detail.payload.meal_id;
+        if (!meals.some((meal) => meal.id === mealId)) return;
+      }
 
       if (detail.kind === "meal_entry_void") {
         onOutboxState?.(detail.operation_id, detail.state);
@@ -318,15 +340,15 @@ export function MealLog({
 
     window.addEventListener(OUTBOX_STATE_EVENT, onState);
     return () => window.removeEventListener(OUTBOX_STATE_EVENT, onState);
-  }, [date, items, localOperations, onOutboxState, refreshMeals]);
+  }, [date, items, meals, localOperations, onOutboxState, refreshMeals]);
 
   function openComposer(type: MealType) {
     setComposer(type);
     setItemId(items[0]?.id ?? "");
-    setQuantity("1");
+    setQuantity(String(items[0]?.serving_size ?? 1));
     setMessage(null);
     setError(null);
-    if (type === "custom") setCustomAt(new Date().toISOString().slice(0, 16));
+    if (type === "custom") setCustomAt(localDateTimeInput(new Date(), date));
   }
 
   async function addEntry() {
@@ -820,7 +842,7 @@ export function MealLog({
                     {fixedStateOperation && (
                       <div className="pending-operation">
                         <span>
-                          状態変更 → {fixedStateOperation.payload.state === "skipped" ? "skipped" : "未登録"}
+                          状態変更 → {fixedStateOperation.payload.state === "skipped" ? "食べていない" : "未登録"}
                         </span>
                         <span className="pill pending">{operationLabel(fixedStateOperation.status)}</span>
                         {fixedStateOperation.status === "conflict" && (
@@ -894,7 +916,7 @@ export function MealLog({
                       onClick={() => void queueFixedMealState(type, "skipped")}
                       disabled={busy}
                     >
-                      skipped
+                      食べていない
                     </button>
                   )}
                   {(meal?.entries.length ?? 0) === 0
@@ -985,7 +1007,10 @@ export function MealLog({
               <select
                 id="meal-item"
                 value={itemId}
-                onChange={(event) => setItemId(event.target.value)}
+                onChange={(event) => {
+                  setItemId(event.target.value);
+                  setQuantity(String(items.find((item) => item.id === event.target.value)?.serving_size ?? 1));
+                }}
               >
                 <option value="">選択してください</option>
                 {items.map((item) => (
