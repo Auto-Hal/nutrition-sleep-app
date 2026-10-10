@@ -52,7 +52,7 @@ Todayは登録と当日の記録に絞り、栄養素の不足・改善ガイド
 - 56ファイル・355テスト成功。栄養目安量の追加9件は男女の推定式・体重・活動量、年齢境界、未登録・不正値、g換算、基準の区別、女性の鉄、体重更新日を確認する。睡眠詳細の追加10件は、短い覚醒の分離、情報なしと空配列、入眠0の扱い、処理中、昼寝、CLASSIC、欠測・重複区間を検証する。従来の追加テストはガイドの根拠不足・接続失敗、認証境界、90日の全件性、ページ欠落、画面復帰、更新競合、時刻、応答喪失などを確認する。
 - 型チェック・本番ビルド成功。Lintは既存OCRプレビューのimg警告1件、エラーなし。
 - 架空データを使った実コンポーネントの確認用画面で、390px幅・デスクトップ幅の表示、改善手順の展開、栄養・睡眠への導線を確認。
-- ログイン済みの本番ユーザーでのAPI→DB→画面の全経路、iPhone/iPad実機、実ウェアラブル同期は未検証。この変更は本番へデプロイしていない。本番DBのスキーマ・設定・個人記録を変更していない。新マイグレーションとDBテストはPRに含む。
+- ログイン済みの本番ユーザーでのAPI→DB→画面の全経路、iPhone/iPad実機、実ウェアラブル同期は未検証。2026-10-11に本番へ反映し、DBと公開応答を確認した。詳細は下記の本番反映記録を参照。
 
 ## 睡眠詳細と導入順
 
@@ -65,7 +65,7 @@ Google Healthの[睡眠ガイド](https://developers.google.com/health/data-type
 - `shortAwakenings` はステージ・離床と独立に正規化し、`sleep_sessions.short_awakenings`（nullable JSONB配列）へ保存する。取得フィールド省略・既存未再同期はnull、明示的空配列は0区間。ステージと重なるため時間合計へ足さない。既存の所有者RLS、ブラウザーSELECTのみ、アカウント削除ガードを維持。明示的なデータエクスポートにも追加する。
 - 既存のpayload hashにこのフィールドが含まれていた場合でも、`sleep_details_version`で一度だけ再正規化できるようにする。古い履歴を0区間とみなさない。
 
-リリース時は **`20261010090000_sleep_details.sql`を先に適用し、その後アプリを更新する**。本作業では本番適用していない。通常の直近3日同期でその期間を補完できる。それより前の履歴は、必要な期間を再同期するまでは短い覚醒が情報なしとなる。提供元がこのフィールドを返さない記録も情報なしのまま。
+リリース時は **`20261010090000_sleep_details.sql`を先に適用し、その後アプリを更新する**。2026-10-11にこの順序で本番適用した。通常の直近3日同期でその期間を補完できる。それより前の履歴は、必要な期間を再同期するまでは短い覚醒が情報なしとなる。提供元がこのフィールドを返さない記録も情報なしのまま。
 
 呼吸数、HRV、SpO₂、皮膚温のような別データ種別は、体調の原因を確定する値として追加しない。次段階で利用する場合は、利用目的、対応するセッション、機器対応・欠測、読み取り権限を設計する。今回は時間・リズムと眠りの経過の分析に必要なsleep内の情報を使う。
 
@@ -78,3 +78,15 @@ Google Healthの[睡眠ガイド](https://developers.google.com/health/data-type
 - たんぱく質・ビタミン・ミネラル等: 既存の年齢・性別別DRI 2025基準を使用し、体重に比例させない。たんぱく質のRDAとDGは区別する。ULやEARを推奨量として表示しない。食塩は「未満」を維持し、ナトリウムは食塩相当量の目標へ案内する。
 - 基準の解釈: 女性の鉄（65歳未満）は月経状況が不足するため値を推定しない。妊娠・授乳の付加量は未対応であることを説明する。ビタミンEはα-トコフェロール基準であり、意味が未確定の記録値とは直接比較しない。
 - 「目安量の計算・プロフィール」に、計算時点・登録体格・体重更新日・活動量、計算の説明と出典、設定への導線をまとめる。体重維持の参考値で、減量・増量目標や総合健康判定は追加しない。新しいDB項目・権限・マイグレーションは必要ない。
+
+## 本番反映記録（2026-10-11 JST）
+
+ユーザーの本番反映依頼に基づき、[PR #40](https://github.com/Auto-Hal/nutrition-sleep-app/pull/40)の確定HEAD `49f315897fd225c69a35306852212b98a59f12d7`を検証してmainへマージした。
+
+- 本番DB: `nutrition-sleep-production` (`vyvnicyupcrsmtgdyypv`)。`20261010090000_sleep_details.sql`の内容を`apply_migration`で適用。台帳名`sleep_details`、リモート台帳バージョン`20261010150123`。既存の台帳も同様に適用日時のバージョンを用いる。
+- 適用後: JSONBのnullable、詳細バージョン初期値0、所有者RLS有効・強制、エクスポートのsecurity invoker、匿名実行不可・認証済み実行可を確認。既存の16セッション・371ステージ・0離床は変化なし。未再同期の16セッションは短い覚醒がnullのままで、0と扱わない。
+- アプリ: マージコミット`b0c4767187f9f61600da05077f60a30b2b925fcb`をVercelのproduction環境へGitソースからビルド・デプロイ。デプロイID`dpl_CZnrkTFp8eVAyQzhBCAddeQMdz8Z`、READY。既存の公開URL [nutrition-sleep-app.vercel.app](https://nutrition-sleep-app.vercel.app)へ割り当て済み。
+- 公開確認: `/api/app-version`はHTTP 200で上記マージSHAを返す。`/login`はHTTP 200でログイン画面を返す。対象デプロイの反映後30分のerror/fatalログは0件。mainの[CI #38061995657](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/38061995657)も成功。
+- Supabaseのセキュリティアドバイザーでは、既存のprivateスキーマ用ポリシーなし・認証付きsecurity definer RPC・漏洩パスワード保護未有効の項目を確認。今回変更するエクスポートはsecurity invokerを維持する。既存項目の権限や認証設定は変更していない。[RLS](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)、[RPC](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)、[パスワード保護](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+
+デザインの見直しはこの反映済みコミットから別ブランチで進め、上記の機能リリースと分離する。
