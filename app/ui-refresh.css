@@ -616,6 +616,16 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
   font-size: 1.05rem;
 }
 
+.compact-nutrient-row .nutrition-row-main { flex: 1; }
+.nutrient-reference-help { margin-bottom: 10px; }
+.nutrient-amount-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.nutrient-average-amount, .nutrient-reference-amount { min-width: 0; }
+.nutrient-amount-label { display: block; color: var(--muted); font-size: 0.73rem; line-height: 1.5; }
+.nutrient-reference-amount { padding-left: 12px; border-left: 1px solid var(--line); }
+.nutrient-reference-value { display: block; margin-top: 4px; color: var(--accent); font-size: 1.05rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.nutrient-reference-amount small { display: block; margin-top: 4px; color: var(--muted); font-size: 0.7rem; line-height: 1.55; }
+.nutrient-reference-unavailable { margin-top: 3px; }
+
 .compact-tags {
   margin-top: 5px;
   gap: 4px;

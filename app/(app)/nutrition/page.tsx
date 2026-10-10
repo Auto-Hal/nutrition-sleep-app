@@ -11,6 +11,7 @@ import { NutritionReview } from "@/components/nutrition-review";
 import { ActionGuide } from "@/components/action-guide";
 import { nutritionGuide } from "@/lib/wellbeing/guide";
 import { getProfile } from "@/lib/profile";
+import { buildNutritionDisplayReferences, type NutritionReferenceProfile } from "@/lib/nutrition/dri/display-reference";
 
 export const dynamic = "force-dynamic";
 
@@ -65,21 +66,24 @@ export default async function NutritionPage({
   const range = parseRange(params.range);
   const selectedCode = parseNutrient(params.nutrient);
   const profile = await getProfile(session.accessToken);
+  const referenceProfile: NutritionReferenceProfile = {
+    birthDate: profile?.birth_date ?? null,
+    sex: profile?.sex === "male" || profile?.sex === "female" ? profile.sex : null,
+    activityLevel: profile?.activity_level === "low" || profile?.activity_level === "moderate" || profile?.activity_level === "high" ? profile.activity_level : null,
+    heightCm: profile?.height_cm ?? null,
+    weightKg: profile?.weight_kg ?? null,
+    weightUpdatedOn: profile?.weight_updated_on ?? null,
+  };
 
   const analytics = await getNutritionAnalytics(
     session.accessToken,
     {
-      birthDate: profile?.birth_date ?? null,
-      sex: profile?.sex === "male" || profile?.sex === "female" ? profile.sex : null,
-      activityLevel: profile?.activity_level === "low"
-        || profile?.activity_level === "moderate"
-        || profile?.activity_level === "high"
-        ? profile.activity_level
-        : null,
+      ...referenceProfile,
       timeZone: profile?.time_zone ?? "Asia/Tokyo",
     },
     range,
   );
+  const displayReferences = buildNutritionDisplayReferences(referenceProfile, analytics.end_date);
 
   const review = deriveNutritionReview({
     range,
@@ -120,7 +124,7 @@ export default async function NutritionPage({
       </nav>
 
       <div className="stack nutrition-stack">
-        <NutrientAverages nutrients={analytics.nutrients} range={range} selectedCode={selectedCode} />
+        <NutrientAverages nutrients={analytics.nutrients} range={range} selectedCode={selectedCode} displayReferences={displayReferences} />
         <ActionGuide guide={nutritionGuide(review)} />
         <NutritionReview review={review} />
 
