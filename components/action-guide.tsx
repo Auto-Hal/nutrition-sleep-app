@@ -4,7 +4,7 @@ import type { Guide } from "@/lib/wellbeing/guide";
 
 export function ActionGuide({ guide }: { guide: Guide }) {
   return (
-    <section className="card action-guide" aria-labelledby={`${guide.domain}-guide-title`}>
+    <section className="card action-guide" data-domain={guide.domain} aria-labelledby={`${guide.domain}-guide-title`}>
       <div className="section-heading">
         <p className="eyebrow">{guide.domain === "nutrition" ? "食事から見直す" : "睡眠から見直す"}</p>
         {guide.limited && <span className="pill pending">記録の確認が先</span>}

@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppIcon } from "@/components/app-icon";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { getProfile } from "@/lib/profile";
 import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
@@ -65,9 +66,12 @@ export default async function SleepPage({
       />
 
       <header className="topbar sleep-topbar">
-        <div>
-          <p className="eyebrow">睡眠の時間と、生活のリズム</p>
-          <h1>睡眠</h1>
+        <div className="page-heading">
+          <span className="heading-icon"><AppIcon name="sleep" /></span>
+          <div>
+            <p className="eyebrow">睡眠の時間と、生活のリズム</p>
+            <h1>睡眠</h1>
+          </div>
         </div>
         <span className={`pill ${connection?.status === "connected" ? "" : "pending"}`}>
           {connectionLabel(connection?.status)}

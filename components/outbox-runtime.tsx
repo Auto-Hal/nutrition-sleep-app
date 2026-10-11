@@ -14,6 +14,7 @@ import type { OutboxBinding } from "@/lib/offline/outbox-contract";
 
 export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
   const running = useRef(false);
+  const runAgain = useRef(false);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
   const [incompatibleCount, setIncompatibleCount] = useState(0);
@@ -38,7 +39,11 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
   }, []);
 
   const run = useCallback(async () => {
-    if (running.current || !mounted.current) return;
+    if (!mounted.current) return;
+    if (running.current) {
+      runAgain.current = true;
+      return;
+    }
     running.current = true;
     try {
       const result = await drainOutbox(binding);
@@ -56,6 +61,12 @@ export function OutboxRuntime({ binding }: { binding: OutboxBinding }) {
       );
     } finally {
       running.current = false;
+      if (runAgain.current && mounted.current) {
+        runAgain.current = false;
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+        void run();
+      }
     }
   }, [binding, refreshCompatibility, scheduleRetry]);
 

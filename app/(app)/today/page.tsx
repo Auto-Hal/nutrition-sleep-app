@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { AppIcon } from "@/components/app-icon";
 import { ChatGptNutritionLink } from "@/components/chatgpt-nutrition-link";
 import { TodayInteractive } from "@/components/today-interactive";
 import { appEnvironmentId } from "@/lib/app-environment";
@@ -65,9 +66,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   return (
     <main className="app-main today-page">
       <header className="topbar today-topbar">
-        <div className="today-title-block">
-          <p className="eyebrow">{historical ? "過去の記録" : "今日の記録"}</p>
-          <h1>{formatDateTitle(date)}{!historical && <span className="today-label">今日</span>}</h1>
+        <div className="page-heading">
+          <span className="heading-icon"><AppIcon name="today" /></span>
+          <div className="today-title-block">
+            <p className="eyebrow">{historical ? "過去の記録" : "今日の記録"}</p>
+            <h1>{formatDateTitle(date)}{!historical && <span className="today-label">今日</span>}</h1>
+          </div>
         </div>
         <nav className="today-date-nav" aria-label="日付と履歴">
           <Link className="button ghost" href={`/today?date=${previousDate}` as Route}>← 前日</Link>

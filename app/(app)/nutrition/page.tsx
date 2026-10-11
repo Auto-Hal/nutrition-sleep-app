@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AppIcon } from "@/components/app-icon";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
@@ -103,9 +104,12 @@ export default async function NutritionPage({
   return (
     <main className="app-main nutrition-page">
       <header className="topbar nutrition-topbar">
-        <div>
-          <p className="eyebrow">食事の傾向と、見直すポイント</p>
-          <h1>栄養</h1>
+        <div className="page-heading">
+          <span className="heading-icon"><AppIcon name="nutrition" /></span>
+          <div>
+            <p className="eyebrow">食事の傾向と、見直すポイント</p>
+            <h1>栄養</h1>
+          </div>
         </div>
         <span className="pill">DRI 2025</span>
       </header>

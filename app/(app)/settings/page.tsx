@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppIcon } from "@/components/app-icon";
 import { ProfileForm } from "@/components/profile-form";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
@@ -23,9 +24,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <main className="app-main settings-page">
       <ProviderBrandingSanitizer />
       <header className="topbar settings-topbar">
-        <div>
-          <p className="eyebrow">プロフィールとデータの管理</p>
-          <h1>設定</h1>
+        <div className="page-heading">
+          <span className="heading-icon"><AppIcon name="settings" /></span>
+          <div>
+            <p className="eyebrow">プロフィールとデータの管理</p>
+            <h1>設定</h1>
+          </div>
         </div>
       </header>
       <nav className="subnav settings-subnav" aria-label="設定メニュー">

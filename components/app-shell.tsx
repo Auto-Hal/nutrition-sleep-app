@@ -87,7 +87,7 @@ export function AppShell({
   }
 
   return (
-    <div className="app-frame" aria-busy={isNavigating || undefined}>
+    <div className="app-frame" data-area={pathname.startsWith("/sleep") ? "sleep" : pathname.startsWith("/nutrition") ? "nutrition" : undefined} aria-busy={isNavigating || undefined}>
       <AccountHeader email={email} onLogout={() => void logout()} />
       <ConnectivityBoundary binding={binding}>
         {children}
