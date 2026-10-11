@@ -111,7 +111,6 @@ export default async function NutritionPage({
             <h1>栄養</h1>
           </div>
         </div>
-        <span className="pill">DRI 2025</span>
       </header>
       <p className="page-purpose">何がどの食品から摂れているかを確認し、次の献立で見直す点を1つ選びます。</p>
 
