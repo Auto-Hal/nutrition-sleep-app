@@ -1,0 +1,127 @@
+/* Warm paper, gentle green and blue surfaces, and readable data. */
+.app-main { width: min(880px, 100%); padding-top: 32px; }
+.account-header { width: min(880px, 100%); padding-top: 24px; }
+.app-wordmark { color: var(--ink); letter-spacing: 0; gap: 12px; font-size: 0.95rem; }
+.app-wordmark > span:last-child { display: grid; gap: 2px; }
+.app-wordmark small { color: var(--muted); font-size: 0.58rem; letter-spacing: 0.15em; font-weight: 500; }
+.wordmark-symbol { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 14px; background: url("/icon.svg") center / contain no-repeat; }
+.account-menu > summary { background: transparent; border-color: #d6d9dc; }
+.page-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.heading-icon { display: grid; place-items: center; flex: 0 0 auto; width: 54px; height: 54px; border-radius: 17px; color: var(--accent); background: #dde9df; }
+.heading-icon .app-icon { width: 27px; height: 27px; stroke-width: 1.5; }
+.today-page .heading-icon, .settings-page .heading-icon { color: var(--ink); background: #e2e4e7; }
+.topbar .eyebrow { font-size: 0.75rem; margin-bottom: 5px; letter-spacing: 0.015em; }
+.topbar h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); font-weight: 650; letter-spacing: -0.04em; }
+.page-purpose { font-size: 0.88rem; margin-bottom: 22px; }
+.today-label { background: #e5eee6; color: var(--accent); padding: 5px 8px; font-weight: 500; }
+.today-stack, .nutrition-stack, .sleep-stack, .settings-stack { gap: 20px; }
+.card { border-color: var(--line); box-shadow: 0 2px 3px rgb(32 44 60 / 2%); }
+.card h2 { font-size: 1.08rem; font-weight: 650; }
+.chatgpt-primary { position: relative; padding: 22px 24px; color: #274f3e; border: 1px solid #d6e3d8; background: #e6efe7; box-shadow: 0 3px 12px rgb(48 61 59 / 3%); }
+.chatgpt-primary-copy strong { font-weight: 600; }
+.chatgpt-primary-copy small { color: var(--muted); }
+.chatgpt-mark { width: 42px; height: 42px; color: var(--accent); background: #d7e5da; border-radius: 13px; }
+.chatgpt-primary-button { background: var(--accent); color: #fff; min-height: 44px; padding: 10px 14px; }
+.chatgpt-config-warning { color: var(--warning); }
+.today-summary-card, section.card:has(#meals-title), .nutrition-overview-card, .sleep-summary-card, .sleep-stage-card, .profile-card { padding: 24px; }
+.compact-summary strong { font-size: clamp(1.9rem, 6vw, 2.4rem); font-weight: 600; line-height: 1.4; letter-spacing: -0.035em; }
+.today-summary-card .today-nutrition-summary { margin-block: 20px 16px; }
+.pill { padding: 4px 8px; background: var(--surface-soft); color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
+.pill.pending { background: var(--warning-soft); color: var(--warning); }
+.button { min-height: 44px; border-radius: 11px; }
+.button.secondary { background: #f1f3f5; border-color: #e5e8ec; }
+.button.ghost { min-height: 44px; }
+section.card:has(#meals-title) .meal-row { padding-block: 18px; }
+section.card:has(#meals-title) .meal-row:first-child { padding-top: 12px; }
+section.card:has(#meals-title) .meal-actions { gap: 8px; }
+section.card:has(#meals-title) .meal-actions .button { min-height: 44px; padding: 8px 12px; }
+.subnav { padding: 5px; gap: 5px; background: #e7e7e4; border: 0; border-radius: 14px; }
+.subnav a, .subnav button { border-radius: 10px; font-size: 0.87rem; }
+.subnav a[aria-current="page"], .subnav button[aria-current="page"] { background: #dde9df; border-color: #b7ccbc; color: var(--accent); box-shadow: 0 2px 4px rgb(48 61 59 / 3%); }
+.range-nav, .settings-subnav { margin-bottom: 22px; }
+.nutrition-caption { font-size: 0.8rem; line-height: 1.65; }
+.nutrient-reference-help { margin-block: 12px 20px; }
+.compact-nutrient-list { column-gap: 28px; }
+.compact-nutrient-list .compact-nutrient-row { padding-block: 22px; }
+.compact-nutrient-row .nutrition-row-main { gap: 10px; }
+.nutrition-row-title > strong { font-size: 0.98rem; font-weight: 650; }
+.compact-nutrient-row .nutrition-value { font-size: 1.27rem; font-weight: 650; line-height: 1.4; letter-spacing: -0.025em; }
+.nutrient-amount-comparison { gap: 12px; margin-top: 0; align-items: stretch; }
+.nutrient-average-amount { padding: 10px 0; }
+.nutrient-reference-amount { padding: 10px 12px; border: 0; border-radius: 11px; background: #f2f5f2; }
+.nutrient-amount-label { min-height: 0; font-size: 0.73rem; }
+.nutrient-reference-value { margin-top: 6px; color: var(--accent); font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.nutrient-reference-amount small { font-size: 0.72rem; }
+.nutrition-meta { font-size: 0.74rem; line-height: 1.6; }
+.nutrition-chevron { color: #758292; font-size: 1.6rem; }
+.nutrition-row[aria-current="page"] { background: #f3f7f4; }
+.action-guide { border-top: 3px solid var(--accent); padding: 24px; gap: 14px; }
+.action-guide .eyebrow { color: var(--accent); font-weight: 600; }
+.action-guide .guide-observation { font-size: 0.9rem; }
+.guide-next { background: var(--surface-soft); border-radius: 13px; padding: 18px; gap: 10px; }
+.guide-next .eyebrow { color: var(--muted); font-size: 0.72rem; }
+.guide-next .button { font-size: 0.82rem; }
+.sleep-page { --accent: #3c5984; --accent-soft: #eef2f9; }
+.sleep-page .heading-icon { background: #dfe6f1; }
+.sleep-page .subnav a[aria-current="page"], .sleep-page .subnav button[aria-current="page"] { background: #dfe6f1; border-color: #bdcce2; color: var(--accent); }
+.sleep-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.metric-tile { padding: 18px; border-radius: 14px; background: #f3f5f8; gap: 8px; }
+.metric-tile strong { font-size: 1.25rem; font-weight: 600; }
+.metric-tile span, .metric-tile small { font-size: 0.74rem; }
+.sleep-metric-grid .primary-metric { grid-column: 1 / -1; background: #e7eef8; color: var(--accent); padding: 24px; }
+.sleep-metric-grid .primary-metric span, .sleep-metric-grid .primary-metric small { color: #53677e; }
+.sleep-metric-grid .primary-metric strong { font-size: clamp(1.9rem, 5vw, 2.4rem); letter-spacing: -0.035em; }
+.stage-grid .metric-tile { border-top: 3px solid #708ea9; }
+.stage-grid .metric-tile:first-child { border-top-color: #c88744; }
+.stage-grid .metric-tile:nth-child(3) { border-top-color: #254c6f; }
+.stage-grid .metric-tile:last-child { border-top-color: #7e69a5; }
+.profile-card .field label { font-size: 0.82rem; font-weight: 600; }
+.profile-card .field input, .profile-card .field select, .profile-card .field textarea { border-color: #dce1e7; border-radius: 11px; background: #fafbfc; min-height: 48px; padding: 11px 12px; }
+.profile-form { gap: 24px; }
+.settings-form-section { gap: 16px; padding-top: 22px; }
+.settings-form-section h3 { color: var(--ink); font-size: 0.88rem; }
+.profile-savebar { padding-top: 20px; }
+.notice { color: var(--accent); }
+.empty-state { background: #fafbfc; border-color: #d9dfe6; }
+.bottom-nav { left: 50%; right: auto; bottom: calc(12px + env(safe-area-inset-bottom)); width: min(480px, calc(100% - 24px)); transform: translateX(-50%); border: 1px solid #dedfd9; border-radius: 22px; background: rgb(255 255 255 / 98%); padding: 7px; gap: 6px; box-shadow: 0 8px 28px rgb(48 61 59 / 8%); }
+.bottom-nav .nav-link { min-height: 58px; border-radius: 16px; color: #606e69; gap: 5px; font-size: 0.72rem; }
+.bottom-nav .nav-link[aria-current="page"] { color: var(--accent); background: #dde9df; font-weight: 600; }
+.app-frame[data-area="sleep"] .bottom-nav .nav-link[aria-current="page"] { background: #dfe6f1; color: #3c5984; }
+.bottom-nav .app-icon { width: 21px; height: 21px; }
+.bottom-nav .nav-link:focus-visible { outline-color: var(--accent); outline-offset: -3px; }
+.bottom-nav .nav-link[aria-current="page"]:focus-visible { outline-color: var(--ink); }
+.bottom-nav .nav-link[data-pending="true"] { color: var(--accent); }
+@media (hover: hover) { .bottom-nav .nav-link:hover { color: var(--ink); } }
+@media (max-width: 520px) {
+  .app-main { padding: 26px 18px 28px; }
+  .account-header { padding: 20px 18px 0; }
+  .today-topbar { gap: 16px; margin-bottom: 22px; }
+  .today-date-nav { margin-left: auto; gap: 4px; }
+  .page-heading { gap: 12px; }
+  .heading-icon { width: 48px; height: 48px; border-radius: 15px; }
+  .heading-icon .app-icon { width: 25px; height: 25px; }
+  .topbar .eyebrow { font-size: 0.67rem; }
+  .card, .today-summary-card, .nutrition-overview-card, .sleep-summary-card, .sleep-stage-card, .profile-card, section.card:has(#meals-title), .chatgpt-primary { padding: 20px; }
+  .sleep-provider-card { padding: 0; }
+  .chatgpt-primary-copy { gap: 10px; }
+  .chatgpt-primary-copy strong { font-size: 0.9rem; }
+  .chatgpt-mark { width: 34px; height: 38px; background: transparent; }
+  .chatgpt-primary-button { padding: 9px 12px; min-width: 72px; }
+  .today-summary-card .section-heading .button { font-size: 0.76rem; }
+  .today-summary-card .today-nutrition-summary { gap: 10px; }
+  .compact-nutrient-list .compact-nutrient-row { padding-block: 20px; }
+  .nutrient-amount-comparison { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .nutrient-reference-value { font-size: 0.95rem; }
+  .sleep-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sleep-metric-grid .metric-tile:nth-child(2) { grid-column: 1 / -1; }
+  .sleep-metric-grid .primary-metric { padding: 22px; }
+  .metric-tile { padding: 16px; }
+  .profile-card .section-heading { gap: 8px; }
+}
+@media (max-width: 350px) {
+  .chatgpt-primary { gap: 8px; }
+  .nutrient-amount-comparison { gap: 8px; }
+  .nutrient-reference-amount { padding-inline: 8px; }
+  .compact-nutrient-row .nutrition-value { font-size: 1.12rem; }
+  .app-main { padding-inline: 14px; }
+}

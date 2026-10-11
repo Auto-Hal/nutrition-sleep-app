@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./ui-refresh.css";
+import "./visual-theme.css";
 import { PwaRuntime } from "@/components/pwa-runtime";
 import { appBuildVersion } from "@/lib/app-version";
 
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f5f7f4",
+  themeColor: "#f3f1eb",
   width: "device-width",
   initialScale: 1,
 };

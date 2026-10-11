@@ -308,7 +308,7 @@ export function ProfileForm({
     <section className="card profile-card" aria-labelledby="profile-title">
       <div className="section-heading compact-heading">
         <div>
-          <p className="eyebrow">Profile</p>
+          <p className="eyebrow">栄養の目安量に使う情報</p>
           <h2 id="profile-title">プロフィール</h2>
         </div>
         <span className={`pill ${pending ? "pending" : ""}`}>{syncLabel(pending)}</span>
@@ -420,4 +420,3 @@ export function ProfileForm({
     </section>
   );
 }
-

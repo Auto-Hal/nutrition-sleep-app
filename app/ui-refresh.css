@@ -1,7 +1,6 @@
 /* UI refresh: Today, Settings, Nutrition and Sleep. Loaded after globals.css. */
 
 /* Shared hierarchy: purpose → observation → next action → source records. */
-:root { --muted: #526960; }
 /* Sleep details use the same elapsed-time scale for every stage. */
 .sleep-session-detail { border-top: 1px solid var(--line); padding: 14px 0; }
 .sleep-session-detail > summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; min-height: 44px; }
@@ -33,40 +32,40 @@
 .metric-tile small { color: var(--muted); }
 #detail, #night-detail { scroll-margin-top: 20px; }
 @media (min-width: 700px) {
-  .compact-nutrient-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; }
+  .compact-nutrient-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+  .compact-nutrient-list .nutrition-row:nth-child(-n+2) { border-top: 0; }
 }
 @media (max-width: 600px) {
   .sleep-session-body .detail-stat-list { grid-template-columns: 1fr; }
   .sleep-detail-grid .metric-tile strong { font-size: 1.1rem; }
 }
-body { line-height: 1.65; }
-.page-purpose { color: var(--muted); max-width: 60ch; margin-bottom: 20px; }
-.action-guide { display: flex; flex-direction: column; gap: 10px; box-shadow: none; }
+.page-purpose { color: var(--muted); max-width: 60ch; margin-bottom: 24px; font-size: 0.9rem; }
+.action-guide { display: flex; flex-direction: column; gap: 14px; }
 .action-guide .section-heading { align-items: center; gap: 8px; flex-wrap: wrap; }
 .action-guide .eyebrow, .action-guide h2, .action-guide p { margin: 0; }
 .action-guide h2 { line-height: 1.5; }
 .guide-observation { line-height: 1.65; }
-.guide-next { display: grid; gap: 9px; margin-top: auto; padding: 14px; background: var(--accent-soft); border-radius: 12px; }
+.guide-next { display: grid; gap: 10px; margin-top: 4px; padding: 16px; background: var(--surface-soft); border-radius: 10px; }
 .guide-next .button { text-align: center; align-self: start; justify-self: start; }
 .guide-steps ol { margin: 12px 0 0; padding-left: 22px; }
 .action-guide .guide-steps { font-size: 0.9rem; color: var(--ink); }
 .guide-steps li + li { margin-top: 10px; }
 .guide-boundary { font-size: 0.82rem; color: var(--muted); margin: 12px 0 0; }
 a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.bottom-nav .nav-link { min-height: 48px; font-size: 0.82rem; }
+.bottom-nav .nav-link { min-height: 54px; font-size: 0.78rem; }
 
 .today-page,
 .settings-page,
 .nutrition-page,
 .sleep-page {
-  padding-top: 18px;
+  padding-top: 28px;
 }
 
 .today-topbar,
 .settings-topbar,
 .nutrition-topbar,
 .sleep-topbar {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .today-topbar {
@@ -88,12 +87,12 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .today-label {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  border-radius: 5px;
   padding: 4px 8px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 0.72rem;
-  font-weight: 750;
+  font-weight: 500;
   line-height: 1;
 }
 
@@ -114,7 +113,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .settings-stack,
 .nutrition-stack,
 .sleep-stack {
-  gap: 12px;
+  gap: 20px;
 }
 
 .chatgpt-primary {
@@ -122,18 +121,18 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px;
-  border: 1px solid #b8d9cc;
+  padding: 20px;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: linear-gradient(135deg, #e6f4ee 0%, #f8fbf9 100%);
-  box-shadow: 0 8px 28px rgb(33 66 53 / 6%);
+  background: var(--surface);
+  flex-wrap: wrap;
 }
 
 .chatgpt-primary-copy {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
 }
 
 .chatgpt-primary-copy > div {
@@ -143,8 +142,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 }
 
 .chatgpt-primary-copy strong {
-  font-size: 1.02rem;
-  line-height: 1.3;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
 .chatgpt-primary-copy small {
@@ -156,21 +156,21 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: white;
-  font-size: 1.05rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .chatgpt-primary-button {
   flex: 0 0 auto;
-  min-width: 68px;
+  min-width: 76px;
   text-align: center;
 }
 
 .chatgpt-config-warning {
+  flex-basis: 100%;
   color: var(--warning);
   font-size: 0.72rem;
 }
@@ -197,7 +197,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .sleep-summary-card,
 .sleep-stage-card,
 .sleep-daily-card {
-  padding: 16px;
+  padding: 24px;
 }
 
 .compact-list {
@@ -234,7 +234,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 }
 
 .compact-summary strong {
-  font-size: 1.7rem;
+  font-size: 2rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -246,7 +247,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .inline-help {
   margin-top: 8px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 .inline-help summary,
@@ -272,7 +273,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 
 /* Keep every MealLog capability, but reduce persistent chrome/text. */
 section.card:has(#meals-title) {
-  padding: 16px;
+  padding: 24px;
 }
 
 section.card:has(#meals-title) > .section-heading {
@@ -325,7 +326,7 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 }
 
 .settings-subnav {
-  margin-bottom: 12px;
+  margin-bottom: 24px;
 }
 
 .settings-subnav a {
@@ -338,13 +339,13 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 }
 
 .profile-form {
-  gap: 16px;
+  gap: 24px;
 }
 
 .settings-form-section {
   display: grid;
-  gap: 12px;
-  padding-top: 14px;
+  gap: 16px;
+  padding-top: 20px;
   border-top: 1px solid var(--line);
 }
 
@@ -360,7 +361,7 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 }
 
 .profile-card .field label {
-  font-size: 0.82rem;
+  font-size: 0.86rem;
 }
 
 .profile-card .field input,
@@ -469,10 +470,10 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 
 /* Shared Nutrition / Sleep information hierarchy */
 .range-nav {
-  margin-bottom: 12px;
+  margin-bottom: 24px;
 }
 
-.range-nav a {
+.range-nav a, .range-nav button {
   flex: 1;
   text-align: center;
 }
@@ -480,31 +481,33 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .metric-tile {
   min-width: 0;
   display: grid;
-  gap: 5px;
-  padding: 12px;
-  border-radius: 14px;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 10px;
   background: var(--surface-soft, #f5f7f4);
 }
 
 .metric-tile span {
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.8rem;
 }
 
 .metric-tile strong {
-  font-size: 1.05rem;
-  line-height: 1.2;
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
 .primary-metric strong {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
 }
 
 .compact-policy-card {
@@ -537,7 +540,7 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 .compact-review-intro,
 .compact-review-section,
 .compact-review-within {
-  padding: 16px;
+  padding: 24px;
 }
 
 .compact-review-intro .section-heading,
@@ -608,22 +611,26 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 
 .compact-nutrient-list .nutrition-row,
 .compact-day-list .nutrition-day {
-  padding-block: 11px;
+  padding-block: 20px;
 }
 
 .compact-nutrient-row .nutrition-value {
-  margin-top: 4px;
-  font-size: 1.05rem;
+  margin-top: 6px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 
 .compact-nutrient-row .nutrition-row-main { flex: 1; }
+.compact-nutrient-row { align-items: flex-start; }
+.compact-nutrient-row .nutrition-chevron { align-self: center; }
 .nutrient-reference-help { margin-bottom: 10px; }
-.nutrient-amount-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.nutrient-amount-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 8px; }
 .nutrient-average-amount, .nutrient-reference-amount { min-width: 0; }
-.nutrient-amount-label { display: block; color: var(--muted); font-size: 0.73rem; line-height: 1.5; }
+.nutrient-amount-label { display: block; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
 .nutrient-reference-amount { padding-left: 12px; border-left: 1px solid var(--line); }
-.nutrient-reference-value { display: block; margin-top: 4px; color: var(--accent); font-size: 1.05rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.nutrient-reference-amount small { display: block; margin-top: 4px; color: var(--muted); font-size: 0.7rem; line-height: 1.55; }
+.nutrient-reference-value { display: block; margin-top: 6px; color: var(--ink); font-size: 1.12rem; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.nutrient-reference-amount small { display: block; margin-top: 6px; color: var(--muted); font-size: 0.8rem; line-height: 1.55; }
 .nutrient-reference-unavailable { margin-top: 3px; }
 
 .compact-tags {
@@ -758,9 +765,9 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
 
 @media (max-width: 520px) {
   .today-topbar {
-    display: grid;
-    align-items: stretch;
-    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
   }
 
   .today-date-nav {
@@ -776,7 +783,7 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
   }
 
   .chatgpt-primary-button {
-    min-width: 62px;
+    min-width: 68px;
   }
 
   .today-summary-card .today-nutrition-summary {
@@ -803,7 +810,7 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
   }
 
   .metric-tile {
-    padding: 10px;
+    padding: 14px;
   }
 
   .detail-stat-list {
@@ -817,4 +824,18 @@ section.card:has(#meals-title) .meal-actions > .pill:not(.pending) {
   .nutrition-day-value {
     min-width: 82px;
   }
+}
+
+@media (max-width: 520px) {
+  .card, .chatgpt-primary, section.card:has(#meals-title) { padding: 20px; }
+  .sleep-provider-card { padding: 0; }
+  .today-summary-card .section-heading { flex-wrap: wrap; gap: 8px; }
+  .today-summary-card .section-heading .button { padding-inline: 0; }
+  .nutrition-row-title > strong { font-weight: 600; }
+  .nutrient-amount-label { min-height: 3em; }
+}
+
+@media (max-width: 350px) {
+  .chatgpt-primary-copy { flex: 1; }
+  .chatgpt-mark { display: none; }
 }
