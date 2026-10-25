@@ -1,5 +1,6 @@
 import type { NutritionReviewResult } from "@/lib/nutrition/review-priority";
 import type { getSleepAnalytics } from "@/lib/sleep/analytics";
+import type { SleepRecommendation } from "@/lib/sleep/recommendations";
 
 export type Guide = {
   domain: "nutrition" | "sleep";
@@ -11,6 +12,14 @@ export type Guide = {
   href: string;
   limited: boolean;
 };
+
+/** The score UI uses main-night evidence. Keep the legacy guide API for callers
+ * outside that flow; it is never used to gate the new score or its advice. */
+export function sleepScoreGuide(recommendation: SleepRecommendation): Guide {
+  return { domain: "sleep", title: recommendation.title, observation: recommendation.observation,
+    evidence: recommendation.evidence, action: recommendation.action, steps: recommendation.steps,
+    href: recommendation.href, limited: recommendation.confidence === "limited" };
+}
 
 export function nutritionGuide(review: NutritionReviewResult): Guide {
   const item = [

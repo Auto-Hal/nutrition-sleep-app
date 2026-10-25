@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./ui-refresh.css";
 import "./visual-theme.css";
+import "./sleep-score.css";
 import { PwaRuntime } from "@/components/pwa-runtime";
 import { appBuildVersion } from "@/lib/app-version";
 

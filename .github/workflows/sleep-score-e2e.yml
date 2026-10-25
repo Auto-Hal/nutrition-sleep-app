@@ -1,0 +1,46 @@
+name: Sleep score E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sleep-score-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-browser-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Render actual sleep components with synthetic observations
+        run: pnpm exec vitest run tests/sleep-score-render.test.ts
+        env:
+          WRITE_SLEEP_UI_PREVIEW: "1"
+      - name: Install Chromium and WebKit
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Verify public auth shell and synthetic sleep UI
+        run: pnpm exec playwright test
+      - name: Save synthetic acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sleep-score-synthetic-browser-report
+          path: |
+            playwright-report/
+            test-results/playwright/
+          retention-days: 7
+          if-no-files-found: ignore

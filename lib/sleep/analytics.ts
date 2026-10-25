@@ -159,11 +159,20 @@ function clockLabel(minutes: number | null) {
   return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
 }
 
+function unwrapClockMinutes(values: number[]) {
+  if (values.length === 0) return [];
+  const distance = (a: number, b: number) => Math.abs(((a - b + 2160) % 1440) - 720);
+  const anchor = [...values].sort((a, b) => values.reduce((sum, value) => sum + distance(a, value), 0)
+    - values.reduce((sum, value) => sum + distance(b, value), 0) || a - b)[0];
+  return values.map((value) => anchor + ((value - anchor + 2160) % 1440) - 720);
+}
+
 function chooseMainSession(rows: NumericSleepSession[]) {
   if (rows.length === 0) return null;
   const nonNaps = rows.filter((row) => row.provider_nap !== true);
   return [...nonNaps].sort(
-    (a, b) => durationMinutes(b.start_at, b.end_at) - durationMinutes(a.start_at, a.end_at),
+    (a, b) => durationMinutes(b.start_at, b.end_at) - durationMinutes(a.start_at, a.end_at)
+      || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   )[0] ?? null;
 }
 
@@ -276,11 +285,8 @@ export function summarizeSleepData(options: {
     (day) => !day.processing && day.main_start_minutes !== null && day.main_end_minutes !== null,
   );
 
-  const bedtimeMinutes = timingEligible.map((day) => {
-    const value = day.main_start_minutes ?? 0;
-    return value < 12 * 60 ? value + 1440 : value;
-  });
-  const wakeMinutes = timingEligible.map((day) => day.main_end_minutes ?? 0);
+  const bedtimeMinutes = unwrapClockMinutes(timingEligible.map((day) => day.main_start_minutes!));
+  const wakeMinutes = unwrapClockMinutes(timingEligible.map((day) => day.main_end_minutes!));
 
   const stageValues = (stage: SleepStageType) => stageEligible.map((day) => day.stage_durations[stage]).filter((value): value is number => value !== null);
   const stageAverage = (stage: SleepStageType) => average(stageValues(stage));
@@ -337,12 +343,14 @@ export async function getSleepAnalytics(
   timeZone: string,
   range: SleepRange,
   now = new Date(),
+  prefetchedSessions?: RawSleepSession[],
 ) {
   const endDate = localDateInTimeZone(timeZone, now);
   const startDate = shiftIsoDate(endDate, -(range - 1));
   const client = createUserClient(accessToken);
 
-  const sessionData = await readAllPages<RawSleepSession>((from, to) => client
+  const sessionData = prefetchedSessions?.filter((row) => row.sleep_date >= startDate && row.sleep_date <= endDate)
+    ?? await readAllPages<RawSleepSession>((from, to) => client
     .from("sleep_sessions")
     .select(
       "id,sleep_date,start_at,end_at,start_utc_offset_seconds,end_utc_offset_seconds,sleep_type,provider_nap,provider_processed,provider_stages_status,provider_manually_edited,short_awakenings,minutes_asleep,time_in_bed_minutes,efficiency,minutes_to_fall_asleep,minutes_after_wakeup,minutes_awake,superseded_at", { count: "exact" },
@@ -359,22 +367,25 @@ export async function getSleepAnalytics(
   let outOfBedSegments: RawOutOfBed[] = [];
 
   if (sessionIds.length > 0) {
-    const [stageResult, segmentResult] = await Promise.all([
-      readAllPages<RawStageInterval>((from, to) => client
-        .from("sleep_stage_intervals")
-        .select("sleep_session_id,stage_type,start_at,end_at", { count: "exact" })
-        .in("sleep_session_id", sessionIds)
-        .order("sleep_session_id", { ascending: true })
-        .order("sequence", { ascending: true }).order("id", { ascending: true }).range(from, to)),
-      readAllPages<RawOutOfBed>((from, to) => client
-        .from("sleep_out_of_bed_segments")
-        .select("sleep_session_id,start_at,end_at", { count: "exact" })
-        .in("sleep_session_id", sessionIds)
-        .order("sleep_session_id", { ascending: true })
-        .order("sequence", { ascending: true }).order("id", { ascending: true }).range(from, to)),
-    ]);
-    stages = stageResult;
-    outOfBedSegments = segmentResult;
+    for (let index = 0; index < sessionIds.length; index += 100) {
+      const ids = sessionIds.slice(index, index + 100);
+      const [stageResult, segmentResult] = await Promise.all([
+        readAllPages<RawStageInterval>((from, to) => client
+          .from("sleep_stage_intervals")
+          .select("sleep_session_id,stage_type,start_at,end_at", { count: "exact" })
+          .in("sleep_session_id", ids)
+          .order("sleep_session_id", { ascending: true })
+          .order("sequence", { ascending: true }).order("id", { ascending: true }).range(from, to)),
+        readAllPages<RawOutOfBed>((from, to) => client
+          .from("sleep_out_of_bed_segments")
+          .select("sleep_session_id,start_at,end_at", { count: "exact" })
+          .in("sleep_session_id", ids)
+          .order("sleep_session_id", { ascending: true })
+          .order("sequence", { ascending: true }).order("id", { ascending: true }).range(from, to)),
+      ]);
+      stages.push(...stageResult);
+      outOfBedSegments.push(...segmentResult);
+    }
   }
 
   return summarizeSleepData({
