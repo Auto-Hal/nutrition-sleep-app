@@ -27,14 +27,15 @@ describe("review uses recorded-period evidence instead of complete-day selection
       primary: { state: "at_or_above_rda", evidence_basis: "partial", complete_days: 0, partial_days: 7 } });
     expect(review.items[0].primary?.summary).toContain("参考評価");
     expect(review.sections.within_reference).toHaveLength(0);
-    expect(nutritionGuide(review).observation).toContain("少ない既知量だけでは不足と判断できません");
+    expect(nutritionGuide(review).observation).toContain("既知分だけでRDA以上");
   });
 
-  it("holds a low subtotal instead of recommending more intake", () => {
+  it("uses a low subtotal for a reference comparison without recommending more intake", () => {
     const review = deriveNutritionReview({ range: 7, nutrients: [vitamin(5)] });
-    expect(review.items[0]).toMatchObject({ band: "insufficient_evidence", direction: "indeterminate",
+    expect(review.items[0]).toMatchObject({ band: "known_intake", direction: "indeterminate",
       primary: { state: "indeterminate", evidence_eligible: false } });
-    expect(review.items[0].primary?.summary).toContain("判定保留");
+    expect(review.items[0].primary?.known_reference).toMatchObject({ ratio_percent: 5, reference_amount: 100 });
+    expect(nutritionGuide(review).action).toContain("未判明の食品");
     expect(review.sections.review_first).toHaveLength(0);
     expect(review.sections.review).toHaveLength(0);
   });
@@ -43,6 +44,8 @@ describe("review uses recorded-period evidence instead of complete-day selection
     const review = deriveNutritionReview({ range: 7, nutrients: [vitamin(0, 2)] });
     expect(review.items[0].primary).toMatchObject({ state: "indeterminate", evidence_basis: "none", unknown_days: 7 });
     expect(review.items[0].primary?.rda_ratio_percent).toBeNull();
+    expect(nutritionGuide(review).observation).toContain("食事は記録されています");
+    expect(nutritionGuide(review).title).toContain("未判明値");
   });
 
   it("shows a comparable UL exceeded by the known subtotal, with source uncertainty", () => {
@@ -59,6 +62,9 @@ describe("review uses recorded-period evidence instead of complete-day selection
     const review = deriveNutritionReview({ range: 7, nutrients: [a, e] });
     expect(review.items.flatMap((item) => item.signals).some((s) => s.metric === "UL")).toBe(false);
     expect(review.items.find((item) => item.nutrient_code === "vitamin_e")?.primary?.state).toBe("indeterminate");
+    const eOnly = deriveNutritionReview({ range: 7, nutrients: [e] });
+    expect(nutritionGuide(eOnly).title).toContain("比較基準");
+    expect(nutritionGuide(eOnly).action).toContain("プロフィール");
   });
 
   it("keeps AI below-threshold data indeterminate even when all values are present", () => {
@@ -67,5 +73,30 @@ describe("review uses recorded-period evidence instead of complete-day selection
     const signal = item.signals.find((s) => s.metric === "AI");
     expect(signal).toMatchObject({ state: "below_ai_indeterminate", direction: "indeterminate", band: "watch" });
     expect(signal?.summary).toContain("不足とは判定できません");
+  });
+
+  it("explains an uncertain energy ratio as missing numerator or denominator data, not a missing profile", () => {
+    const input: NutritionReviewNutrientInput = vitamin(35);
+    input.code = "fat"; input.unit = "g";
+    input.evidence_dri!.references = [{ edition: "2025", nutrientCode: "fat", sex: "male", ageMin: 18,
+      ageMax: 29, unit: "percent_energy", metric: "DG", lower: 20, upper: 30, comparable: true }];
+    input.percent_energy_evidence = { ...input.evidence!, lower: 0, upper: null };
+    const guide = nutritionGuide(deriveNutritionReview({ range: 7, nutrients: [input] }));
+    expect(guide.action).toContain("エネルギーの値を別々に");
+    expect(guide.observation).toContain("比率");
+    expect(guide.action).not.toContain("プロフィール");
+  });
+
+  it("does not invent unknown food values when a complete period retains RDA but loses a stable EAR", () => {
+    const input = vitamin(35, 0);
+    input.evidence_dri.references = input.evidence_dri.references.filter((reference) => reference.metric === "RDA");
+    const review = deriveNutritionReview({ range: 7, nutrients: [input] });
+    expect(review.items[0].primary).toMatchObject({ band: "known_intake", evidence_basis: "complete", missing_entries: 0 });
+    expect(review.items[0].primary?.summary).toContain("必要な基準を確定できません");
+    const guide = nutritionGuide(review);
+    expect(guide.observation).toContain("栄養値は揃っています");
+    expect(guide.action).toContain("比較基準");
+    expect(guide.action).not.toContain("未判明");
+    expect(guide.observation).not.toContain("未判明分がある");
   });
 });

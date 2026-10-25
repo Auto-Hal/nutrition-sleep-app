@@ -14,6 +14,7 @@ import { nutritionGuide } from "@/lib/wellbeing/guide";
 import { getProfile } from "@/lib/profile";
 import { buildNutritionDisplayReferences, type NutritionReferenceProfile } from "@/lib/nutrition/dri/display-reference";
 import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
+import { NutritionMissingValueActions } from "@/components/nutrition-missing-value-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -285,6 +286,7 @@ export default async function NutritionPage({
                               {entry.quantity} {entry.quantity_unit}
                               {entry.item_type === "supplement" ? " · サプリ" : ""}
                             </div>
+                            {entry.amount === null && <NutritionMissingValueActions entryId={entry.id} />}
                           </div>
                           <div className="nutrition-day-value">
                             <strong>{formatAmount(entry.amount, entry.unit)}</strong>

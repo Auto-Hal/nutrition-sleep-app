@@ -5,6 +5,9 @@ import type { NutrientCode } from "@/lib/nutrition/catalog";
 import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 import { formatReferenceAmount, type NutritionDisplayReferences } from "@/lib/nutrition/dri/display-reference";
 import { DRI_2025_SOURCE } from "@/lib/nutrition/dri/2025";
+import { compareKnownIntakeToReference } from "@/lib/nutrition/reference-comparison";
+import type { DriUnit } from "@/lib/nutrition/dri/types";
+import { NutritionKnownComparison } from "@/components/nutrition-known-comparison";
 
 type Nutrient = Awaited<ReturnType<typeof getNutritionAnalytics>>["nutrients"][number];
 
@@ -19,7 +22,10 @@ function driLabels(nutrient: Nutrient) {
   if (dri.adequacy) labels.push(describeDriPosition(dri.adequacy));
   if (dri.target) labels.push(describeDriPosition(dri.target));
   if (dri.upper_limit) labels.push(describeDriPosition(dri.upper_limit));
-  if (labels.length === 0) labels.push("判定保留");
+  if (labels.length === 0) {
+    const comparison = compareKnownIntakeToReference(dri.references, nutrient.evidence, nutrient.unit as DriUnit);
+    labels.push(comparison ? "食事全体の到達は未確定" : "判定保留");
+  }
   return labels;
 }
 
@@ -64,6 +70,7 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
           const referenceOnly = incomplete || evidence.quality !== "user_verified"
             || ratioIncomplete || (ratio.days > 0 && ratio.quality !== "user_verified");
           const reference = displayReferences.nutrients[nutrient.code];
+          const knownComparison = compareKnownIntakeToReference(nutrient.evidence_dri.references, evidence, nutrient.unit as DriUnit);
           return (
             <Link key={nutrient.code} className="nutrition-row compact-nutrient-row"
               href={`/nutrition?range=${range}&nutrient=${nutrient.code}#detail` as Route}
@@ -87,6 +94,7 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
                     {reference.detail && <small>{reference.detail}</small>}
                   </div>
                 </div>
+                {knownComparison && <NutritionKnownComparison comparison={knownComparison} partial={incomplete} />}
                 {reference.unavailableReason && <div className="nutrition-meta nutrient-reference-unavailable">{reference.unavailableReason}</div>}
                 <div className="nutrition-meta">完全 {evidence.complete_days}日 · 部分 {evidence.partial_days}日 · 全不明 {evidence.unknown_days}日</div>
                 {nutrient.percent_energy_evidence.days > 0 && (
