@@ -18,6 +18,7 @@ function directionLabel(item: NutritionReviewItem) {
   if (item.direction === "reduce") return "減らす方向";
   if (item.direction === "mixed") return "複数基準";
   if (item.direction === "indeterminate") return "判定保留";
+  if (item.primary?.evidence_basis === "partial" || item.band === "watch") return "参考・到達確認";
   return "基準範囲";
 }
 
@@ -66,7 +67,7 @@ function ReviewItem({
           <strong>{item.label}</strong>
           <div className="nutrition-tags">
             <span className="pill">{directionLabel(item)}</span>
-            <span className="pill pending">{primary.evaluable_days}/{range}日</span>
+            <span className="pill pending">{primary.evidence_basis ? "記録対象 " : "評価 "}{primary.evaluable_days}/{range}日</span>
           </div>
         </div>
         <Link
@@ -82,6 +83,8 @@ function ReviewItem({
       <details className="inline-help review-evidence">
         <summary>根拠を見る</summary>
         <div className="review-evidence-body">
+          {primary.evidence_basis && <p className="nutrition-meta">栄養値が完全 {primary.complete_days}日・部分 {primary.partial_days}日・全不明 {primary.unknown_days}日。対象日数は判定が確定した日数ではありません。</p>}
+          {primary.evidence_basis === "partial" && <p className="nutrition-meta">登録値の正確さを前提とする参考情報です。推定の有無は食品別の出典で確認してください。</p>}
           {signalFacts(primary).map((fact) => (
             <p className="nutrition-meta" key={fact}>{fact}</p>
           ))}
@@ -162,8 +165,9 @@ export function NutritionReview({
         <details className="inline-help">
           <summary>判定の見方</summary>
           <p>
-            評価可能日の平均と食事摂取基準を基準ごとの意味を保って比較します。病気・欠乏・個人の必要量を診断するものではありません。
-            通常表示には最低 {review.minimum_evaluable_days} 日の評価可能記録が必要で、端末に未同期の値は根拠に含めません。
+            記録完了日の登録値から分かる量・範囲を食事摂取基準と比較します。部分データでは既知分で確認できる到達・超過を参考表示し、結論が変わり得る場合は保留します。
+            継続傾向の表示には最低 {review.minimum_evaluable_days} 日の対象記録が必要です。これは医学的に十分な日数を保証するものではありません。端末に未同期の値は根拠に含めません。
+            食生活全体の代表性や習慣的摂取量、病気・欠乏・個人の必要量を確定する表示ではありません。
           </p>
         </details>
       </section>

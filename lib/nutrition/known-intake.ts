@@ -14,8 +14,9 @@ function average(values: number[]) {
 }
 
 /**
- * Separates "what we can observe" from "what is complete enough to compare
- * against DRI". Missing nutrient values never become zero.
+ * Compatibility summary: observed-only averages and the old complete-coverage
+ * subset remain distinct. DRI comparisons now use summarizeIntakeEvidence's
+ * period bounds, never evaluation_average. Missing values never become zero.
  */
 export function summarizeKnownIntake(rows: KnownIntakeRow[]) {
   const recordedRows = rows.filter((row) => row.record_complete);

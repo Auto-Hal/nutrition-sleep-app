@@ -20,10 +20,11 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
   ].find((candidate) => candidate.primary?.evidence_eligible);
   if (!item?.primary) {
     const hasEvidence = review.sections.within_reference.some((candidate) => candidate.primary?.evidence_eligible);
+    const hasPartial = review.items.some((candidate) => candidate.primary?.evidence_basis === "partial");
     return {
       domain: "nutrition",
-      title: hasEvidence ? "食事の傾向を続けて確認" : "まず食事の記録をそろえる",
-      observation: hasEvidence ? "評価できた項目は基準に到達・範囲内です。" : "いまの記録だけでは、見直す栄養素を絞れません。",
+      title: hasEvidence ? "食事の傾向を続けて確認" : hasPartial ? "分かっている量と不明な値を確認" : "まず食事の記録をそろえる",
+      observation: hasEvidence ? "評価できた項目の記録平均は基準に到達・範囲内です。栄養状態の適正を確定するものではありません。" : hasPartial ? "部分データにも既知量があります。少ない既知量だけでは不足と判断できません。" : "いまの記録だけでは、見直す栄養素を絞れません。",
       evidence: `直近${review.range}日・栄養素ごとに評価日数を確認`,
       action: hasEvidence ? "日別の記録と、不明な栄養値を確認する" : "朝・昼・夕の記録と、不明な栄養値を確認する",
       steps: ["食べたものを記録する。欠食は欠食として残す", "ラベルなどで分かる栄養値を補う", "同じ期間の評価平均で傾向を見る"],
@@ -47,7 +48,7 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
       : item.primary.state === "ear_to_rda"
         ? "記録平均は推定平均必要量以上で、推奨量の基準には届いていません。"
         : item.primary.state === "above_ul"
-          ? "記録平均が耐容上限量の基準を上回っています。元の量と出典を確認してください。"
+          ? `${item.primary.evidence_basis === "partial" ? "登録値の既知分だけでも" : "記録平均が"}耐容上限量の基準を上回っています。元の量と出典を確認してください。`
           : item.primary.state === "below_dg"
             ? "記録平均が、目標範囲の下限を下回っています。"
             : item.primary.state === "above_dg"

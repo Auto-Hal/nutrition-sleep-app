@@ -1,7 +1,8 @@
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
-import { evaluateDriSet } from "@/lib/nutrition/dri/evaluate";
+import { evaluateDriInterval, evaluateDriSet } from "@/lib/nutrition/dri/evaluate";
 import { DRI_2025_SOURCE } from "@/lib/nutrition/dri/2025";
 import { summarizeKnownIntake } from "@/lib/nutrition/known-intake";
+import { summarizeIntakeEvidence, summarizePercentEnergyEvidence } from "@/lib/nutrition/intake-evidence";
 import { resolveDri2025 } from "@/lib/nutrition/dri/resolve";
 import type { DriProfile, DriReference } from "@/lib/nutrition/dri/types";
 import { createUserClient } from "@/lib/supabase/user";
@@ -241,6 +242,8 @@ export async function getNutritionAnalytics(
     const eligibleRows = nutrientRows.filter((row) => row.eligible_for_reference);
     const recordCompleteRows = nutrientRows.filter((row) => row.record_complete);
     const knownIntake = summarizeKnownIntake(nutrientRows);
+    const evidence = summarizeIntakeEvidence(nutrientRows);
+    const percentEnergyEvidence = summarizePercentEnergyEvidence(definition.code, nutrientRows, energyRows);
     const eligibleDates = eligibleRows.map((row) => row.meal_date);
     const percentEnergyResult = calculatePercentEnergy(definition.code, nutrientRows, energyRows);
     const directDri = stableReferences(profile, definition.code, eligibleDates, definition.unit);
@@ -254,6 +257,30 @@ export async function getNutritionAnalytics(
     const percentEvaluation = percentEnergyResult.value === null
       ? null
       : evaluateDriSet(percentReferences, percentEnergyResult.value);
+    const evidenceDirectDri = stableReferences(profile, definition.code, evidence.dates, definition.unit);
+    const evidencePercentDri = stableReferences(profile, definition.code, percentEnergyEvidence.dates, "percent_energy");
+    const evidenceDirectEvaluation = evaluateDriInterval(evidenceDirectDri.references, evidence);
+    const evidencePercentEvaluation = evaluateDriInterval(evidencePercentDri.references, percentEnergyEvidence);
+    const evidenceDaily = nutrientRows.map((row) => {
+      const dailyEvidence = summarizeIntakeEvidence([row]);
+      const dailyPercentEvidence = summarizePercentEnergyEvidence(definition.code, [row], energyRows);
+      const dailyDirectDri = stableReferences(profile, definition.code, dailyEvidence.dates, definition.unit);
+      const dailyPercentDri = stableReferences(profile, definition.code, dailyPercentEvidence.dates, "percent_energy");
+      return {
+        meal_date: row.meal_date,
+        evidence: dailyEvidence,
+        percent_energy_evidence: dailyPercentEvidence,
+        direct_evaluation: evaluateDriInterval(dailyDirectDri.references, dailyEvidence),
+        percent_evaluation: evaluateDriInterval(dailyPercentDri.references, dailyPercentEvidence),
+      };
+    });
+    // Counts of days with a valid registered-value comparison, not days of
+    // complete coverage, healthy nutrition, or evidence of usual intake.
+    const evidenceDecisiveDays = {
+      adequacy: evidenceDaily.filter((day) => day.evidence.days > 0 && day.direct_evaluation.adequacy !== null).length,
+      target: evidenceDaily.filter((day) => day.evidence.days > 0 && (day.percent_evaluation.target ?? day.direct_evaluation.target) !== null).length,
+      upper_limit: evidenceDaily.filter((day) => day.evidence.days > 0 && day.direct_evaluation.upperLimit !== null).length,
+    };
 
     return {
       code: definition.code,
@@ -278,6 +305,21 @@ export async function getNutritionAnalytics(
       percent_energy: percentEnergyResult.value,
       percent_energy_eligible_days: percentEnergyResult.eligibleDays,
       percent_energy_quality: percentEnergyResult.quality,
+      evidence,
+      percent_energy_evidence: percentEnergyEvidence,
+      evidence_daily: evidenceDaily,
+      evidence_decisive_days: evidenceDecisiveDays,
+      evidence_dri: {
+        references: [...evidenceDirectDri.references, ...evidencePercentDri.references],
+        stable: evidenceDirectDri.unstableMetrics.length === 0 && evidencePercentDri.unstableMetrics.length === 0,
+        unavailable_reason: [evidenceDirectDri.unavailableReason, evidencePercentDri.unavailableReason].filter(Boolean).join(" ") || null,
+        unstable_metrics: [...new Set([...evidenceDirectDri.unstableMetrics, ...evidencePercentDri.unstableMetrics])],
+        adequacy: evidenceDirectEvaluation.adequacy,
+        target: evidencePercentEvaluation.target ?? evidenceDirectEvaluation.target,
+        upper_limit: evidenceDirectEvaluation.upperLimit,
+        direct_evaluation: evidenceDirectEvaluation,
+        percent_evaluation: evidencePercentEvaluation,
+      },
       dri: {
         references,
         stable: directDri.unstableMetrics.length === 0 && percentDri.unstableMetrics.length === 0,

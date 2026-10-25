@@ -61,7 +61,8 @@ describe("app UI refresh", () => {
     expect(nutrition.indexOf("<NutrientAverages")).toBeLessThan(nutrition.indexOf("<ActionGuide"));
     expect(nutrition).toContain("平均の詳細");
     expect(nutrition).toContain("既知分平均");
-    expect(averages).toContain("評価 {nutrient.eligible_days}/{nutrient.recorded_days}日");
+    expect(averages).toContain("完全 {evidence.complete_days}日 · 部分 {evidence.partial_days}日 · 全不明 {evidence.unknown_days}日");
+    expect(averages).toContain("formatEvidenceRange(evidence, nutrient.unit)");
     expect(nutrition).toContain("source-details");
     expect(nutrition).toContain("栄養評価の見方");
     expect(review).toContain("優先して見る");
