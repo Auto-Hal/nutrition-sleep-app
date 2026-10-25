@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatReferenceAmount } from "@/lib/nutrition/dri/display-reference";
 import type {
   NutritionReviewItem,
   NutritionReviewQuality,
@@ -14,10 +15,13 @@ function qualityLabel(value: NutritionReviewQuality) {
 }
 
 function directionLabel(item: NutritionReviewItem) {
+  if (item.band === "watch" && item.primary?.state === "ear_to_rda") return "推奨量との差";
+  if (item.band === "watch" && item.primary?.state === "below_ai_indeterminate") return "参考・不足は判定できません";
   if (item.direction === "increase") return "増やす方向";
   if (item.direction === "reduce") return "減らす方向";
   if (item.direction === "mixed") return "複数基準";
   if (item.direction === "indeterminate") return "判定保留";
+  if (item.primary?.evidence_basis === "partial" || item.band === "watch") return "参考・到達確認";
   return "基準範囲";
 }
 
@@ -66,7 +70,7 @@ function ReviewItem({
           <strong>{item.label}</strong>
           <div className="nutrition-tags">
             <span className="pill">{directionLabel(item)}</span>
-            <span className="pill pending">{primary.evaluable_days}/{range}日</span>
+            <span className="pill pending">{primary.evidence_basis ? "記録対象 " : "評価 "}{primary.evaluable_days}/{range}日</span>
           </div>
         </div>
         <Link
@@ -78,10 +82,17 @@ function ReviewItem({
       </div>
 
       <p className="nutrition-review-summary">{primary.summary}</p>
+      {primary.state === "ear_to_rda" && primary.rda_gap_amount !== undefined && primary.rda_gap_amount !== null && (
+        <p className="nutrition-meta">推奨量との差: {primary.rda_gap_amount > 0 && primary.rda_gap_amount < 0.01
+          ? `${formatReferenceAmount(0.01, primary.unit)}未満`
+          : formatReferenceAmount(primary.rda_gap_amount, primary.unit)} / 日。追加摂取の必要量や不足量を示すものではありません。</p>
+      )}
 
       <details className="inline-help review-evidence">
         <summary>根拠を見る</summary>
         <div className="review-evidence-body">
+          {primary.evidence_basis && <p className="nutrition-meta">栄養値が完全 {primary.complete_days}日・部分 {primary.partial_days}日・全不明 {primary.unknown_days}日。対象日数は判定が確定した日数ではありません。</p>}
+          {primary.evidence_basis === "partial" && <p className="nutrition-meta">登録値の正確さを前提とする参考情報です。推定の有無は食品別の出典で確認してください。</p>}
           {signalFacts(primary).map((fact) => (
             <p className="nutrition-meta" key={fact}>{fact}</p>
           ))}
@@ -144,11 +155,6 @@ export function NutritionReview({
 }: {
   review: NutritionReviewResult;
 }) {
-  const referenceItems = [
-    ...review.sections.watch,
-    ...review.sections.insufficient_evidence,
-  ];
-
   return (
     <>
       <section className="card nutrition-review-intro compact-review-intro" aria-labelledby="nutrition-review-title">
@@ -162,8 +168,10 @@ export function NutritionReview({
         <details className="inline-help">
           <summary>判定の見方</summary>
           <p>
-            評価可能日の平均と食事摂取基準を基準ごとの意味を保って比較します。病気・欠乏・個人の必要量を診断するものではありません。
-            通常表示には最低 {review.minimum_evaluable_days} 日の評価可能記録が必要で、端末に未同期の値は根拠に含めません。
+            記録完了日の登録値から分かる量・範囲を食事摂取基準と比較します。部分データでは既知分で確認できる到達・超過を参考表示し、結論が変わり得る場合は保留します。
+            継続傾向の表示には最低 {review.minimum_evaluable_days} 日の対象記録が必要です。これは医学的に十分な日数を保証するものではありません。端末に未同期の値は根拠に含めません。
+            食生活全体の代表性や習慣的摂取量、病気・欠乏・個人の必要量を確定する表示ではありません。
+            EAR以上・RDA未満は参考として経過を見ます。基準の数値は変えず、先に確認する項目と分けて表示します。
           </p>
         </details>
       </section>
@@ -183,14 +191,20 @@ export function NutritionReview({
       />
       <ReviewSection
         title="見直す"
-        description="EAR以上RDA未満、またはDG範囲外などの記録状態です。"
+        description="記録からDG範囲外と比較できる項目です。基準値そのものを緩和せず、参考項目より先に表示します。"
         items={review.sections.review}
         range={review.range}
       />
       <ReviewSection
-        title="参考・保留"
-        description="AI未満や評価日数不足など、強い結論にしない参考情報です。"
-        items={referenceItems}
+        title="参考・経過を見る"
+        description="EAR以上RDA未満、AI未満、部分データでの到達確認などの参考情報です。推奨量との差は不足の診断でも追加摂取の必要量でもありません。"
+        items={review.sections.watch}
+        range={review.range}
+      />
+      <ReviewSection
+        title="情報を確認・判定保留"
+        description="栄養値や対象日数、比較可能な基準が不足している項目です。保留は摂取不足を意味しません。"
+        items={review.sections.insufficient_evidence}
         range={review.range}
       />
 

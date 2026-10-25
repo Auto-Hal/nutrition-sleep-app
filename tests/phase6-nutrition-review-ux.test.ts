@@ -20,7 +20,8 @@ describe("Phase 6.7 Nutrition review UX", () => {
     expect(component).toContain("過剰を確認");
     expect(component).toContain("先に見直す");
     expect(component).toContain("見直す");
-    expect(component).toContain("参考・保留");
+    expect(component).toContain("参考・経過を見る");
+    expect(component).toContain("情報を確認・判定保留");
     expect(component).toContain("基準到達・範囲内");
     expect(component).not.toContain("総合スコア");
     expect(component).not.toContain("不足率");

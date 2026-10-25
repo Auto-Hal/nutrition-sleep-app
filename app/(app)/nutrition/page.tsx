@@ -5,7 +5,7 @@ import { AppIcon } from "@/components/app-icon";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
-import { NutrientAverages, formatNutrientAmount as formatAmount } from "@/components/nutrient-averages";
+import { NutrientAverages, formatEvidenceRange, formatNutrientAmount as formatAmount } from "@/components/nutrient-averages";
 import { dailyDisplayAmount } from "@/lib/nutrition/presentation";
 import { deriveNutritionReview } from "@/lib/nutrition/review-priority";
 import { NutritionReview } from "@/components/nutrition-review";
@@ -13,6 +13,7 @@ import { ActionGuide } from "@/components/action-guide";
 import { nutritionGuide } from "@/lib/wellbeing/guide";
 import { getProfile } from "@/lib/profile";
 import { buildNutritionDisplayReferences, type NutritionReferenceProfile } from "@/lib/nutrition/dri/display-reference";
+import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 
 export const dynamic = "force-dynamic";
 
@@ -143,7 +144,8 @@ export default async function NutritionPage({
             <summary>集計ルール</summary>
             <p>
               朝・昼・夕が「記録済み」または「スキップ」の日を記録完了日として扱います。
-              栄養値が一部不明でも既知分は平均に残し、不明値を0にはしません。DRIとの基準評価だけ完全データ日に限定します。
+              栄養値が一部不明でも登録値の既知分を下限として使い、不明値を0とは断定しません。全不明日も対象分母に含め、完全データ日だけを選ぶ偏りを抑えます。
+              食事の記録未完了日は期間比較から外し、摂取項目なしの日も0摂取とは判定しません。記録した日が食生活全体を代表するとは限りません。
             </p>
           </details>
         </section>
@@ -161,8 +163,8 @@ export default async function NutritionPage({
 
             <div className="metric-grid nutrient-metric-grid">
               <div className="metric-tile">
-                <span>既知分平均</span>
-                <strong>{formatAmount(selected.record_average_known_amount, selected.unit)}</strong>
+                <span>記録完了日の平均範囲</span>
+                <strong>{formatEvidenceRange(selected.evidence, selected.unit)}</strong>
               </div>
               <div className="metric-tile">
                 <span>食品（既知分）</span>
@@ -173,37 +175,51 @@ export default async function NutritionPage({
                 <strong>{formatAmount(selected.record_average_supplement_amount, selected.unit)}</strong>
               </div>
               <div className="metric-tile">
-                <span>基準評価</span>
-                <strong>{selected.eligible_days}/{selected.recorded_days}日</strong>
+                <span>栄養値の完全 / 対象日数</span>
+                <strong>{selected.evidence.complete_days}/{selected.evidence.days}日</strong>
               </div>
             </div>
 
             <details className="inline-help nutrient-method-details">
               <summary>平均の詳細</summary>
               <div className="detail-copy-stack">
-                <p>データ品質: {qualityLabel(selected.quality)}</p>
+                <p>データ品質: {qualityLabel(selected.evidence.quality)}。推定の有無は集計では確定できません。食品別の由来・出典をご確認ください。</p>
+                <p>既知量がある{selected.observed_days}日の既知分平均: {formatAmount(selected.record_average_known_amount, selected.unit)}。上の期間比較は全不明日も含む{selected.evidence.days}日を分母とするため、値が異なる場合があります。</p>
+                <p>判明している食品記録 {selected.evidence.known_entries}件 / 不明 {selected.evidence.missing_entries}件。完全 {selected.evidence.complete_days}日・部分 {selected.evidence.partial_days}日・全不明 {selected.evidence.unknown_days}日。</p>
+                <p>食事記録が未完了 {selected.evidence.incomplete_record_days}日・記録完了で摂取項目なし {selected.evidence.empty_days}日。</p>
+                <p>登録値から日別の比較が成立: RDA/AI等 {selected.evidence_decisive_days.adequacy}日・DG {selected.evidence_decisive_days.target}日・UL {selected.evidence_decisive_days.upper_limit}日。完全データ日数とは別です。期間評価は日別結果の多数決ではありません。</p>
                 {selected.average_unclassified_amount !== null && selected.average_unclassified_amount > 0 && (
                   <p>由来内訳未確定: {formatAmount(selected.average_unclassified_amount, selected.unit)}</p>
                 )}
-                {selected.partial_known_days > 0 && <p>一部の食品で値不明: {selected.partial_known_days}日（既知分平均には含め、基準評価からは除外）</p>}
-                {selected.excluded_coverage_days > 0 && <p>基準評価から除外: {selected.excluded_coverage_days}日</p>}
-                {selected.empty_complete_days > 0 && <p>摂取項目なしで比較対象外: {selected.empty_complete_days}日</p>}
-                {selected.percent_energy !== null && (
+                {selected.percent_energy_evidence.days > 0 && (
                   <p>
-                    エネルギー比 {new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(selected.percent_energy)}%
-                    · 評価 {selected.percent_energy_eligible_days}日 · {qualityLabel(selected.percent_energy_quality)}
+                    判定に使用するエネルギー比: {formatEvidenceRange(selected.percent_energy_evidence, "%")}
+                    · 同じ記録完了{selected.percent_energy_evidence.days}日の栄養量合計÷エネルギー合計。分子・分母の不明分を別々に扱います。gの表示目安はこの判定には使いません。
                   </p>
                 )}
-                {selected.dri.unavailable_reason && <p>{selected.dri.unavailable_reason}</p>}
-                {selected.dri.references.filter((reference) => !reference.comparable && reference.caveat).map((reference) => (
+                {selected.evidence_dri.unavailable_reason && <p>{selected.evidence_dri.unavailable_reason}</p>}
+                {selected.evidence_dri.references.filter((reference) => reference.comparable).map((reference) => (
+                  <p key={`${reference.metric}-${reference.unit}`}>比較に使用: {reference.metric} · {reference.unit === "percent_energy" ? "エネルギー比 " : ""}
+                    {reference.value !== undefined ? formatAmount(reference.value, reference.unit === "percent_energy" ? "%" : reference.unit)
+                      : `${reference.lower === undefined ? "下限なし" : `${formatAmount(reference.lower, reference.unit === "percent_energy" ? "%" : reference.unit)}${reference.lowerInclusive === false ? "超" : "以上"}`} / ${reference.upper === undefined ? "上限なし" : `${formatAmount(reference.upper, reference.unit === "percent_energy" ? "%" : reference.unit)}${reference.upperInclusive === false ? "未満" : "以下"}`}`}
+                    {reference.caveat ? ` · ${reference.caveat}` : ""}
+                  </p>
+                ))}
+                {selected.evidence_dri.references.filter((reference) => !reference.comparable && reference.caveat).map((reference) => (
                   <p key={`${reference.metric}-${reference.caveat}`}>{reference.metric}: {reference.caveat}</p>
                 ))}
-                <p>不明な食品を含む日も、分かっている量は「既知分平均」に残します。不明値を0にはせず、DRIとの不足・適正判定だけ完全データ日に限定します。</p>
+                <p>不明分の上限は推測しません。既知分だけで推奨量への到達や比較可能な上限超過を確認できる場合は参考評価し、低い既知分だけで不足とは判定しません。RDA到達は「適正」の診断ではありません。</p>
               </div>
             </details>
 
             <div className="nutrition-days compact-day-list">
-              {[...selected.daily].reverse().map((day) => (
+              {[...selected.daily].reverse().map((day) => {
+                const evidenceDay = selected.evidence_daily.find((row) => row.meal_date === day.meal_date);
+                const comparison = evidenceDay?.direct_evaluation;
+                const target = evidenceDay?.percent_evaluation.target ?? comparison?.target;
+                const referenceOnly = evidenceDay?.evidence.basis !== "complete" || evidenceDay?.evidence.quality !== "user_verified"
+                  || (Boolean(evidenceDay?.percent_energy_evidence.days) && (evidenceDay?.percent_energy_evidence.basis !== "complete" || evidenceDay?.percent_energy_evidence.quality !== "user_verified"));
+                return (
                 <Link
                   key={day.meal_date}
                   className="nutrition-day"
@@ -219,6 +235,11 @@ export default async function NutritionPage({
                         ? "項目なし"
                         : day.coverage_complete ? "栄養値 完全" : "栄養値 不完全"}
                     </div>
+                    {day.record_complete && day.entry_count > 0 && <div className="nutrition-meta">{[
+                      comparison?.adequacy ? describeDriPosition(comparison.adequacy) : null,
+                      comparison?.upperLimit === "above_ul" ? "登録値でUL超過" : null,
+                      target ? `DG: ${target === "above_dg" ? "上限超過" : target === "below_dg" ? "下限未満" : "範囲内"}` : null,
+                    ].filter(Boolean).join(" · ") || "判定保留"}{referenceOnly ? " · 登録値からの参考" : ""}</div>}
                   </div>
                   <div className="nutrition-day-value">
                     <strong>{formatAmount(dailyDisplayAmount(day), day.unit)}</strong>
@@ -227,7 +248,7 @@ export default async function NutritionPage({
                       : !day.coverage_complete && <small>既知分のみ</small>}
                   </div>
                 </Link>
-              ))}
+              );})}
             </div>
           </section>
         )}
@@ -268,6 +289,7 @@ export default async function NutritionPage({
                           <div className="nutrition-day-value">
                             <strong>{formatAmount(entry.amount, entry.unit)}</strong>
                             <small>{entry.amount === null ? "値不明" : qualityLabel(entry.quality)}</small>
+                            {entry.amount === null && <small>未判明分があるため、少ない既知量だけで不足・適正とは判断しません。</small>}
                             {(entry.provenance || entry.source_uri || entry.source_observed_at) && (
                               <details className="source-details">
                                 <summary>出典</summary>

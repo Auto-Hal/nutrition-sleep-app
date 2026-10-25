@@ -15,11 +15,20 @@ export function formatNutrientAmount(value: number | null, unit: string) {
 
 function driLabels(nutrient: Nutrient) {
   const labels: string[] = [];
-  if (nutrient.dri.adequacy) labels.push(describeDriPosition(nutrient.dri.adequacy));
-  if (nutrient.dri.target) labels.push(describeDriPosition(nutrient.dri.target));
-  if (nutrient.dri.upper_limit) labels.push(describeDriPosition(nutrient.dri.upper_limit));
-  if (labels.length === 0 && nutrient.dri.references.some((reference) => !reference.comparable)) labels.push("比較対象外");
+  const dri = nutrient.evidence_dri;
+  if (dri.adequacy) labels.push(describeDriPosition(dri.adequacy));
+  if (dri.target) labels.push(describeDriPosition(dri.target));
+  if (dri.upper_limit) labels.push(describeDriPosition(dri.upper_limit));
+  if (labels.length === 0) labels.push("判定保留");
   return labels;
+}
+
+export function formatEvidenceRange(evidence: { lower: number | null; upper: number | null }, unit: string) {
+  if (evidence.lower === null) return "既知データなし";
+  const lower = formatNutrientAmount(evidence.lower, unit);
+  if (evidence.upper === evidence.lower) return lower;
+  if (evidence.upper === null) return `${lower}以上（上限不明）`;
+  return `${lower}〜${formatNutrientAmount(evidence.upper, unit)}`;
 }
 
 export function NutrientAverages({ nutrients, range, selectedCode, displayReferences }: {
@@ -34,7 +43,7 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
         <h2 id="nutrient-averages-title">栄養素の{range}日平均</h2>
         <span className="muted">1日あたり</span>
       </div>
-      <p className="muted nutrition-caption">記録された既知分の平均です。各栄養素から日別・食品別の内訳を確認できます。</p>
+      <p className="muted nutrition-caption">食事の記録完了日を対象に、登録値の分かっている量を表示します。不明分がある場合は下限の参考値です。少ない既知量だけで不足とは判定しません。</p>
       <p className="muted nutrition-caption">目安は現在のプロフィールに基づく1日量です。</p>
       <details className="inline-help nutrient-reference-help">
         <summary>目安量の計算・プロフィール</summary>
@@ -48,8 +57,12 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
       <div className="nutrition-list compact-nutrient-list">
         {nutrients.map((nutrient) => {
           const labels = driLabels(nutrient);
-          const incomplete = nutrient.eligible_days < nutrient.recorded_days;
-          const displayAmount = nutrient.record_average_known_amount;
+          const evidence = nutrient.evidence;
+          const incomplete = evidence.basis !== "complete";
+          const ratio = nutrient.percent_energy_evidence;
+          const ratioIncomplete = ratio.days > 0 && ratio.basis !== "complete";
+          const referenceOnly = incomplete || evidence.quality !== "user_verified"
+            || ratioIncomplete || (ratio.days > 0 && ratio.quality !== "user_verified");
           const reference = displayReferences.nutrients[nutrient.code];
           return (
             <Link key={nutrient.code} className="nutrition-row compact-nutrient-row"
@@ -58,12 +71,15 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
               <div className="nutrition-row-main">
                 <div className="nutrition-row-title">
                   <strong>{nutrient.label}</strong>
-                  <span className={`pill ${incomplete ? "pending" : ""}`}>既知 {nutrient.observed_days}日</span>
+                  <span className={`pill ${referenceOnly ? "pending" : ""}`}>{evidence.basis === "none" ? "情報不足" : incomplete || ratioIncomplete ? "参考・部分データ" : referenceOnly ? "値は揃う・参考評価" : "データ完全"}</span>
                 </div>
                 <div className="nutrient-amount-comparison">
                   <div className="nutrient-average-amount">
-                    <span className="nutrient-amount-label">{range}日平均</span>
-                    <div className="nutrition-value">{displayAmount === null ? "データ不足" : formatNutrientAmount(displayAmount, nutrient.unit)}</div>
+                    <span className="nutrient-amount-label">記録完了 {evidence.days}日の平均</span>
+                    <div className="nutrition-value">{evidence.lower !== null && evidence.upper === null
+                      ? `${formatNutrientAmount(evidence.lower, nutrient.unit)}以上`
+                      : formatEvidenceRange(evidence, nutrient.unit)}</div>
+                    {evidence.lower !== null && evidence.upper === null && <small className="nutrition-meta">上限不明</small>}
                   </div>
                   <div className="nutrient-reference-amount">
                     <span className="nutrient-amount-label">{reference.label}</span>
@@ -72,9 +88,12 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
                   </div>
                 </div>
                 {reference.unavailableReason && <div className="nutrition-meta nutrient-reference-unavailable">{reference.unavailableReason}</div>}
-                <div className="nutrition-meta">{displayAmount !== null ? "既知分平均" : "既知データなし"} · 評価 {nutrient.eligible_days}/{nutrient.recorded_days}日</div>
-                {labels.length > 0 && nutrient.eligible_days > 0 && (
-                  <div className="nutrition-tags compact-tags">{labels.map((label) => <span className="pill" key={label}>{label}</span>)}</div>
+                <div className="nutrition-meta">完全 {evidence.complete_days}日 · 部分 {evidence.partial_days}日 · 全不明 {evidence.unknown_days}日</div>
+                {nutrient.percent_energy_evidence.days > 0 && (
+                  <div className="nutrition-meta">判定に使うエネルギー比: {formatEvidenceRange(nutrient.percent_energy_evidence, "%")}</div>
+                )}
+                {labels.length > 0 && (
+                  <div className="nutrition-tags compact-tags">{labels.map((label) => <span className="pill" key={label}>{referenceOnly && label !== "判定保留" ? "参考: " : ""}{label}</span>)}</div>
                 )}
               </div>
               <span className="nutrition-chevron" aria-hidden="true">›</span>
