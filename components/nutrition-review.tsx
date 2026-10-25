@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatReferenceAmount } from "@/lib/nutrition/dri/display-reference";
+import { NutritionKnownComparison } from "@/components/nutrition-known-comparison";
 import type {
   NutritionReviewItem,
   NutritionReviewQuality,
@@ -15,6 +16,8 @@ function qualityLabel(value: NutritionReviewQuality) {
 }
 
 function directionLabel(item: NutritionReviewItem) {
+  if (item.band === "known_intake") return "既知分を比較";
+  if (item.primary?.trend_limited && item.primary.state !== "above_ul") return "記録値の参考比較";
   if (item.band === "watch" && item.primary?.state === "ear_to_rda") return "推奨量との差";
   if (item.band === "watch" && item.primary?.state === "below_ai_indeterminate") return "参考・不足は判定できません";
   if (item.direction === "increase") return "増やす方向";
@@ -82,6 +85,13 @@ function ReviewItem({
       </div>
 
       <p className="nutrition-review-summary">{primary.summary}</p>
+      {primary.known_reference && <NutritionKnownComparison comparison={primary.known_reference} partial={primary.evidence_basis === "partial"} showAmounts />}
+      {primary.trend_limited && <p className="nutrition-meta">記録した{primary.evaluable_days}日の比較です。長期傾向を見るには記録を続けてください。</p>}
+      {item.missing_value_followup && (
+        <Link className="text-link" href={`/nutrition?range=${range}&nutrient=${encodeURIComponent(item.nutrient_code)}&day=${item.missing_value_followup.date}#day-detail`}>
+          未判明の食品を見る（{item.missing_value_followup.date}・{item.missing_value_followup.missing_entries}件）
+        </Link>
+      )}
       {primary.state === "ear_to_rda" && primary.rda_gap_amount !== undefined && primary.rda_gap_amount !== null && (
         <p className="nutrition-meta">推奨量との差: {primary.rda_gap_amount > 0 && primary.rda_gap_amount < 0.01
           ? `${formatReferenceAmount(0.01, primary.unit)}未満`
@@ -92,6 +102,7 @@ function ReviewItem({
         <summary>根拠を見る</summary>
         <div className="review-evidence-body">
           {primary.evidence_basis && <p className="nutrition-meta">栄養値が完全 {primary.complete_days}日・部分 {primary.partial_days}日・全不明 {primary.unknown_days}日。対象日数は判定が確定した日数ではありません。</p>}
+          {primary.known_reference && <p className="nutrition-meta">この割合から、食事全体の不足や追加摂取の必要量は計算できません。未判明の食品へのリンクは、対象日で未判明件数が最多の日です。栄養量への影響が最大の日という意味ではありません。</p>}
           {primary.evidence_basis === "partial" && <p className="nutrition-meta">登録値の正確さを前提とする参考情報です。推定の有無は食品別の出典で確認してください。</p>}
           {signalFacts(primary).map((fact) => (
             <p className="nutrition-meta" key={fact}>{fact}</p>
@@ -169,7 +180,7 @@ export function NutritionReview({
           <summary>判定の見方</summary>
           <p>
             記録完了日の登録値から分かる量・範囲を食事摂取基準と比較します。部分データでは既知分で確認できる到達・超過を参考表示し、結論が変わり得る場合は保留します。
-            継続傾向の表示には最低 {review.minimum_evaluable_days} 日の対象記録が必要です。これは医学的に十分な日数を保証するものではありません。端末に未同期の値は根拠に含めません。
+            記録した日の比較と長期傾向は分けます。対象記録が {review.minimum_evaluable_days} 日未満でも分かる比較を表示し、短い記録として注記します。この日数は医学的に十分な日数を保証するものではありません。端末に未同期の値は根拠に含めません。
             食生活全体の代表性や習慣的摂取量、病気・欠乏・個人の必要量を確定する表示ではありません。
             EAR以上・RDA未満は参考として経過を見ます。基準の数値は変えず、先に確認する項目と分けて表示します。
           </p>
@@ -199,6 +210,12 @@ export function NutritionReview({
         title="参考・経過を見る"
         description="EAR以上RDA未満、AI未満、部分データでの到達確認などの参考情報です。推奨量との差は不足の診断でも追加摂取の必要量でもありません。"
         items={review.sections.watch}
+        range={review.range}
+      />
+      <ReviewSection
+        title="分かっている量を基準と比較"
+        description="既知分の平均と推奨量・目安量・目標量の下限を比較します。未判明分があるため、食事全体の不足や到達は未確定です。割合の低さを栄養不足の深刻さや追加摂取量に読み替えないでください。"
+        items={review.sections.known_intake}
         range={review.range}
       />
       <ReviewSection

@@ -3,6 +3,7 @@ import type { NutritionRange } from "@/lib/nutrition/analytics";
 import type { DriMetric, DriReference, DriUnit } from "@/lib/nutrition/dri/types";
 import { evaluateDriInterval } from "@/lib/nutrition/dri/evaluate";
 import type { IntakeEvidence } from "@/lib/nutrition/intake-evidence";
+import { compareKnownIntakeToReference, type KnownReferenceComparison } from "@/lib/nutrition/reference-comparison";
 
 export type NutritionReviewDirection =
   | "increase"
@@ -16,6 +17,7 @@ export type NutritionReviewBand =
   | "review_first"
   | "review"
   | "watch"
+  | "known_intake"
   | "within_reference"
   | "insufficient_evidence";
 
@@ -35,6 +37,9 @@ export type NutritionReviewDailyRow = {
   meal_date: string;
   known_amount: number;
   eligible_for_reference: boolean;
+  record_complete?: boolean;
+  entry_count?: number;
+  missing_entry_count?: number;
 };
 
 export type NutritionReviewNutrientInput = {
@@ -103,6 +108,9 @@ export type NutritionReviewSignal = {
   unknown_days?: number;
   lower?: number | null;
   upper?: number | null;
+  known_reference?: KnownReferenceComparison | null;
+  trend_limited?: boolean;
+  missing_entries?: number;
 };
 
 export type NutritionReviewItem = {
@@ -112,6 +120,7 @@ export type NutritionReviewItem = {
   direction: NutritionReviewDirection;
   primary: NutritionReviewSignal | null;
   signals: NutritionReviewSignal[];
+  missing_value_followup?: { date: string; missing_entries: number } | null;
 };
 
 export type NutritionReviewResult = {
@@ -123,6 +132,7 @@ export type NutritionReviewResult = {
     review_first: NutritionReviewItem[];
     review: NutritionReviewItem[];
     watch: NutritionReviewItem[];
+    known_intake: NutritionReviewItem[];
     insufficient_evidence: NutritionReviewItem[];
     within_reference: NutritionReviewItem[];
   };
@@ -422,6 +432,7 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
     const evaluated = evaluateDriInterval(refs, evidence);
     const partial = evidence.basis !== "complete";
     const referenceOnly = partial || evidence.quality !== "user_verified";
+    const knownReference = compareKnownIntakeToReference(refs, evidence, unit);
     const basis = referenceOnly ? "登録値の既知分からの参考評価" : "記録完了日の平均";
     const candidates = [
       { metric: "EAR_RDA" as const, axis: "adequacy" as const, state: evaluated.adequacy,
@@ -436,7 +447,14 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
     for (const candidate of candidates) {
       if (!candidate.present) continue;
       const state = candidate.state ?? "indeterminate";
-      const enough = evidence.days >= minimumDays && state !== "indeterminate";
+      // The interval comparison is a fact about the recorded days. A display
+      // threshold for a sustained trend must not erase a valid comparison.
+      const comparable = state !== "indeterminate";
+      const trendLimited = evidence.days < minimumDays;
+      const comparison = knownReference && (
+        (candidate.metric === "EAR_RDA" && knownReference.metric === "RDA")
+        || candidate.metric === knownReference.metric
+      ) ? knownReference : null;
       const concern = state === "above_ul" || state === "above_dg" || state === "below_dg"
         || state === "below_ear" || state === "ear_to_rda";
       const desired: NutritionReviewBand = state === "above_ul" ? "excess_alert"
@@ -449,7 +467,9 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
         && evidence.lower !== null && evidence.upper === evidence.lower
         && rda?.value !== undefined;
       const text: Record<NutritionReviewSignal["state"], string> = {
-        indeterminate: "判定保留：未判明分または記録が不足しているため結論を出せません",
+        indeterminate: comparison
+          ? "既知分と基準の比較。食事全体の到達は未確定です"
+          : "判定保留：未判明分または記録が不足しているため結論を出せません",
         below_ear: "平均がEAR未満（欠乏の診断ではありません）",
         ear_to_rda: "平均がEAR以上・RDA未満（推奨量との差を確認し、経過を見る）",
         at_or_above_rda: "既知分だけでRDA以上（栄養状態の適正判定ではありません）",
@@ -464,12 +484,14 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
       signals.push({
         axis: candidate.axis, metric: candidate.metric, state, unit,
         value: evidence.lower,
-        band: enough ? desired : "insufficient_evidence",
+        band: comparable
+          ? trendLimited && (desired === "review_first" || desired === "review") ? "watch" : desired
+          : comparison ? "known_intake" : "insufficient_evidence",
         direction: state === "indeterminate" || state === "below_ai_indeterminate" ? "indeterminate"
           : state === "above_ul" || state === "above_dg" ? "reduce"
             : state === "below_dg" || state === "below_ear" || state === "ear_to_rda" ? "increase" : "hold",
         evaluable_days: evidence.days, minimum_evaluable_days: minimumDays,
-        evidence_eligible: enough,
+        evidence_eligible: comparable,
         quality: evidence.quality === "unknown" ? "unknown_or_incomplete" : evidence.quality,
         rda_ratio_percent: null, target_distance_percent: null,
         rda_gap_amount: showRdaGap ? rda.value! - evidence.lower! : null,
@@ -479,6 +501,8 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
         evidence_basis: evidence.basis, complete_days: evidence.complete_days,
         partial_days: evidence.partial_days, unknown_days: evidence.unknown_days,
         lower: evidence.lower, upper: evidence.upper,
+        known_reference: comparison, trend_limited: trendLimited,
+        missing_entries: evidence.missing_entries,
       });
     }
   }
@@ -493,6 +517,8 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
       concern_day_ratio: null, concern_evaluable_dates: null, evidence_basis: e.basis,
       complete_days: e.complete_days, partial_days: e.partial_days, unknown_days: e.unknown_days,
       lower: e.lower, upper: e.upper,
+      known_reference: null, trend_limited: e.days < minimumDays,
+      missing_entries: e.missing_entries,
       summary: e.lower === null ? "判定保留：既知の栄養量がありません"
         : "既知分は記録されています。比較できる基準を確定できないため判定保留です",
     });
@@ -501,6 +527,7 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
 }
 
 function semanticRank(signal: NutritionReviewSignal) {
+  if (signal.band === "known_intake") return 55;
   if (signal.evidence_eligible) {
     if (signal.metric === "UL" && signal.state === "above_ul") return 0;
     if (signal.metric === "EAR_RDA" && signal.state === "below_ear") return 10;
@@ -607,6 +634,10 @@ export function deriveNutritionReview(input: NutritionReviewInput): NutritionRev
       ...makePercentEnergySignals(nutrient, minimumDays),
     ];
     const primary = primarySignal(signals);
+    const missingDay = nutrient.daily.filter((row) => row.record_complete === true
+      && Number.isInteger(row.missing_entry_count) && row.missing_entry_count! > 0)
+      .sort((a, b) => b.missing_entry_count! - a.missing_entry_count!
+        || b.meal_date.localeCompare(a.meal_date))[0];
     return {
       nutrient_code: nutrient.code,
       label: nutrient.label,
@@ -614,6 +645,8 @@ export function deriveNutritionReview(input: NutritionReviewInput): NutritionRev
       direction: itemDirection(signals),
       primary,
       signals,
+      missing_value_followup: missingDay
+        ? { date: missingDay.meal_date, missing_entries: missingDay.missing_entry_count! } : null,
     };
   }).sort(compareItems);
 
@@ -626,6 +659,7 @@ export function deriveNutritionReview(input: NutritionReviewInput): NutritionRev
       review_first: items.filter((item) => item.band === "review_first"),
       review: items.filter((item) => item.band === "review"),
       watch: items.filter((item) => item.band === "watch"),
+      known_intake: items.filter((item) => item.band === "known_intake"),
       insufficient_evidence: items.filter((item) => item.band === "insufficient_evidence"),
       within_reference: items.filter((item) => item.band === "within_reference"),
     },

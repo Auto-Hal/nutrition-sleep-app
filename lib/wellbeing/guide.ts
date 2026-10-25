@@ -22,6 +22,18 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
     const hasEvidence = review.sections.within_reference.some((candidate) => candidate.primary?.evidence_eligible);
     const hasPartial = review.items.some((candidate) => candidate.primary?.evidence_basis === "partial");
     const reference = review.sections.watch.find((candidate) => candidate.primary?.evidence_eligible && candidate.primary.state === "ear_to_rda");
+    const shortObservation = review.sections.watch.find((candidate) => candidate.primary?.trend_limited
+      && candidate.primary.evidence_eligible && ["below_ear", "below_dg", "above_dg"].includes(candidate.primary.state));
+    if (shortObservation?.primary) {
+      return {
+        domain: "nutrition", title: `${shortObservation.label}の記録値を確認`,
+        observation: `${shortObservation.primary.summary}。記録日数が少ないため、長期の食生活全体の傾向とは区別してください。`,
+        evidence: `直近${review.range}日・記録した${shortObservation.primary.evaluable_days}日の比較`,
+        action: "食品の内訳と栄養値を確認し、記録を続ける",
+        steps: ["詳細で比較に使った値と基準を見る", "食品の量と、栄養値の出典を確認する", "同じ期間の記録を続け、傾向を比較する"],
+        href: `/nutrition?range=${review.range}&nutrient=${shortObservation.nutrient_code}#detail`, limited: true,
+      };
+    }
     if (reference?.primary) {
       return {
         domain: "nutrition",
@@ -34,6 +46,60 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
         limited: true,
       };
     }
+    const known = review.sections.known_intake[0];
+    if (known?.primary?.known_reference) {
+      const comparison = known.primary.known_reference;
+      const followup = known.missing_value_followup;
+      return {
+        domain: "nutrition", title: `${known.label}の既知分と基準を確認`,
+        observation: `既知分で${comparison.label}の少なくとも${comparison.ratio_percent}%を記録しています。未判明分があるため、食事全体の到達や不足はまだ判断できません。`,
+        evidence: `直近${review.range}日・対象記録${known.primary.evaluable_days}日・未判明の食品記録${known.primary.missing_entries ?? 0}件`,
+        action: "未判明の食品を1つ選び、成分表示や出典を確認する",
+        steps: ["未判明の食品を開き、栄養値と単位を確認する", "値が分かる場合は、出典を残して食品を修正する。不明は0にしない", "食品の編集だけでは過去の記録は変わらないため、必要なら食事履歴も明示的に修正する"],
+        href: followup ? `/nutrition?range=${review.range}&nutrient=${known.nutrient_code}&day=${followup.date}#day-detail`
+          : `/nutrition?range=${review.range}&nutrient=${known.nutrient_code}#detail`,
+        limited: true,
+      };
+    }
+    const attainment = review.sections.watch.find((candidate) => candidate.primary?.evidence_eligible
+      && ["at_or_above_rda", "at_or_above_ai", "within_dg"].includes(candidate.primary.state));
+    if (attainment?.primary) {
+      return {
+        domain: "nutrition", title: `${attainment.label}の基準到達を確認`,
+        observation: attainment.primary.summary,
+        evidence: `直近${review.range}日・対象記録${attainment.primary.evaluable_days}日${attainment.primary.trend_limited ? "・短い記録の参考比較" : ""}`,
+        action: "摂れている食品と未判明分を確認し、記録を続ける",
+        steps: ["基準到達の根拠となる食品を見る", "到達確認とは別に、未判明値や上限の比較を確認する", "記録を続けて、次の期間の傾向を見る"],
+        href: `/nutrition?range=${review.range}&nutrient=${attainment.nutrient_code}#detail`, limited: true,
+      };
+    }
+    const unresolved = review.sections.insufficient_evidence.find((candidate) => candidate.primary?.evidence_basis !== undefined
+      && candidate.primary.evaluable_days > 0);
+    if (unresolved?.primary) {
+      const noAmount = unresolved.primary.value === null;
+      const followup = unresolved.missing_value_followup;
+      if (unresolved.primary.unit === "percent_energy") {
+        return {
+          domain: "nutrition", title: `${unresolved.label}とエネルギーの未判明分を確認`,
+          observation: "栄養素またはエネルギーに未判明分があるため、食事全体の比率が目標範囲内かは未確定です。g量の目安と比率の判定は別です。",
+          evidence: `直近${review.range}日・比率の対象記録${unresolved.primary.evaluable_days}日`,
+          action: "栄養素とエネルギーの値を別々に確認する",
+          steps: ["詳細で比率の範囲と、分子・分母の欠損を確認する", "同じ食事の栄養素とエネルギーを出典に沿って確認する", "分からない値を0にせず、必要なら食事履歴も明示的に修正する"],
+          href: `/nutrition?range=${review.range}&nutrient=${unresolved.nutrient_code}#detail`, limited: true,
+        };
+      }
+      return {
+        domain: "nutrition", title: `${unresolved.label}の${noAmount ? "未判明値" : "比較基準"}を確認`,
+        observation: noAmount ? "食事は記録されていますが、この栄養素の量はまだ分かりません。未判明値は0ではありません。"
+          : "既知分は記録されていますが、比較に必要な基準や栄養素の定義を確定できません。",
+        evidence: `直近${review.range}日・対象記録${unresolved.primary.evaluable_days}日`,
+        action: noAmount ? "登録済み食品の栄養値と出典を確認する" : "詳細の比較条件とプロフィールを確認する",
+        steps: noAmount ? ["未判明の食品と元の表示を確認する", "分かる値は単位と出典を残し、不明は0にしない", "食品の修正後、必要なら食事履歴も明示的に修正する"]
+          : ["詳細で比較できない理由と対象成分を確認する", "プロフィールと、登録した栄養素の定義・単位を確認する", "比較できない基準から過不足を判断しない"],
+        href: noAmount && followup ? `/nutrition?range=${review.range}&nutrient=${unresolved.nutrient_code}&day=${followup.date}#day-detail`
+          : `/nutrition?range=${review.range}&nutrient=${unresolved.nutrient_code}#detail`, limited: true,
+      };
+    }
     return {
       domain: "nutrition",
       title: hasEvidence ? "食事の傾向を続けて確認" : hasPartial ? "分かっている量と不明な値を確認" : "まず食事の記録をそろえる",
@@ -42,7 +108,7 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
       action: hasEvidence ? "日別の記録と、不明な栄養値を確認する" : "朝・昼・夕の記録と、不明な栄養値を確認する",
       steps: ["食べたものを記録する。欠食は欠食として残す", "ラベルなどで分かる栄養値を補う", "同じ期間の評価平均で傾向を見る"],
       href: `/nutrition?range=${review.range}`,
-      limited: !hasEvidence,
+      limited: !hasEvidence || review.sections.within_reference.some((candidate) => candidate.primary?.trend_limited),
     };
   }
   const alert = item.band === "excess_alert";
@@ -71,7 +137,7 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
     action,
     steps: ["詳細で食品・サプリと元の栄養値を確認する", action, "記録を続け、次の7日間も同じ基準で比較する"],
     href: `/nutrition?range=${review.range}&nutrient=${item.nutrient_code}#detail`,
-    limited: item.primary.quality !== "user_verified",
+    limited: item.primary.trend_limited === true || item.primary.quality !== "user_verified",
   };
 }
 

@@ -143,11 +143,12 @@ describe.each([false, true])("priority presentation (evidence path: %s)", (evide
 
   it.each([
     [7, 2], [30, 6], [90, 13],
-  ] as const)("keeps %d-day watch observations with %d records below the display threshold", (range, days) => {
+  ] as const)("separates the %d-day recorded comparison from trend sufficiency with %d records", (range, days) => {
     const review = deriveNutritionReview({ range, nutrients: [nutrient(95, adequacy, { evidence, days })] });
-    expect(review.items[0].primary).toMatchObject({ state: "ear_to_rda", band: "insufficient_evidence",
-      evidence_eligible: false });
-    expect(review.sections.watch).toHaveLength(0);
+    expect(review.items[0].primary).toMatchObject({ state: "ear_to_rda", band: evidence ? "watch" : "insufficient_evidence",
+      evidence_eligible: evidence });
+    if (evidence) expect(review.items[0].primary?.trend_limited).toBe(true);
+    expect(review.sections.watch).toHaveLength(evidence ? 1 : 0);
     expect(review.sections.review).toHaveLength(0);
   });
 });
@@ -155,7 +156,7 @@ describe.each([false, true])("priority presentation (evidence path: %s)", (evide
 describe("RDA differences respect incomplete evidence", () => {
   it.each([5, 95])("keeps the partial lower mean %d indeterminate without a numeric RDA gap", (amount) => {
     const review = deriveNutritionReview({ range: 7, nutrients: [nutrient(amount, adequacy, { evidence: true, missing: 1 })] });
-    expect(review.items[0].primary).toMatchObject({ state: "indeterminate", band: "insufficient_evidence",
+    expect(review.items[0].primary).toMatchObject({ state: "indeterminate", band: "known_intake",
       evidence_basis: "partial", complete_days: 0, partial_days: 7, lower: amount, upper: null,
       rda_gap_amount: null, rda_target_amount: null, rda_ratio_percent: null });
     expect(review.sections.review_first).toHaveLength(0);
