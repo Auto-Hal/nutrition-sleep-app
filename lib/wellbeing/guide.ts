@@ -21,6 +21,19 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
   if (!item?.primary) {
     const hasEvidence = review.sections.within_reference.some((candidate) => candidate.primary?.evidence_eligible);
     const hasPartial = review.items.some((candidate) => candidate.primary?.evidence_basis === "partial");
+    const reference = review.sections.watch.find((candidate) => candidate.primary?.evidence_eligible && candidate.primary.state === "ear_to_rda");
+    if (reference?.primary) {
+      return {
+        domain: "nutrition",
+        title: "推奨量との差を参考に、経過を見る",
+        observation: "記録平均はEAR以上・RDA未満です。推奨量との差だけで不足や追加摂取の必要量は判断しません。",
+        evidence: `直近${review.range}日・${reference.label}の対象記録${reference.primary.evaluable_days}日`,
+        action: "今の食事を記録し、次の期間も同じ基準で比較する",
+        steps: ["詳細で推奨量との差と食品の内訳を確認する", "栄養値の品質と、未判明分がないかを確認する", "記録を続け、同じ期間の傾向を比べる"],
+        href: `/nutrition?range=${review.range}&nutrient=${reference.nutrient_code}#detail`,
+        limited: true,
+      };
+    }
     return {
       domain: "nutrition",
       title: hasEvidence ? "食事の傾向を続けて確認" : hasPartial ? "分かっている量と不明な値を確認" : "まず食事の記録をそろえる",

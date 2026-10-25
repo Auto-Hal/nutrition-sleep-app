@@ -349,7 +349,7 @@ describe("Phase 6 AI/DG/UL semantics", () => {
 });
 
 describe("Phase 6 multi-axis and ranking semantics", () => {
-  it("does not produce one direction when direct and percent-energy axes conflict", () => {
+  it("keeps a strong percent-energy concern ahead of the reference EAR-to-RDA gap", () => {
     const result = deriveNutritionReview({
       range: 30,
       nutrients: [nutrient({
@@ -380,7 +380,7 @@ describe("Phase 6 multi-axis and ranking semantics", () => {
       expect.objectContaining({ metric: "EAR_RDA", direction: "increase" }),
       expect.objectContaining({ metric: "DG", unit: "percent_energy", direction: "reduce" }),
     ]));
-    expect(result.items[0].direction).toBe("mixed");
+    expect(result.items[0].direction).toBe("reduce");
     expect(result.items[0].primary?.metric).toBe("DG");
   });
 

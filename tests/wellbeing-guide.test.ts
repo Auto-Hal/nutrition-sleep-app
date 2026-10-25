@@ -46,6 +46,15 @@ describe("record-derived guidance", () => {
     expect(guide.observation).toContain("評価できた項目");
     expect(guide.observation).not.toContain("健康です");
   });
+  it("keeps a complete EAR-to-RDA average as a reference without requesting more records or urgent dietary change", () => {
+    const guide = nutritionGuide(nutrition(7, 790));
+    expect(guide.title).toContain("経過");
+    expect(guide.observation).toContain("EAR以上・RDA未満");
+    expect(guide.action).toContain("比較");
+    expect(guide.title).not.toContain("まず食事の記録");
+    expect(guide.action).not.toContain("増やす");
+    expect(guide.limited).toBe(true);
+  });
   it("keeps missing sleep unknown and proposes sync rather than sleep deprivation", () => {
     const guide = sleepGuide(sleep([]));
     expect(guide.limited).toBe(true);

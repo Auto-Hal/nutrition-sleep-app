@@ -83,6 +83,7 @@ async function writeSyntheticPreview() {
     { title: "架空例2：ビタミンCの既知分が少なく、判定保留", code: "vitamin_c", amount: 5, missing: 1, energyMissing: 0 },
     { title: "架空例3：ビタミンCがすべて不明", code: "vitamin_c", amount: 0, missing: 2, energyMissing: 0 },
     { title: "架空例4：脂質gは判明、エネルギーが一部不明", code: "fat", amount: 120, missing: 1, energyMissing: 1 },
+    { title: "架空例5：完全データの平均95mgは推奨量との差を参考表示", code: "vitamin_c", amount: 95, missing: 0, energyMissing: 0 },
   ] as const;
   const sections = [];
   for (const scenario of scenarios) {
@@ -105,10 +106,21 @@ async function writeSyntheticPreview() {
   const outputDir = resolve("test-results");
   mkdirSync(outputDir, { recursive: true });
   writeFileSync(resolve(outputDir, "nutrition-evidence-preview.html"),
-    `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>栄養評価・人工データ検証</title><style>${css}</style></head><body><main class="app-main nutrition-page"><header class="topbar nutrition-topbar"><div><p class="eyebrow">人工データによる表示確認</p><h1>栄養評価の4ケース</h1></div></header><p class="page-purpose">全て架空の記録です。本番データへの接続や書込みはありません。リンク先のアプリはこの静的プレビューに含みません。</p>${sections.join("\n")}</main></body></html>`, "utf8");
+    `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>栄養評価・人工データ検証</title><style>${css}</style></head><body><main class="app-main nutrition-page"><header class="topbar nutrition-topbar"><div><p class="eyebrow">人工データによる表示確認</p><h1>栄養評価の5ケース</h1></div></header><p class="page-purpose">全て架空の記録です。本番データへの接続や書込みはありません。リンク先のアプリはこの静的プレビューに含みません。</p>${sections.join("\n")}</main></body></html>`, "utf8");
 }
 
 describe("rendered nutrition evidence for incomplete nutrient records", () => {
+  it("keeps a complete average close to RDA in reference follow-up with its actual gap", async () => {
+    fixture.vitaminAmount = 95;
+    fixture.vitaminMissing = 0;
+    const { overview, review } = await renderNutrient("vitamin_c");
+    expect(overview).toContain("95 mg");
+    expect(overview).toContain("EAR以上・RDA未満");
+    expect(review).toContain("参考・経過を見る");
+    expect(review).toContain("推奨量との差: 5 mg / 日");
+    expect(review).not.toContain("増やす方向");
+    expect(review).not.toContain("参考・到達確認");
+  });
   it("renders the known vitamin amount and zero complete days with a reference attainment", async () => {
     const { overview, review } = await renderNutrient("vitamin_c");
     expect(overview).toContain("120 mg以上");
