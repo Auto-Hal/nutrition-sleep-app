@@ -10,6 +10,11 @@ import { getPendingChatMealDrafts } from "@/lib/nutrition/chat-drafts";
 import { isIsoDate } from "@/lib/nutrition/meal-history";
 import { getMealLogCatalogItems, getMealsForDate } from "@/lib/nutrition/today-data";
 import { getProfile } from "@/lib/profile";
+import { loadSleepAssessment } from "@/lib/sleep/assessment";
+import { getGoogleHealthConnectionSummary } from "@/lib/sleep/analytics";
+import { sleepRecommendations } from "@/lib/sleep/recommendations";
+import { SleepScore } from "@/components/sleep-score";
+import { SleepScoreRefresh } from "@/components/sleep-score-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +58,20 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const previousDate = shiftIsoDate(date, -1);
   const nextDate = shiftIsoDate(date, 1);
 
-  const [summary, initialMeals, pendingDrafts] = session
+  const [summary, initialMeals, pendingDrafts, sleep] = session
     ? await Promise.all([
       getNutritionSummaryForDate(session.accessToken, date),
       getMealsForDate(session.accessToken, date),
       historical ? Promise.resolve([]) : getPendingChatMealDrafts(session.accessToken, 10).catch(() => []),
+      historical ? Promise.resolve(null) : Promise.all([
+        loadSleepAssessment(session.accessToken, timeZone, 7, profile?.birth_date ?? null),
+        getGoogleHealthConnectionSummary(session.accessToken),
+      ]).then(([source, connection]) => ({ assessment: source.assessment,
+        recommendation: sleepRecommendations(source.assessment.current, { range: 7,
+          endDate: source.assessment.end_date, connectionStatus: connection?.status ?? "not_connected" })[0],
+      })).catch(() => null),
     ])
-    : [null, [], []];
+    : [null, [], [], null];
 
   const nextHref = nextDate >= today ? "/today" : `/today?date=${nextDate}`;
 
@@ -81,6 +93,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       </header>
 
       <div className="stack today-stack">
+        {!historical && <SleepScoreRefresh />}
         <ChatGptNutritionLink />
 
         {!historical && pendingDrafts.length > 0 && (
@@ -118,6 +131,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           ownerUserId={session?.userId ?? ""}
           environmentId={appEnvironmentId()}
         />
+
+        {!historical && sleep && <section className="today-sleep-score" aria-label="最新の睡眠">
+          <SleepScore assessment={sleep.assessment} compact />
+          <p className="nutrition-meta">{sleep.recommendation?.action}</p>
+        </section>}
+        {!historical && session && !sleep && <section className="card"><p>睡眠情報を取得できませんでした。</p><Link className="text-link" href="/sleep">睡眠と同期状況を確認</Link></section>}
 
       </div>
     </main>

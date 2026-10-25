@@ -9,8 +9,12 @@ import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
 import { SleepStaleSync } from "@/components/sleep-stale-sync";
 import { SleepOverview, sleepDurationLabel as durationLabel } from "@/components/sleep-overview";
 import { SleepNightDetails } from "@/components/sleep-night-details";
-import { ActionGuide } from "@/components/action-guide";
-import { sleepGuide } from "@/lib/wellbeing/guide";
+import { SleepScore, SleepScoreBreakdown } from "@/components/sleep-score";
+import { SleepTrends } from "@/components/sleep-trends";
+import { SleepAdvice } from "@/components/sleep-advice";
+import { loadSleepAssessment } from "@/lib/sleep/assessment";
+import { sleepRecommendations } from "@/lib/sleep/recommendations";
+import { SleepScoreRefresh } from "@/components/sleep-score-refresh";
 import {
   getGoogleHealthConnectionSummary,
   getSleepAnalytics,
@@ -51,15 +55,20 @@ export default async function SleepPage({
   const oauthConfigured = googleHealthOAuthConfigured();
   const profile = await getProfile(session.accessToken);
   const timeZone = profile?.time_zone ?? "Asia/Tokyo";
-  const [analytics, connection] = await Promise.all([
-    getSleepAnalytics(session.accessToken, timeZone, range),
+  const now = new Date();
+  const [source, connection] = await Promise.all([
+    loadSleepAssessment(session.accessToken, timeZone, range, profile?.birth_date ?? null, now),
     getGoogleHealthConnectionSummary(session.accessToken),
   ]);
+  const analytics = await getSleepAnalytics(session.accessToken, timeZone, range, now, source.sessions);
+  const assessment = source.assessment;
+  const recommendations = sleepRecommendations(assessment.current, { range, endDate: assessment.end_date, connectionStatus: connection?.status ?? "not_connected" });
   const selectedDay = analytics.daily.find((day) => day.date === params.day) ?? [...analytics.daily].reverse().find((day) => day.observed) ?? null;
   const providerNeedsAttention = connection?.status !== "connected" || Boolean(params.google || params.sync);
 
   return (
     <main className="app-main sleep-page">
+      <SleepScoreRefresh />
       <SleepStaleSync
         enabled={oauthConfigured && (connection?.status === "connected" || connection?.status === "error")}
         lastSuccessfulSyncAt={connection?.last_successful_sync_at ?? null}
@@ -92,7 +101,12 @@ export default async function SleepPage({
       </nav>
 
       <div className="stack sleep-stack">
-        <ActionGuide guide={sleepGuide(analytics, connection ?? { status: "not_connected" })} />
+        <div id="sleep-score"><SleepScore assessment={assessment} /></div>
+        <SleepAdvice recommendations={recommendations} />
+        <SleepTrends assessment={assessment} />
+        <div id="sleep-score-details">
+          <SleepScoreBreakdown night={assessment.current.find((night) => night.date === selectedDay?.date) ?? assessment.latest} />
+        </div>
         <SleepOverview analytics={analytics} />
         <SleepNightDetails day={selectedDay} timeZone={timeZone} />
 
@@ -141,7 +155,7 @@ export default async function SleepPage({
           </div>
         </section>
 
-        <details className="card sleep-provider-card" open={providerNeedsAttention}>
+        <details className="card sleep-provider-card" id="sleep-connection" open={providerNeedsAttention}>
           <summary className="sleep-provider-summary">
             <span>
               <strong>Google Health</strong>
