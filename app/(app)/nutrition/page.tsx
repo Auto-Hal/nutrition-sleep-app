@@ -13,6 +13,7 @@ import { ActionGuide } from "@/components/action-guide";
 import { nutritionGuide } from "@/lib/wellbeing/guide";
 import { getProfile } from "@/lib/profile";
 import { buildNutritionDisplayReferences, type NutritionReferenceProfile } from "@/lib/nutrition/dri/display-reference";
+import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 
 export const dynamic = "force-dynamic";
 
@@ -216,6 +217,8 @@ export default async function NutritionPage({
                 const evidenceDay = selected.evidence_daily.find((row) => row.meal_date === day.meal_date);
                 const comparison = evidenceDay?.direct_evaluation;
                 const target = evidenceDay?.percent_evaluation.target ?? comparison?.target;
+                const referenceOnly = evidenceDay?.evidence.basis !== "complete" || evidenceDay?.evidence.quality !== "user_verified"
+                  || (Boolean(evidenceDay?.percent_energy_evidence.days) && (evidenceDay?.percent_energy_evidence.basis !== "complete" || evidenceDay?.percent_energy_evidence.quality !== "user_verified"));
                 return (
                 <Link
                   key={day.meal_date}
@@ -233,10 +236,10 @@ export default async function NutritionPage({
                         : day.coverage_complete ? "栄養値 完全" : "栄養値 不完全"}
                     </div>
                     {day.record_complete && day.entry_count > 0 && <div className="nutrition-meta">{[
-                      comparison?.adequacy === "at_or_above_rda" ? "登録値でRDA以上" : comparison?.adequacy === "at_or_above_ai" ? "登録値でAI以上" : null,
+                      comparison?.adequacy ? describeDriPosition(comparison.adequacy) : null,
                       comparison?.upperLimit === "above_ul" ? "登録値でUL超過" : null,
                       target ? `DG: ${target === "above_dg" ? "上限超過" : target === "below_dg" ? "下限未満" : "範囲内"}` : null,
-                    ].filter(Boolean).join(" · ") || "到達・超過の確認なし（詳細で判断）"}{!day.coverage_complete ? " · 参考" : ""}</div>}
+                    ].filter(Boolean).join(" · ") || "判定保留"}{referenceOnly ? " · 登録値からの参考" : ""}</div>}
                   </div>
                   <div className="nutrition-day-value">
                     <strong>{formatAmount(dailyDisplayAmount(day), day.unit)}</strong>

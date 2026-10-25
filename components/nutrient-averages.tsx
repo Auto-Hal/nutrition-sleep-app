@@ -76,7 +76,10 @@ export function NutrientAverages({ nutrients, range, selectedCode, displayRefere
                 <div className="nutrient-amount-comparison">
                   <div className="nutrient-average-amount">
                     <span className="nutrient-amount-label">記録完了 {evidence.days}日の平均</span>
-                    <div className="nutrition-value">{formatEvidenceRange(evidence, nutrient.unit)}</div>
+                    <div className="nutrition-value">{evidence.lower !== null && evidence.upper === null
+                      ? `${formatNutrientAmount(evidence.lower, nutrient.unit)}以上`
+                      : formatEvidenceRange(evidence, nutrient.unit)}</div>
+                    {evidence.lower !== null && evidence.upper === null && <small className="nutrition-meta">上限不明</small>}
                   </div>
                   <div className="nutrient-reference-amount">
                     <span className="nutrient-amount-label">{reference.label}</span>

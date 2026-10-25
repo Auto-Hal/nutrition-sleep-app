@@ -111,7 +111,8 @@ async function writeSyntheticPreview() {
 describe("rendered nutrition evidence for incomplete nutrient records", () => {
   it("renders the known vitamin amount and zero complete days with a reference attainment", async () => {
     const { overview, review } = await renderNutrient("vitamin_c");
-    expect(overview).toContain("120 mg以上（上限不明）");
+    expect(overview).toContain("120 mg以上");
+    expect(overview).toContain("上限不明");
     expect(overview).toContain("完全 0日 · 部分 7日 · 全不明 0日");
     expect(overview).toContain("参考・部分データ");
     expect(overview).toContain("RDA以上");
@@ -124,7 +125,8 @@ describe("rendered nutrition evidence for incomplete nutrient records", () => {
   it("renders a low known subtotal as held rather than an EAR shortfall", async () => {
     fixture.vitaminAmount = 5;
     const { overview, review } = await renderNutrient("vitamin_c");
-    expect(overview).toContain("5 mg以上（上限不明）");
+    expect(overview).toContain("5 mg以上");
+    expect(overview).toContain("上限不明");
     expect(overview).toContain("判定保留");
     expect(review).toContain("判定保留");
     expect(review).not.toContain("EAR未満");
