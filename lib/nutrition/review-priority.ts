@@ -468,7 +468,9 @@ function makeEvidenceSignals(nutrient: NutritionReviewNutrientInput, minimumDays
         && rda?.value !== undefined;
       const text: Record<NutritionReviewSignal["state"], string> = {
         indeterminate: comparison
-          ? "既知分と基準の比較。食事全体の到達は未確定です"
+          ? evidence.basis === "complete"
+            ? "記録平均と基準の比較。総合した判断に必要な基準を確定できません"
+            : "既知分と基準の比較。食事全体の到達は未確定です"
           : "判定保留：未判明分または記録が不足しているため結論を出せません",
         below_ear: "平均がEAR未満（欠乏の診断ではありません）",
         ear_to_rda: "平均がEAR以上・RDA未満（推奨量との差を確認し、経過を見る）",

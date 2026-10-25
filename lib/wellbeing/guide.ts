@@ -50,6 +50,16 @@ export function nutritionGuide(review: NutritionReviewResult): Guide {
     if (known?.primary?.known_reference) {
       const comparison = known.primary.known_reference;
       const followup = known.missing_value_followup;
+      if (known.primary.evidence_basis === "complete") {
+        return {
+          domain: "nutrition", title: `${known.label}の記録平均と基準を確認`,
+          observation: `記録平均は${comparison.label}の${comparison.ratio_percent}%です。栄養値は揃っていますが、総合した判断に必要な比較基準を期間全体で確定できません。`,
+          evidence: `直近${review.range}日・栄養値が揃う対象記録${known.primary.evaluable_days}日`,
+          action: "詳細で期間内の比較基準を確認する",
+          steps: ["詳細で期間内の年齢区分や比較基準の変化を確認する", "日別の比較結果と、期間全体の記録平均を分けて見る", "比較できない基準から過不足を判断しない"],
+          href: `/nutrition?range=${review.range}&nutrient=${known.nutrient_code}#detail`, limited: true,
+        };
+      }
       return {
         domain: "nutrition", title: `${known.label}の既知分と基準を確認`,
         observation: `既知分で${comparison.label}の少なくとも${comparison.ratio_percent}%を記録しています。未判明分があるため、食事全体の到達や不足はまだ判断できません。`,

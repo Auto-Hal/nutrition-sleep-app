@@ -16,7 +16,7 @@ function qualityLabel(value: NutritionReviewQuality) {
 }
 
 function directionLabel(item: NutritionReviewItem) {
-  if (item.band === "known_intake") return "既知分を比較";
+  if (item.band === "known_intake") return item.primary?.evidence_basis === "complete" ? "記録平均を比較" : "既知分を比較";
   if (item.primary?.trend_limited && item.primary.state !== "above_ul") return "記録値の参考比較";
   if (item.band === "watch" && item.primary?.state === "ear_to_rda") return "推奨量との差";
   if (item.band === "watch" && item.primary?.state === "below_ai_indeterminate") return "参考・不足は判定できません";
@@ -214,7 +214,7 @@ export function NutritionReview({
       />
       <ReviewSection
         title="分かっている量を基準と比較"
-        description="既知分の平均と推奨量・目安量・目標量の下限を比較します。未判明分があるため、食事全体の不足や到達は未確定です。割合の低さを栄養不足の深刻さや追加摂取量に読み替えないでください。"
+        description="分かっている量と推奨量・目安量・目標量の下限を比較します。未判明の栄養値や、期間内に確定できない比較基準がある場合は、総合した判定を保留します。割合の低さを栄養不足の深刻さや追加摂取量に読み替えないでください。"
         items={review.sections.known_intake}
         range={review.range}
       />

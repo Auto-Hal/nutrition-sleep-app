@@ -32,6 +32,8 @@ vi.mock("@/lib/supabase/user", () => ({
   },
 }));
 import { getNutritionAnalytics } from "@/lib/nutrition/analytics";
+import { deriveNutritionReview } from "@/lib/nutrition/review-priority";
+import { nutritionGuide } from "@/lib/wellbeing/guide";
 
 const profile = { birthDate: "1990-01-01", sex: "male" as const, activityLevel: "moderate" as const, timeZone: "Asia/Tokyo" };
 const now = new Date("2026-10-25T03:00:00Z");
@@ -113,6 +115,20 @@ describe("nutrition evidence through the authenticated summary RPC", () => {
     expect(before.nutrients.find((value) => value.code === "vitamin_c")?.evidence).toMatchObject({ lower: 120, upper: null, complete_days: 0 });
     expect(after.nutrients.find((value) => value.code === "vitamin_c")?.evidence).toMatchObject({ lower: 140, upper: 140, complete_days: 7, partial_days: 0 });
     expect(repeated).toEqual(after);
+  });
+
+  it("keeps complete values complete when a birthday changes EAR but leaves the RDA comparison available", async () => {
+    fixture.mode = "complete";
+    fixture.amount = 1;
+    const analytics = await getNutritionAnalytics("synthetic-access-token", { ...profile, birthDate: "1951-10-22" }, 7, now);
+    const b2 = analytics.nutrients.find((value) => value.code === "vitamin_b2")!;
+    expect(b2.evidence).toMatchObject({ basis: "complete", complete_days: 7, missing_entries: 0 });
+    expect(b2.evidence_dri.unstable_metrics).toContain("EAR");
+    expect(b2.evidence_dri.references).toContainEqual(expect.objectContaining({ metric: "RDA", value: 1.4 }));
+    const review = deriveNutritionReview({ range: 7, nutrients: [b2] });
+    expect(review.items[0].primary).toMatchObject({ band: "known_intake", evidence_basis: "complete" });
+    expect(nutritionGuide(review).observation).toContain("栄養値は揃っています");
+    expect(nutritionGuide(review).action).not.toContain("未判明");
   });
 
   it("propagates RPC authorization failure without deriving an empty or zero intake", async () => {

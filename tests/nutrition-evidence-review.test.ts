@@ -86,4 +86,17 @@ describe("review uses recorded-period evidence instead of complete-day selection
     expect(guide.observation).toContain("比率");
     expect(guide.action).not.toContain("プロフィール");
   });
+
+  it("does not invent unknown food values when a complete period retains RDA but loses a stable EAR", () => {
+    const input = vitamin(35, 0);
+    input.evidence_dri.references = input.evidence_dri.references.filter((reference) => reference.metric === "RDA");
+    const review = deriveNutritionReview({ range: 7, nutrients: [input] });
+    expect(review.items[0].primary).toMatchObject({ band: "known_intake", evidence_basis: "complete", missing_entries: 0 });
+    expect(review.items[0].primary?.summary).toContain("必要な基準を確定できません");
+    const guide = nutritionGuide(review);
+    expect(guide.observation).toContain("栄養値は揃っています");
+    expect(guide.action).toContain("比較基準");
+    expect(guide.action).not.toContain("未判明");
+    expect(guide.observation).not.toContain("未判明分がある");
+  });
 });
