@@ -28,6 +28,7 @@ PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyと
 | [08-implementation-handoff.md](08-implementation-handoff.md) | 次回Codexへ渡す実装開始指示 |
 | [09-implementation-status.md](09-implementation-status.md) | 重点4項目の補足判断、実装単位の検証・環境反映状況 |
 | [10-preview-acceptance-and-production-plan.md](10-preview-acceptance-and-production-plan.md) | 操作案内、実機確認表、Production承認後の移行・障害対応 |
+| [11-chat-v2-instructions.md](11-chat-v2-instructions.md) | 既存ChatGPT Projectをv2契約へ切り替えるためのコピー用指示 |
 
 ## 主要な設計判断
 

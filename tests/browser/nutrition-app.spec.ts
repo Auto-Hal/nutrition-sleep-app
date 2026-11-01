@@ -322,6 +322,7 @@ test("authenticated nutrition, body and transfer story", async ({
   // Analysis screens are actual authenticated SSR + period API, not fixture HTML.
   await page.goto("/nutrition?view=pfc");
   await expect(page.locator(".pfc-calendar")).toBeVisible();
+  await expect(page.getByText(/^同期状態を確認中/)).toHaveCount(0);
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("calendar.png"),
@@ -331,7 +332,8 @@ test("authenticated nutrition, body and transfer story", async ({
   if(previousDay.slice(0,7)===day.slice(0,7)){
     await page.getByRole("button",{name:new RegExp(previousDay)}).click();
     const counts=await page.locator(".pfc-counts").innerText();
-    await page.getByRole("checkbox",{name:/現在の目標で参考比較/}).check();
+    await page.getByText("現在の目標で参考比較",{exact:true}).click();
+    await page.getByRole("checkbox",{name:/現在の目標と比べる/}).check();
     await expect(page.getByText(/当時の目標では/).last()).toBeVisible();
     expect(await page.locator(".pfc-counts").innerText()).toBe(counts);
   }
