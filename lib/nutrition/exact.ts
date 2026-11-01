@@ -13,6 +13,19 @@ export function decimal(value: string): Exact {
   const [whole, digits = ""] = value.replace(/^-/, "").split(".");
   return fraction(BigInt(whole + digits) * (value.startsWith("-") ? -1n : 1n), 10n ** BigInt(digits.length));
 }
+/** Expand a finite JS decimal representation without rounding a tiny value to 0. */
+export function numberDecimalText(value: number): string {
+  if (!Number.isFinite(value)) throw new Error("finite decimal required");
+  const text = String(value);
+  if (!/[eE]/.test(text)) return text;
+  const [coefficient, exponentText] = text.toLowerCase().split("e");
+  const negative = coefficient.startsWith("-");
+  const [whole, tail = ""] = coefficient.replace(/^-/, "").split(".");
+  const digits = whole + tail;
+  const position = whole.length + Number(exponentText);
+  const expanded = position <= 0 ? `0.${"0".repeat(-position)}${digits}` : position >= digits.length ? digits + "0".repeat(position - digits.length) : `${digits.slice(0, position)}.${digits.slice(position)}`;
+  return `${negative ? "-" : ""}${expanded}`;
+}
 export function add(a: Exact, b: Exact) { return fraction(a.n * b.d + b.n * a.d, a.d * b.d); }
 export function subtract(a: Exact, b: Exact) { return fraction(a.n * b.d - b.n * a.d, a.d * b.d); }
 export function multiply(a: Exact, b: Exact) { return fraction(a.n * b.n, a.d * b.d); }

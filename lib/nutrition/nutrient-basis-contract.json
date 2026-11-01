@@ -1,0 +1,247 @@
+{
+  "energy": {
+    "unit": "kcal",
+    "allowed": [
+      "recorded_food_energy"
+    ],
+    "incompatible": []
+  },
+  "protein": {
+    "unit": "g",
+    "allowed": [
+      "total_protein"
+    ],
+    "incompatible": []
+  },
+  "fat": {
+    "unit": "g",
+    "allowed": [
+      "total_fat"
+    ],
+    "incompatible": []
+  },
+  "carbohydrate": {
+    "unit": "g",
+    "allowed": [
+      "total_carbohydrate_including_fiber",
+      "jp_label_carbohydrate"
+    ],
+    "incompatible": [
+      "carbohydrates_excluding_fiber",
+      "available_carbohydrate_monosaccharide"
+    ]
+  },
+  "fiber": {
+    "unit": "g",
+    "allowed": [
+      "dietary_fiber",
+      "jp_label_dietary_fiber"
+    ],
+    "incompatible": []
+  },
+  "calcium": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "iron": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "zinc": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "vitamin_a": {
+    "unit": "ug_rae",
+    "allowed": [
+      "total_rae",
+      "rae"
+    ],
+    "incompatible": [
+      "iu",
+      "retinol_mass",
+      "beta_carotene_mass",
+      "generic_ug"
+    ]
+  },
+  "vitamin_b1": {
+    "unit": "mg",
+    "allowed": [
+      "thiamine_mass"
+    ],
+    "incompatible": [
+      "thiamine_hydrochloride_mass"
+    ]
+  },
+  "vitamin_b2": {
+    "unit": "mg",
+    "allowed": [
+      "riboflavin_mass"
+    ],
+    "incompatible": []
+  },
+  "vitamin_b6": {
+    "unit": "mg",
+    "allowed": [
+      "vitamin_b6_mass"
+    ],
+    "incompatible": []
+  },
+  "vitamin_b12": {
+    "unit": "ug",
+    "allowed": [
+      "vitamin_b12_mass"
+    ],
+    "incompatible": []
+  },
+  "vitamin_c": {
+    "unit": "mg",
+    "allowed": [
+      "ascorbic_acid_equivalent"
+    ],
+    "incompatible": []
+  },
+  "vitamin_d": {
+    "unit": "ug",
+    "allowed": [
+      "vitamin_d_mass"
+    ],
+    "incompatible": [
+      "iu"
+    ]
+  },
+  "vitamin_e": {
+    "unit": "mg",
+    "allowed": [
+      "alpha_tocopherol"
+    ],
+    "incompatible": [
+      "iu",
+      "alpha_te",
+      "total_tocopherol"
+    ]
+  },
+  "sodium": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_sodium",
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "salt_equivalent": {
+    "unit": "g",
+    "allowed": [
+      "salt_equivalent",
+      "salt_equivalent_from_sodium"
+    ],
+    "incompatible": []
+  },
+  "saturated_fat": {
+    "unit": "g",
+    "allowed": [
+      "total_saturated_fat"
+    ],
+    "incompatible": []
+  },
+  "n3_fatty_acids": {
+    "unit": "g",
+    "allowed": [
+      "total_n3"
+    ],
+    "incompatible": [
+      "ala_only",
+      "epa_only",
+      "dha_only"
+    ]
+  },
+  "n6_fatty_acids": {
+    "unit": "g",
+    "allowed": [
+      "total_n6"
+    ],
+    "incompatible": [
+      "linoleic_acid_only"
+    ]
+  },
+  "cholesterol": {
+    "unit": "mg",
+    "allowed": [
+      "cholesterol_mass"
+    ],
+    "incompatible": []
+  },
+  "carbohydrate_excluding_fiber": {
+    "unit": "g",
+    "allowed": [
+      "jp_label_carbohydrate_excluding_fiber",
+      "carbohydrates_excluding_fiber"
+    ],
+    "incompatible": [
+      "sugars",
+      "total_sugars",
+      "available_carbohydrate_monosaccharide"
+    ]
+  },
+  "potassium": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "magnesium": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "phosphorus": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "copper": {
+    "unit": "mg",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "selenium": {
+    "unit": "ug",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "molybdenum": {
+    "unit": "ug",
+    "allowed": [
+      "elemental_mass"
+    ],
+    "incompatible": []
+  },
+  "folate": {
+    "unit": "ug",
+    "allowed": [
+      "food_folate"
+    ],
+    "incompatible": [
+      "dfe",
+      "folic_acid_only"
+    ]
+  }
+}

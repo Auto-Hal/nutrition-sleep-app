@@ -1,3 +1,4 @@
+import { NUTRIENT_BASIS_CONTRACT } from "@/lib/nutrition/evidence-contract";
 /** Compatibility for new period/output paths. Old DRI evidence remains intact.
  * A stored number is not automatically a comparable standard nutrient amount. */
 export function nutrientValueCompatible(
@@ -19,6 +20,15 @@ export function nutrientValueCompatible(
     value.amount === null ||
     !/^\d+(?:\.\d+)?$/.test(value.amount) ||
     value.unit !== expectedUnit
+  )
+    return false;
+  const contract = NUTRIENT_BASIS_CONTRACT[code];
+  if (!contract || (basis !== null && !contract.allowed.includes(basis)))
+    return false;
+  if (
+    uri?.toLowerCase().includes("openfoodfacts") &&
+    ((code === "vitamin_a" && !["total_rae", "rae"].includes(basis ?? "")) ||
+      (code === "vitamin_e" && basis !== "alpha_tocopherol"))
   )
     return false;
   const bad = (values: string[]) => basis !== null && values.includes(basis);

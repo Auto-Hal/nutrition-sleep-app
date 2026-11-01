@@ -1,4 +1,4 @@
-import { nutrientMetadataShape, acceptsNutrientContract } from "@/lib/nutrition/nutrient-schema";
+import { nutrientMetadataShape, acceptsNutrientPayload as acceptsNutrientContract } from "@/lib/nutrition/nutrient-schema";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
@@ -8,7 +8,7 @@ import { createUserClient } from "@/lib/supabase/user";
 
 const nutrient = z.object({
   code: z.string(), amount: z.number().finite().min(0).nullable(), unit: z.string(),
-  provenance: z.string(), quality: z.string(), source_uri: z.string().url().max(1000).nullable().optional(),
+  provenance: z.string(), quality: z.string(), 
   source_observed_at: z.string().datetime().nullable().optional(),
   ...nutrientMetadataShape,
 });

@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 const SAFE_ERROR_CODES = new Set([
+  "invalid_nutrient_definition", "incompatible_nutrient_definition", "invalid_nutrient_source", "invalid_nutrient_derivation", "negative_carbohydrate_difference", "estimated_source_must_be_retained",
   "revision_conflict",
   "reference_changed",
   "operation_content_mismatch",

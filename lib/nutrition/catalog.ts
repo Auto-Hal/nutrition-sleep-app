@@ -35,21 +35,74 @@ export const ADDITIONAL_NUTRIENT_DEFINITIONS = [
   { code: "folate", label: "葉酸", unit: "ug" },
 ] as const;
 
-export const NUTRIENT_DEFINITIONS = [...LEGACY_NUTRIENT_DEFINITIONS, ...ADDITIONAL_NUTRIENT_DEFINITIONS] as const;
-const STANDARD_ORDER = ["energy", "protein", "fat", "saturated_fat", "n3_fatty_acids", "n6_fatty_acids", "cholesterol", "carbohydrate", "carbohydrate_excluding_fiber", "fiber", "salt_equivalent", "potassium", "calcium", "magnesium", "phosphorus", "iron", "zinc", "copper", "selenium", "molybdenum", "vitamin_a", "vitamin_d", "vitamin_e", "vitamin_b1", "vitamin_b2", "vitamin_b6", "vitamin_b12", "folate", "vitamin_c"] as const;
-export const STANDARD_NUTRIENT_DEFINITIONS = STANDARD_ORDER.map((code) => NUTRIENT_DEFINITIONS.find((definition) => definition.code === code)!);
+export const NUTRIENT_DEFINITIONS = [
+  ...LEGACY_NUTRIENT_DEFINITIONS,
+  ...ADDITIONAL_NUTRIENT_DEFINITIONS,
+] as const;
+const STANDARD_ORDER = [
+  "energy",
+  "protein",
+  "fat",
+  "saturated_fat",
+  "n3_fatty_acids",
+  "n6_fatty_acids",
+  "cholesterol",
+  "carbohydrate",
+  "carbohydrate_excluding_fiber",
+  "fiber",
+  "salt_equivalent",
+  "potassium",
+  "calcium",
+  "magnesium",
+  "phosphorus",
+  "iron",
+  "zinc",
+  "copper",
+  "selenium",
+  "molybdenum",
+  "vitamin_a",
+  "vitamin_d",
+  "vitamin_e",
+  "vitamin_b1",
+  "vitamin_b2",
+  "vitamin_b6",
+  "vitamin_b12",
+  "folate",
+  "vitamin_c",
+] as const;
+export const STANDARD_NUTRIENT_DEFINITIONS = STANDARD_ORDER.map(
+  (code) =>
+    NUTRIENT_DEFINITIONS.find((definition) => definition.code === code)!,
+);
 export const NUTRIENT_SCHEMA_VERSION = 2;
 
 export type NutrientMetadata = {
-  value_origin?: "measured" | "official" | "database" | "label" | "calculated" | "estimated" | "user_reported" | null;
+  value_origin?:
+    | "measured"
+    | "official"
+    | "database"
+    | "label"
+    | "calculated"
+    | "estimated"
+    | "user_reported"
+    | null;
   definition_basis?: string | null;
-  intake_scope?: "conventional_food" | "nonconventional_food" | "unknown" | null;
+  intake_scope?:
+    | "conventional_food"
+    | "nonconventional_food"
+    | "unknown"
+    | null;
   derivation?: Record<string, unknown> | null;
   contains_estimates?: boolean | null;
 };
 
 export type NutrientCode = (typeof NUTRIENT_DEFINITIONS)[number]["code"];
-export type CatalogItemType = "ingredient" | "product" | "supplement" | "estimated_dish" | "batch";
+export type CatalogItemType =
+  | "ingredient"
+  | "product"
+  | "supplement"
+  | "estimated_dish"
+  | "batch";
 export type MealType = "breakfast" | "lunch" | "dinner" | "custom";
 export type MealState = "not_recorded" | "recorded" | "skipped";
 
@@ -102,24 +155,94 @@ export function nutrientPayload(values: Record<string, string>) {
     const raw = values[definition.code]?.trim() ?? "";
     if (!raw) return [];
     const amount = Number(raw);
-    if (!Number.isFinite(amount) || amount < 0) throw new Error(`${definition.label}の値を確認してください。`);
-    return [{ code: definition.code, amount, unit: definition.unit, provenance: "user_entered", quality: "user_verified" }];
+    if (!Number.isFinite(amount) || amount < 0)
+      throw new Error(`${definition.label}の値を確認してください。`);
+    return [
+      {
+        code: definition.code,
+        amount,
+        unit: definition.unit,
+        provenance: "user_entered",
+        quality: "user_verified",
+      },
+    ];
   });
 }
 
 export function nutrientFormValues(item: CatalogItem | null) {
-  return Object.fromEntries(NUTRIENT_DEFINITIONS.map(({ code }) => {
-    const value = item?.nutrients.find((nutrient) => nutrient.code === code)?.amount;
-    return [code, value === null || value === undefined ? "" : String(value)];
-  }));
+  return Object.fromEntries(
+    NUTRIENT_DEFINITIONS.map(({ code }) => {
+      const value = item?.nutrients.find(
+        (nutrient) => nutrient.code === code,
+      )?.amount;
+      return [code, value === null || value === undefined ? "" : String(value)];
+    }),
+  );
 }
 
 /** Unedited evidence must survive a name/serving edit. A changed manual value
  * is a user report unless the user explicitly selects another source. */
-export function editedNutrientPayload(values: Record<string, string>, item: CatalogItem | null, origin: NonNullable<NutrientMetadata["value_origin"]> = "user_reported", sourceUri: string | null = null) {
-  return nutrientPayload(values).map((nutrient) => {
+export function editedNutrientPayload(
+  values: Record<string, string>,
+  item: CatalogItem | null,
+  origin: NonNullable<NutrientMetadata["value_origin"]> = "user_reported",
+  sourceUri: string | null = null,
+  servingBasisChanged = false,
+) {
+  const known = new Map(nutrientPayload(values).map((n) => [n.code, n]));
+  return NUTRIENT_DEFINITIONS.flatMap((definition): NutrientValue[] => {
+    const nutrient = known.get(definition.code),
+      old = item?.nutrients.find((n) => n.code === definition.code);
+    if (!nutrient) {
+      if (old?.amount === null && !servingBasisChanged) return [{ ...old }];
+      return old
+        ? [
+            {
+              code: definition.code,
+              amount: null,
+              unit: definition.unit,
+              provenance: "user_entered",
+              quality: "unknown",
+              value_origin: "user_reported",
+              definition_basis: null,
+              intake_scope: null,
+              derivation: null,
+              contains_estimates: null,
+              source_uri: null,
+              source_observed_at: null,
+            },
+          ]
+        : [];
+    }
     const previous = item?.nutrients.find((n) => n.code === nutrient.code);
-    if (previous && previous.amount === nutrient.amount && previous.unit === nutrient.unit) return { ...previous };
-    return { ...nutrient, provenance: origin === "estimated" ? "estimated_dish" : origin === "database" || origin === "official" ? "approved_external_db" : origin === "label" ? "product_label" : "user_entered", quality: origin === "estimated" ? "unknown" : origin === "database" || origin === "official" ? "unverified" : "user_verified", value_origin: origin, source_uri: sourceUri, contains_estimates: origin === "estimated" };
+    if (
+      !servingBasisChanged &&
+      previous &&
+      previous.amount === nutrient.amount &&
+      previous.unit === nutrient.unit
+    )
+      return [{ ...previous }];
+    return [
+      {
+        ...nutrient,
+        provenance:
+          origin === "estimated"
+            ? "estimated_dish"
+            : origin === "database" || origin === "official"
+              ? "approved_external_db"
+              : origin === "label"
+                ? "product_label"
+                : "user_entered",
+        quality:
+          origin === "estimated"
+            ? "unknown"
+            : origin === "database" || origin === "official"
+              ? "unverified"
+              : "user_verified",
+        value_origin: origin,
+        source_uri: sourceUri,
+        contains_estimates: origin === "estimated",
+      },
+    ];
   });
 }

@@ -8,7 +8,7 @@ select is((select count(*)::integer from public.nutrient_definitions),30,'30 int
 create temp table nutrient_fixture as select jsonb_agg(jsonb_build_object(
  'code',code,'amount',case when code='copper' then 0 when code='molybdenum' then null else 12.345678 end,
  'unit',unit,'provenance','estimated_dish','quality','unknown','value_origin','estimated',
- 'definition_basis','fixture-mass-v1','intake_scope','conventional_food','contains_estimates',true)) nutrients
+ 'definition_basis',null,'intake_scope','conventional_food','contains_estimates',true)) nutrients
  from public.nutrient_definitions;
 create temp table result_fixture(kind text primary key,payload jsonb);
 insert into result_fixture select 'catalog',public.create_catalog_item_v3(

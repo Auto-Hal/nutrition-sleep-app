@@ -14,6 +14,8 @@ const provenanceLabels = {
   label: "表示値",
   estimated: "推定",
   user_reported: "申告値",
+  measured: "実測値（出典未確認）",
+  calculated: "計算値",
 } as const;
 
 const mealLabels = {

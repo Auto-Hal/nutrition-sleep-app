@@ -29,7 +29,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P5 PFC日/月/週 | 完了 | CI 41295693517：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。境界・途中記録・参照比較・集計19テスト、同期レース2テストを追加 |
 | P6 Body画面 | 完了 | CI 41296434510：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。実測CRUD、30/90日、移動平均、目標・連携、5タブを接続 |
 | P7 PNG転送 | 実装・自動検証完了 | UI統合CI 41298773341：lint/typecheck/unit/build、fresh replay/605 pgTAP/実接続成功。Preview反映済み。保存・共有で自動確認しない回帰成功。物理iPhone/OCRは未確認 |
-| P8 CSV・入力/品質・UI整理 | CSV実装・検証中 | 単一snapshot source、3粒度、29項目/品質/履歴目標、BOM/CRLF/数式対策を実装 |
+| P8 CSV・入力/品質・UI整理 | CSV完了・品質契約を検証中 | c1bc20a CI 41300275315：fresh replay/618 pgTAP/実接続・lint/typecheck/unit/Deno/build成功。入力と品質契約の回帰を追加中 |
 | P9 統合・受け入れ | 未着手 | 未実施 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
@@ -43,6 +43,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | 20261101025358_nutrition_goal_history.sql | 20261101092348 / nutrition_goal_history | apply成功、4つのowner SELECT policy確認。新規goal/head/target/day-type全0行、目標バックフィルなし |
 | 20261101092352_body_measurement_history.sql | 20261101095413 / body_measurement_history | apply成功、3つのowner SELECT policy確認。measurement/settings/tombstone/linked profile全0、旧profile/snapshot digest一致 |
 | 20261101101537_karomiru_transfer_snapshots.sql | 20261101103222 / karomiru_transfer_snapshots | CI 41297687213：fresh replay/605 pgTAP/実接続成功後apply。owner SELECT policy、transfer0行、旧profile/snapshot digest前後一致 |
+| 20261101104949_nutrition_csv_snapshot_source.sql | 20261101110940 / nutrition_csv_snapshot_source | CI 41300275315：618 pgTAP成功後apply。STABLE/invoker、匿名実行不可を確認 |
 
 P1適用後security advisorは既存private server-only表のpolicyなしINFO、意図したowner検証付き公開SECURITY DEFINER RPC、既存のleaked password protection設定を報告。追加したprivate helperはauthenticated/anon実行不可。Productionは変更なし。
 
@@ -70,3 +71,11 @@ P7のtransfer payloadはsource amount×選択量の分子/分母を文字列で�
 - Todayの入力導線・重複エネルギーカードの整理、iPhone/iPad幅の実画面検証。
 - 認証済み使い捨てDBから実Next API/ブラウザまでのPlaywright、新機能のオフライン復旧、Preview統合/PR本文/本番計画。
 - 物理iPhone、iOS共有・写真保存、カロミル基本7/全29 OCR、実ChatGPT OAuth/確定は未検証。自動テスト合格と区別する。
+
+## P8 追加の品質契約
+
+30コードごとの単位・比較できる化学形態を共通JSONで定義し、TS/SQL/MCPの一致をテストする。新規書込みは不明な定義・認証情報付き出典URL・自由形式の計算根拠を拒否する。既存の保存行や旧18 APIの契約を一括変更しない。新PFC/CSV/画像/Batchでは明示的な非互換値と曖昧なOFFのA/E/Cを判定保留にする。
+
+Na→saltは2.54/1000、C−fiberは同じ資料・同じ基準量と定義を明示確認した場合だけの操作とし、既知の転送先値を上書きしない。入力元に推定があれば計算結果にも推定情報を維持する。正の値がnumeric(18,6)で0へ丸められる新しい食品・食事・Batch計算はNULLとbelow_storage_precision理由を保存する。過去の0から値を推測して復元しない。
+
+この単位のローカル検証は731 Vitest、lint（既存img警告1件のみ）、typecheck、Deno check成功。fresh replay/pgTAPとPreview適用はCI確認後に行う。
