@@ -79,3 +79,5 @@ P7のtransfer payloadはsource amount×選択量の分子/分母を文字列で�
 Na→saltは2.54/1000、C−fiberは同じ資料・同じ基準量と定義を明示確認した場合だけの操作とし、既知の転送先値を上書きしない。入力元に推定があれば計算結果にも推定情報を維持する。正の値がnumeric(18,6)で0へ丸められる新しい食品・食事・Batch計算はNULLとbelow_storage_precision理由を保存する。過去の0から値を推測して復元しない。
 
 この単位のローカル検証は731 Vitest、lint（既存img警告1件のみ）、typecheck、Deno check成功。fresh replay/pgTAPとPreview適用はCI確認後に行う。
+
+初回CI 41303982463のアプリ検査は成功。DB検査で新しいhelperの変数名と列名の衝突を検出し、変数名を修正した。旧SQLの文字列を探すテスト1件は、新しい換算helperがNULLを維持する実値検証へ変更した。Previewへは未適用。

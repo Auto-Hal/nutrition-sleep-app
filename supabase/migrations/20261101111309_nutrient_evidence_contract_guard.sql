@@ -102,7 +102,7 @@ revoke all on function private.phase8_capture_amount(numeric,numeric,numeric),pr
 
 create or replace function private.phase8_apply_nutrient_metadata(p_item_id uuid,p_nutrients jsonb)
 returns void language plpgsql set search_path=pg_catalog as $$
-declare n jsonb; owner_id uuid:=(select auth.uid()); derivation jsonb; origin text; estimates boolean; quality_value text; method text;
+declare n jsonb; owner_id uuid:=(select auth.uid()); trace_value jsonb; origin text; estimates boolean; quality_value text; method text;
 begin
  if owner_id is null then raise insufficient_privilege; end if;
  if jsonb_typeof(p_nutrients) is distinct from 'array' or jsonb_array_length(p_nutrients)>30 or(select count(*)<>count(distinct x->>'code') from jsonb_array_elements(p_nutrients)x) then perform private.phase6_raise_http(422,'invalid_mutation_payload'); end if;
@@ -111,21 +111,21 @@ begin
   perform private.phase8_validate_nutrient_metadata(n);
   origin:=coalesce(n->>'value_origin',case when n->>'provenance'='estimated_dish' then 'estimated' end);
   if n->>'provenance'='estimated_dish' and origin<>'estimated' then perform private.phase6_raise_http(422,'invalid_mutation_payload'); end if;
-  derivation:=nullif(n->'derivation','null'::jsonb); method:=derivation->>'method'; quality_value:=coalesce(n->>'quality','unknown');
+  trace_value:=nullif(n->'derivation','null'::jsonb); method:=trace_value->>'method'; quality_value:=coalesce(n->>'quality','unknown');
   estimates:=case when n->>'provenance'='estimated_dish' or origin='estimated' then true else (n->>'contains_estimates')::boolean end;
-  if jsonb_typeof(derivation->'inputs')='array' and jsonb_array_length(derivation->'inputs')>0 then
-   if exists(select 1 from jsonb_array_elements(derivation->'inputs')i where i->>'value_origin'='estimated' or i->>'contains_estimates'='true') then
+  if jsonb_typeof(trace_value->'inputs')='array' and jsonb_array_length(trace_value->'inputs')>0 then
+   if exists(select 1 from jsonb_array_elements(trace_value->'inputs')i where i->>'value_origin'='estimated' or i->>'contains_estimates'='true') then
     if origin not in ('calculated','estimated') or origin is null then perform private.phase6_raise_http(422,'estimated_source_must_be_retained'); end if; estimates:=true;
-   elsif estimates is distinct from true and exists(select 1 from jsonb_array_elements(derivation->'inputs')i where i->>'contains_estimates' is null) then estimates:=null; end if;
+   elsif estimates is distinct from true and exists(select 1 from jsonb_array_elements(trace_value->'inputs')i where i->>'contains_estimates' is null) then estimates:=null; end if;
    if method in ('sodium_to_salt','total_carbohydrate_minus_fiber') then
-    quality_value:=case when quality_value='unknown' or exists(select 1 from jsonb_array_elements(derivation->'inputs')i where i->>'quality'='unknown') then 'unknown' when quality_value='unverified' or exists(select 1 from jsonb_array_elements(derivation->'inputs')i where i->>'quality'='unverified') then 'unverified' else 'user_verified' end;
+    quality_value:=case when quality_value='unknown' or exists(select 1 from jsonb_array_elements(trace_value->'inputs')i where i->>'quality'='unknown') then 'unknown' when quality_value='unverified' or exists(select 1 from jsonb_array_elements(trace_value->'inputs')i where i->>'quality'='unverified') then 'unverified' else 'user_verified' end;
    end if;
   end if;
   if n->>'amount' is not null and(n->>'amount')::numeric>0 and round((n->>'amount')::numeric,6)=0 then
-   derivation:=jsonb_build_object('method','storage_precision','version',1,'reason','below_storage_precision','source_amount',n->>'amount','source_unit',n->>'unit','source_derivation',derivation);
+   trace_value:=jsonb_build_object('method','storage_precision','version',1,'reason','below_storage_precision','source_amount',n->>'amount','source_unit',n->>'unit','source_derivation',trace_value);
   end if;
   update public.item_nutrients set amount=case when n->>'amount' is not null and(n->>'amount')::numeric>0 and round((n->>'amount')::numeric,6)=0 then null else amount end,
-    quality=quality_value,value_origin=origin,definition_basis=n->>'definition_basis',intake_scope=n->>'intake_scope',derivation=derivation,contains_estimates=estimates
+    quality=quality_value,value_origin=origin,definition_basis=n->>'definition_basis',intake_scope=n->>'intake_scope',derivation=trace_value,contains_estimates=estimates
    where catalog_item_id=p_item_id and user_id=owner_id and nutrient_code=n->>'code';
  end loop;
 end $$;
