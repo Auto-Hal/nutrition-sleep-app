@@ -9,6 +9,11 @@ const todayProps = { date: summary.date, initialItems: [item], initialMeals: [],
 const mealProps = { date: summary.date, initialItems: [item], initialMeals: [], outboxBinding: binding };
 
 describe("confirmed records and provisional UI", () => {
+  it("ignores lightweight queued notifications without a mutation payload",()=>{
+    const listeners=new Map<string,(e:unknown)=>void>();const h=harness();h.context.window.addEventListener=(name:string,fn:(e:unknown)=>void)=>listeners.set(name,fn);
+    const {MealLog}=h.load("components/meal-log.tsx");h.render(MealLog,mealProps);h.effects.forEach(e=>e());
+    expect(()=>listeners.get("outbox")!({detail:{state:"queued",operation_id:"new-intent"}})).not.toThrow();
+  });
   it("does not add an unacknowledged pending record to a server total that may already contain it",async()=>{
     const food={...item,nutrients:[{code:"energy",amount:100,unit:"kcal",quality:"unverified",provenance:"user_entered"}]};
     const h=harness({"@/lib/offline/outbox-idb":{listOutboxMutations:async()=>[{operation_id:"uncertain",kind:"meal_entry_create",payload:{meal_date:summary.date,catalog_item_id:item.id,quantity:100},status:"in_flight"}]}});

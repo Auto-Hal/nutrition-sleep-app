@@ -15,6 +15,7 @@ import {
   deriveSaltEquivalent,
 } from "@/lib/nutrition/calculated-values";
 import { nutrientWriteSchema } from "@/lib/nutrition/nutrient-schema";
+import { nutrientValueCompatible } from "@/lib/nutrition/value-compatibility";
 const value = (
   code: NutrientValue["code"],
   amount: number | null,
@@ -30,6 +31,10 @@ const value = (
   contains_estimates: false,
 });
 describe("evidence and explicit conversions", () => {
+  it("holds ambiguous OFF carbohydrate regardless of URL casing, matching SQL",()=>{
+    const row={nutrient_code:"carbohydrate",unit:"g",amount:"12",definition_basis:null as string|null,source_uri:"https://WORLD.OpenFoodFacts.org/product/1"};
+    expect(nutrientValueCompatible(row,"g")).toBe(false);expect(nutrientValueCompatible({...row,definition_basis:"total_carbohydrate_including_fiber"},"g")).toBe(true);
+  });
   it("shares the exact 30-code contract with SQL and MCP", () => {
     expect(Object.keys(NUTRIENT_BASIS_CONTRACT)).toEqual(
       NUTRIENT_DEFINITIONS.map((n) => n.code),

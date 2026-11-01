@@ -200,7 +200,7 @@ export function MealLog({
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
-      if (!detail) return;
+      if (!detail?.payload || typeof detail.payload !== "object") return;
       if ("meal_date" in detail.payload && detail.payload.meal_date !== date) return;
       if (detail.kind === "meal_entry_void" && "meal_id" in detail.payload) {
         const mealId = detail.payload.meal_id;

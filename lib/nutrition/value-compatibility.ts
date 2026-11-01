@@ -38,7 +38,7 @@ export function nutrientValueCompatible(
       "carbohydrates_excluding_fiber",
       "available_carbohydrate_monosaccharide",
     ]) ||
-      (uri?.includes("openfoodfacts") &&
+      (uri?.toLowerCase().includes("openfoodfacts") &&
         basis !== "total_carbohydrate_including_fiber"))
   )
     return false;
