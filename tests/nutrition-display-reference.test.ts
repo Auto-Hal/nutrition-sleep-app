@@ -38,9 +38,9 @@ describe("registered-profile reference amounts beside nutrition averages", () =>
     expect(result.profileSummary).toContain("70 kg（2026-10-10更新）");
   });
 
-  it("resolves all 18 current references without relying on intake records", () => {
+  it("resolves all 30 internal references without relying on intake records", () => {
     const { nutrients } = buildNutritionDisplayReferences(profile, today);
-    expect(Object.keys(nutrients)).toHaveLength(18);
+    expect(Object.keys(nutrients)).toHaveLength(30);
     expect(nutrients.calcium).toMatchObject({ label: "推奨量", amount: "800 mg" });
     expect(nutrients.protein).toMatchObject({ label: "推奨量", amount: "65 g", detail: "目標範囲 13〜20 %エネルギー" });
     expect(nutrients.vitamin_b12).toMatchObject({ label: "目安量", amount: "4 µg" });

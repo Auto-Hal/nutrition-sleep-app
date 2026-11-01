@@ -1,4 +1,4 @@
-import { parseNutritionLabelText, type LabelBasis } from "@/lib/products/label-ocr";
+import { LABEL_NUTRIENT_DEFINITIONS, parseNutritionLabelText, type LabelBasis } from "@/lib/products/label-ocr";
 import type { OcrBox, OcrDocument, OcrLine, OcrWord } from "@/lib/products/ocr-document";
 import type { CommercialNutrient } from "@/lib/products/open-food-facts";
 
@@ -45,26 +45,9 @@ type ValueCandidate = {
   confidence: number | null;
 };
 
-const ANCHORS: NutrientAnchorDefinition[] = [
-  { code: "energy", labels: ["エネルギー", "熱量", "energy"], parserLabel: "エネルギー" },
-  { code: "protein", labels: ["たんぱく質", "タンパク質", "蛋白質", "protein"], parserLabel: "たんぱく質" },
-  { code: "fat", labels: ["脂質", "fat"], parserLabel: "脂質" },
-  { code: "carbohydrate", labels: ["炭水化物", "carbohydrate"], parserLabel: "炭水化物" },
-  { code: "fiber", labels: ["食物繊維", "食物せんい", "fiber"], parserLabel: "食物繊維" },
-  { code: "calcium", labels: ["カルシウム", "calcium"], parserLabel: "カルシウム" },
-  { code: "iron", labels: ["鉄", "iron"], parserLabel: "鉄" },
-  { code: "zinc", labels: ["亜鉛", "zinc"], parserLabel: "亜鉛" },
-  { code: "vitamin_a", labels: ["ビタミンA", "vitamin A"], parserLabel: "ビタミンA" },
-  { code: "vitamin_b1", labels: ["ビタミンB1", "vitamin B1"], parserLabel: "ビタミンB1" },
-  { code: "vitamin_b2", labels: ["ビタミンB2", "vitamin B2"], parserLabel: "ビタミンB2" },
-  { code: "vitamin_b6", labels: ["ビタミンB6", "vitamin B6"], parserLabel: "ビタミンB6" },
-  { code: "vitamin_b12", labels: ["ビタミンB12", "vitamin B12"], parserLabel: "ビタミンB12" },
-  { code: "vitamin_c", labels: ["ビタミンC", "vitamin C"], parserLabel: "ビタミンC" },
-  { code: "vitamin_d", labels: ["ビタミンD", "vitamin D"], parserLabel: "ビタミンD" },
-  { code: "vitamin_e", labels: ["ビタミンE", "vitamin E"], parserLabel: "ビタミンE" },
-  { code: "sodium", labels: ["ナトリウム", "sodium"], parserLabel: "ナトリウム" },
-  { code: "salt_equivalent", labels: ["食塩相当量", "食塩 相当量", "salt equivalent"], parserLabel: "食塩相当量" },
-];
+const ANCHORS: NutrientAnchorDefinition[] = LABEL_NUTRIENT_DEFINITIONS.map((definition) => ({
+  code: definition.code, labels: definition.labels, parserLabel: definition.labels[0],
+}));
 
 function normalizeToken(value: string) {
   return value
@@ -115,7 +98,7 @@ function labelMatches(phrase: string, label: string) {
   }
 
   const vitaminFamily = normalizedLabel.startsWith("ビタミン") || normalizedLabel.startsWith("vitamin");
-  if (vitaminFamily) return false;
+  if (vitaminFamily || /n[\s-]*[36]/i.test(normalizedLabel)) return false;
 
   // Fuzzy matching is intentionally limited to longer known nutrition labels.
   // It repairs one-character OCR noise without making short labels such as 鉄 ambiguous.

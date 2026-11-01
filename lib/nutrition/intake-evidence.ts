@@ -113,7 +113,7 @@ export function summarizePercentEnergyEvidence(
   nutrientRows: EvidenceRow[],
   energyRows: Map<string, EvidenceRow>,
 ): IntakeEvidence {
-  const factor = nutrientCode === "fat" ? 9
+  const factor = (nutrientCode === "fat" || nutrientCode === "saturated_fat") ? 9
     : nutrientCode === "protein" || nutrientCode === "carbohydrate" ? 4 : null;
   if (factor === null) return summarizeIntakeEvidence([]);
 

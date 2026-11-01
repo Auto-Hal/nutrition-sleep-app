@@ -107,7 +107,7 @@ function displayReference(profile: DriProfile, localDate: string, code: Nutrient
   let amount = describeGoal(preferred);
   let detail: string | null = null;
   if (preferred.unit === "percent_energy" && preferred.lower !== undefined && preferred.upper !== undefined && energy.kcal !== null) {
-    const kcalPerGram = code === "fat" ? 9 : 4;
+    const kcalPerGram = (code === "fat" || code === "saturated_fat") ? 9 : 4;
     const lower = Math.round(energy.kcal * preferred.lower / 100 / kcalPerGram);
     const upper = Math.round(energy.kcal * preferred.upper / 100 / kcalPerGram);
     amount = `約 ${lower}〜${upper} g`;

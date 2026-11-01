@@ -17,7 +17,7 @@ type ParserDefinition = {
   targetUnit: CommercialNutrient["unit"];
 };
 
-const DEFINITIONS: ParserDefinition[] = [
+export const LABEL_NUTRIENT_DEFINITIONS: ParserDefinition[] = [
   { code: "energy", labels: ["エネルギー", "エネルキー", "熱量", "energy"], targetUnit: "kcal" },
   { code: "protein", labels: ["たんぱく質", "タンパク質", "蛋白質", "protein"], targetUnit: "g" },
   { code: "fat", labels: ["脂質", "fat"], targetUnit: "g" },
@@ -36,6 +36,18 @@ const DEFINITIONS: ParserDefinition[] = [
   { code: "vitamin_e", labels: ["ビタミンE", "vitamin E"], targetUnit: "mg" },
   { code: "sodium", labels: ["ナトリウム", "sodium"], targetUnit: "mg" },
   { code: "salt_equivalent", labels: ["食塩相当量", "食塩 相当量", "salt equivalent"], targetUnit: "g" },
+  { code: "saturated_fat", labels: ["飽和脂肪酸", "saturated fat"], targetUnit: "g" },
+  { code: "n3_fatty_acids", labels: ["n-3系脂肪酸", "n-3 fatty acids"], targetUnit: "g" },
+  { code: "n6_fatty_acids", labels: ["n-6系脂肪酸", "n-6 fatty acids"], targetUnit: "g" },
+  { code: "cholesterol", labels: ["コレステロール", "cholesterol"], targetUnit: "mg" },
+  { code: "carbohydrate_excluding_fiber", labels: ["糖質"], targetUnit: "g" },
+  { code: "potassium", labels: ["カリウム", "potassium"], targetUnit: "mg" },
+  { code: "magnesium", labels: ["マグネシウム", "magnesium"], targetUnit: "mg" },
+  { code: "phosphorus", labels: ["リン", "phosphorus"], targetUnit: "mg" },
+  { code: "copper", labels: ["銅", "copper"], targetUnit: "mg" },
+  { code: "selenium", labels: ["セレン", "selenium"], targetUnit: "ug" },
+  { code: "molybdenum", labels: ["モリブデン", "molybdenum"], targetUnit: "ug" },
+  { code: "folate", labels: ["葉酸", "folate"], targetUnit: "ug" },
 ];
 
 function normalizeText(value: string) {
@@ -57,9 +69,10 @@ function escapeRegExp(value: string) {
 }
 
 function flexibleLabelPattern(label: string) {
-  return [...label]
-    .map((character) => character === " " ? "\\s*" : escapeRegExp(character))
-    .join("\\s*");
+  return [...label].map((character, index) => {
+    const separator = /[0-9]/.test(character) && /[0-9]/.test(label[index + 1] ?? "") ? "" : "\\s*";
+    return (character === " " ? "" : escapeRegExp(character)) + (index === label.length - 1 ? "" : separator);
+  }).join("");
 }
 
 function convertValue(value: number, sourceUnit: string, targetUnit: CommercialNutrient["unit"]) {
@@ -104,9 +117,13 @@ function findBasis(text: string): LabelBasis {
 function findNutrient(text: string, definition: ParserDefinition): CommercialNutrient | null {
   const labelAlternation = definition.labels.map(flexibleLabelPattern).join("|");
   const separator = "[\\s:：=・.\\-()（）]{0,24}";
-  const pattern = "(?:" + labelAlternation + ")" + separator + "([0-9]+(?:\\.[0-9]+)?)\\s*(kcal|kJ|mg|ug|g)";
+  const pattern = "(?:" + labelAlternation + ")(?![0-9A-Za-z])" + separator + "([0-9]+(?:\\.[0-9]+)?)\\s*(kcal|kJ|mg|ug|g)(?:\\s*(RAE|DFE|IU))?";
   const match = text.match(new RegExp(pattern, "i"));
   if (!match) return null;
+  // A mass unit alone cannot establish retinol activity equivalence. DFE/IU
+  // also cannot be silently reinterpreted as this registry's mass definition.
+  if (definition.code === "vitamin_a" && match[3]?.toUpperCase() !== "RAE") return null;
+  if (definition.code === "folate" && match[3]) return null;
 
   const converted = convertValue(Number(match[1]), match[2], definition.targetUnit);
   if (converted === null) return null;
@@ -115,7 +132,7 @@ function findNutrient(text: string, definition: ParserDefinition): CommercialNut
 
 export function parseNutritionLabelText(rawText: string): ParsedNutritionLabel {
   const text = normalizeText(rawText);
-  const nutrients = DEFINITIONS.flatMap((definition) => {
+  const nutrients = LABEL_NUTRIENT_DEFINITIONS.flatMap((definition) => {
     const nutrient = findNutrient(text, definition);
     return nutrient ? [nutrient] : [];
   });

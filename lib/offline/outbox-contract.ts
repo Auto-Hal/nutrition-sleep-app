@@ -1,4 +1,5 @@
 export const OUTBOX_CONTRACT_VERSION = 1;
+export const SUPPORTED_OUTBOX_CONTRACT_VERSIONS = [1, 2] as const;
 export const OUTBOX_AUTO_REPLAY_DAYS = 30;
 export const MUTATION_RECEIPT_RETENTION_DAYS = 90;
 export const OUTBOX_LEASE_MS = 30_000;
@@ -57,7 +58,7 @@ export type ProfileOutboxPayload = {
   time_zone: string;
 };
 
-export type NutrientOutboxValue = {
+export type NutrientOutboxValue = import("@/lib/nutrition/catalog").NutrientMetadata & {
   code: string;
   amount: number | null;
   unit: string;
@@ -197,6 +198,7 @@ export type PendingMutation = {
 }[OutboxMutationKind];
 
 export type OutboxMutationInput<K extends OutboxMutationKind> = {
+  contractVersion?: 1 | 2;
   operationId: string;
   createdAt: string;
   kind: K;
@@ -208,6 +210,7 @@ export type OutboxMutationInput<K extends OutboxMutationKind> = {
 };
 
 export type MealEntryMutationInput = {
+  contractVersion?: 1 | 2;
   operationId: string;
   createdAt: string;
   payload: MealEntryOutboxPayload;
@@ -276,7 +279,7 @@ export function createOutboxMutation<K extends OutboxMutationKind>(
 
   const mutation = {
     operation_id: input.operationId,
-    contract_version: OUTBOX_CONTRACT_VERSION,
+    contract_version: input.contractVersion ?? OUTBOX_CONTRACT_VERSION,
     environment_id: binding.environmentId,
     owner_user_id: binding.ownerUserId,
     entity_key: input.entityKey.trim(),
@@ -316,6 +319,7 @@ export function createMealEntryMutation(
     : `fixed-meal:${input.payload.meal_date}:${input.payload.meal_type}`;
 
   return createOutboxMutation(binding, {
+    contractVersion: input.contractVersion,
     operationId: input.operationId,
     createdAt: input.createdAt,
     kind: "meal_entry_create",

@@ -174,7 +174,7 @@ describe("Phase 4 Astra DRI corrections", () => {
   });
 
   it("pins DRI interpretation to the corrected 2025 report revision", () => {
-    expect(DRI_2025_SOURCE.revision).toBe("report-corrected-2025-03-25");
+    expect(DRI_2025_SOURCE.revision).toBe("report-corrected-2025-03-25-nutrients-v2");
     expect(DRI_2025_SOURCE.correctionsReflectedOn).toBe("2025-03-25");
   });
 });

@@ -6,7 +6,7 @@ import { createUserClient } from "@/lib/supabase/user";
 
 const schema = z.object({
   operation_id: z.string().uuid(),
-  contract_version: z.literal(1),
+  contract_version: z.union([z.literal(1), z.literal(2)]),
   intent_created_at: z.string().datetime(),
   meal_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   meal_type: z.enum(["breakfast", "lunch", "dinner", "custom"]),
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   }
 
   const result = await createUserClient(session.accessToken).rpc(
-    "create_meal_entry_v2",
+    parsed.data.contract_version === 2 ? "create_meal_entry_v3" : "create_meal_entry_v2",
     {
       p_operation_id: parsed.data.operation_id,
       p_contract_version: parsed.data.contract_version,

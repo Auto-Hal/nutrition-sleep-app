@@ -166,7 +166,7 @@ export function calculatePercentEnergy(
   nutrientRows: DailyRow[],
   energyRows: Map<string, DailyRow>,
 ) {
-  const factor = nutrientCode === "fat" ? 9
+  const factor = (nutrientCode === "fat" || nutrientCode === "saturated_fat") ? 9
     : nutrientCode === "protein" || nutrientCode === "carbohydrate" ? 4
       : null;
   if (factor === null) {

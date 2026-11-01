@@ -1,3 +1,4 @@
+import { nutrientMetadataShape, acceptsNutrientContract } from "@/lib/nutrition/nutrient-schema";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
@@ -9,13 +10,14 @@ const nutrient = z.object({
   code: z.string(), amount: z.number().finite().min(0).nullable(), unit: z.string(),
   provenance: z.string(), quality: z.string(), source_uri: z.string().url().max(1000).nullable().optional(),
   source_observed_at: z.string().datetime().nullable().optional(),
+  ...nutrientMetadataShape,
 });
 const schema = z.object({
-  operation_id: z.string().uuid(), contract_version: z.literal(1), intent_created_at: z.string().datetime(),
+  operation_id: z.string().uuid(), contract_version: z.union([z.literal(1), z.literal(2)]), intent_created_at: z.string().datetime(),
   expected_revision: z.number().int().positive(), catalog_item_id: z.string().uuid(),
   name: z.string().trim().min(1).max(200), brand: z.string().trim().max(120).nullable(),
   serving_size: z.number().finite().positive(), serving_unit: z.string().trim().min(1).max(32),
-  active: z.boolean(), nutrients: z.array(nutrient).max(18),
+  active: z.boolean(), nutrients: z.array(nutrient).max(30),
 });
 type Context = { params: Promise<{ id: string }> };
 
@@ -31,7 +33,8 @@ export async function PATCH(request: Request, context: Context) {
     return NextResponse.json({ error: "入力内容を確認してください。", error_code: "invalid_request" }, { status: 400 });
   }
   const d = parsed.data;
-  const result = await createUserClient(session.accessToken).rpc("update_catalog_item_v2", {
+  if (!acceptsNutrientContract(d.contract_version, d.nutrients)) return NextResponse.json({ error: "栄養素の契約を確認してください。", error_code: "unsupported_nutrient_schema" }, { status: 422 });
+  const result = await createUserClient(session.accessToken).rpc(d.contract_version === 2 ? "update_catalog_item_v3" : "update_catalog_item_v2", {
     p_operation_id: d.operation_id, p_contract_version: d.contract_version, p_intent_created_at: d.intent_created_at,
     p_catalog_item_id: id, p_expected_revision: d.expected_revision, p_name: d.name, p_brand: d.brand,
     p_serving_size: d.serving_size, p_serving_unit: d.serving_unit, p_active: d.active, p_nutrients: d.nutrients,

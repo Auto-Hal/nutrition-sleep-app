@@ -1,3 +1,4 @@
+import { nutrientMetadataShape, acceptsNutrientContract } from "@/lib/nutrition/nutrient-schema";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
@@ -36,6 +37,7 @@ const fullNutrientSchema = z.object({
   quality: nutrientQualitySchema,
   source_uri: z.string().url().max(1000).nullable().optional(),
   source_observed_at: z.string().datetime().nullable().optional(),
+  ...nutrientMetadataShape,
 }).superRefine((value, context) => {
   if (value.provenance === "approved_external_db" && value.quality === "user_verified") {
     context.addIssue({ code: "custom", message: "external database nutrients cannot be adapter-verified" });
@@ -44,7 +46,7 @@ const fullNutrientSchema = z.object({
 
 const operationSchema = z.object({
   operation_id: z.string().uuid(),
-  contract_version: z.literal(1),
+  contract_version: z.union([z.literal(1), z.literal(2)]),
   intent_created_at: z.string().datetime(),
 });
 
@@ -90,7 +92,8 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
-  const result = await createUserClient(session.accessToken).rpc("create_product_item_reliable_v2", {
+  if (!acceptsNutrientContract(input.contract_version, input.nutrients)) return NextResponse.json({ error: "栄養素の契約を確認してください。", error_code: "unsupported_nutrient_schema" }, { status: 422 });
+  const result = await createUserClient(session.accessToken).rpc(input.contract_version === 2 ? "create_product_item_reliable_v3" : "create_product_item_reliable_v2", {
     p_operation_id: input.operation_id,
     p_contract_version: input.contract_version,
     p_intent_created_at: input.intent_created_at,
