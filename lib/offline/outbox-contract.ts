@@ -24,7 +24,9 @@ export type OutboxMutationKind =
   | "batch_update"
   | "meal_entry_void"
   | "product_create"
-  | "product_update";
+  | "product_update"
+  | "goal_append"
+  | "day_type_append";
 
 export type OutboxBinding = {
   ownerUserId: string;
@@ -158,6 +160,8 @@ export type ProductUpdateOutboxPayload = {
 };
 
 export type OutboxPayloadByKind = {
+  goal_append: { goal: import("@/lib/nutrition/goals").GoalCommand };
+  day_type_append: import("@/lib/nutrition/goals").DayTypeCommand;
   meal_entry_create: MealEntryOutboxPayload;
   fixed_meal_state: FixedMealStateOutboxPayload;
   profile_upsert: ProfileOutboxPayload;

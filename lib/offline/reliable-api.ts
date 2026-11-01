@@ -25,6 +25,14 @@ const SAFE_ERROR_CODES = new Set([
   "batch_rpc_required",
   "unsupported_nutrient_schema",
   "upgrade_required_for_serving_basis",
+  "immutable_goal_history",
+  "invalid_goal_variants",
+  "invalid_goal_payload",
+  "invalid_goal_precision",
+  "goal_schedule_changed",
+  "profile_time_zone_changed",
+  "profile_reference_changed",
+  "training_goal_required",
 ]);
 
 export function reliableMutationError(

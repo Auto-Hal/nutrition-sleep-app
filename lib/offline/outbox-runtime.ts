@@ -75,6 +75,12 @@ function mutationRequest(mutation: PendingMutation): {
   };
 
   switch (mutation.kind) {
+    case "goal_append":
+    case "day_type_append":
+      return {
+        url: mutation.kind === "goal_append" ? "/api/nutrition/goals/reliable" : "/api/nutrition/day-type/reliable",
+        init: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...common, ...mutation.payload, expected_revision: mutation.expected_revision }) },
+      };
     case "meal_entry_create":
       return {
         url: "/api/meals/reliable",
