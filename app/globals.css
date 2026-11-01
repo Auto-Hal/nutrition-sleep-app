@@ -170,6 +170,36 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
 
 
 /* Phase 6.10 PWA/version recovery */
+.pfc-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 12px 0; }
+.pfc-metric { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; align-content: start; gap: 6px; }
+.pfc-metric > div:first-child { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.pfc-metric p { margin: 0; }
+.pfc-metric small { display: block; color: var(--muted); font-size: .74rem; }
+.pfc-value { font-size: 1.3rem; font-weight: 760; font-variant-numeric: tabular-nums; }
+.pfc-value small { display: inline; font-weight: 500; }
+.pfc-composition { font-size: .85rem; font-variant-numeric: tabular-nums; }
+.pfc-state-achieved { background: #e8f5ed; color: #176243; }
+.pfc-state-below, .pfc-state-above, .pfc-state-out_of_range { background: #fff3df; color: #79501d; }
+.pfc-state-hold, .pfc-state-not_recorded, .pfc-state-future { background: #f2f5f5; color: #50636a; }
+.pfc-state-unsynced { background: #e8f2ff; color: #235c94; }
+.pfc-counts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 16px 0; }
+.pfc-counts > div { display: grid; gap: 3px; padding: 8px; border-radius: 10px; background: var(--surface-soft); }
+.pfc-counts span, .pfc-counts small { font-size: .72rem; color: var(--muted); }
+.pfc-counts strong { font-size: 1.2rem; }
+.pfc-calendar { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; margin-top: 18px; }
+.pfc-weekday { text-align: center; font-size: .75rem; color: var(--muted); }
+.pfc-calendar-day { appearance: none; cursor: pointer; min-height: 76px; min-width: 0; padding: 7px 1px; border: 1px solid transparent; border-radius: 8px; display: grid; gap: 4px; text-align: center; font: inherit; }
+.pfc-calendar-day[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pfc-calendar-day > small { font-size: .68rem; white-space: nowrap; }
+.pfc-mini-status { display: flex; justify-content: center; gap: 2px; font-size: .625rem; }
+.pfc-mini-status > span { border: 1px solid currentColor; border-radius: 3px; padding: 1px 2px; }
+.pfc-week-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(90px,1fr)); gap: 6px; margin: 14px 0; }
+.pfc-week-list > button { display: grid; gap: 4px; white-space: normal; }
+.pfc-week-list > button[aria-pressed="true"] { outline: 2px solid var(--accent); }
+.inline-form { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+.inline-form input { min-height: 44px; max-width: 155px; }
+@media (max-width: 360px) { .pfc-calendar { gap: 2px; } .pfc-mini-status { gap: 1px; } .pfc-mini-status > span { padding: 1px; } .pfc-metric { padding: 9px; } }
+
 .pwa-update-banner {
   position: fixed;
   z-index: 1000;

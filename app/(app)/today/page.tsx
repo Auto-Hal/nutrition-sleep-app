@@ -15,6 +15,8 @@ import { getGoogleHealthConnectionSummary } from "@/lib/sleep/analytics";
 import { sleepRecommendations } from "@/lib/sleep/recommendations";
 import { SleepScore } from "@/components/sleep-score";
 import { SleepScoreRefresh } from "@/components/sleep-score-refresh";
+import { DailyPfcCard } from "@/components/pfc-dashboard";
+import { getNutritionPeriod } from "@/lib/nutrition/goal-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +60,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const previousDate = shiftIsoDate(date, -1);
   const nextDate = shiftIsoDate(date, 1);
 
-  const [summary, initialMeals, pendingDrafts, sleep] = session
+  const [summary, initialMeals, pendingDrafts, sleep, pfcPeriod] = session
     ? await Promise.all([
       getNutritionSummaryForDate(session.accessToken, date),
       getMealsForDate(session.accessToken, date),
@@ -70,8 +72,9 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
         recommendation: sleepRecommendations(source.assessment.current, { range: 7,
           endDate: source.assessment.end_date, connectionStatus: connection?.status ?? "not_connected" })[0],
       })).catch(() => null),
+      getNutritionPeriod(session.accessToken, date, date),
     ])
-    : [null, [], [], null];
+    : [null, [], [], null, null];
 
   const nextHref = nextDate >= today ? "/today" : `/today?date=${nextDate}`;
 
@@ -94,6 +97,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
       <div className="stack today-stack">
         {!historical && <SleepScoreRefresh />}
+        {pfcPeriod && session && <DailyPfcCard key={date} initial={pfcPeriod} binding={{ ownerUserId: session.userId, environmentId: appEnvironmentId() }} />}
         <ChatGptNutritionLink />
 
         {!historical && pendingDrafts.length > 0 && (

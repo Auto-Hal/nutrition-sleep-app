@@ -25,8 +25,9 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P1 旧契約bridge | 完了 | CI 41265351899 fresh replay/pgTAP・652 Vitest・lint/typecheck/build成功。Sleep E2E 41265351909成功 |
 | P2 30コード基盤 | 基盤・接続完了 | CI 41266753928 replay/pgTAP・662 Vitest・lint/typecheck/build成功。手動/Product/OCR/Chat/Batchは新契約へ接続。実機入力は未検証 |
 | P3 目標・期間読取り | 完了 | CI 41292501211：674 Vitest、lint/typecheck/Deno/build、fresh replay、506 pgTAP、認証済み別接続の同時保存/receipt/export isolation成功。Sleep E2E成功 |
-| P4 体重履歴 | 実装中 | 未検証 |
-| P5〜P9 | 未着手 | 未実施 |
+| P4 体重履歴基盤 | 完了 | CI 41294836278：fresh replay、559 pgTAP、Body/旧プロフィールの実接続同時更新、lint/typecheck/Deno/build成功。Preview適用後も旧snapshot/profile digest一致 |
+| P5 PFC日/月/週 | 実装・検証中 | 境界値/途中記録/参照比較/期間集計19テスト＋同期レース2テスト成功。画面統合のCI検証へ |
+| P6〜P9 | 未着手 | 未実施 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
 
@@ -37,6 +38,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | 20261101022326_nutrition_legacy_nutrient_bridge.sql | 20261101023306 / nutrition_legacy_nutrient_bridge | apply成功、7関数の存在/ACL照合、Batch直接EXECUTE取り消し確認 |
 | 20261101023441_nutrition_30_code_foundation.sql | 20261101025327 / nutrition_30_code_foundation | apply成功、内部30/標準29を照合。既存食品21行・snapshot322行の全旧列digest/件数とlegacy fingerprint digestが前後一致 |
 | 20261101025358_nutrition_goal_history.sql | 20261101092348 / nutrition_goal_history | apply成功、4つのowner SELECT policy確認。新規goal/head/target/day-type全0行、目標バックフィルなし |
+| 20261101092352_body_measurement_history.sql | 20261101095413 / body_measurement_history | apply成功、3つのowner SELECT policy確認。measurement/settings/tombstone/linked profile全0、旧profile/snapshot digest一致 |
 
 P1適用後security advisorは既存private server-only表のpolicyなしINFO、意図したowner検証付き公開SECURITY DEFINER RPC、既存のleaked password protection設定を報告。追加したprivate helperはauthenticated/anon実行不可。Productionは変更なし。
 

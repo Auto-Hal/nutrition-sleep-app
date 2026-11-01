@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppIcon } from "@/components/app-icon";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
-import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
+import { NUTRIENT_DEFINITIONS, STANDARD_NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
 import { NutrientAverages, formatEvidenceRange, formatNutrientAmount as formatAmount } from "@/components/nutrient-averages";
 import { dailyDisplayAmount } from "@/lib/nutrition/presentation";
@@ -15,6 +15,10 @@ import { getProfile } from "@/lib/profile";
 import { buildNutritionDisplayReferences, type NutritionReferenceProfile } from "@/lib/nutrition/dri/display-reference";
 import { describeDriPosition } from "@/lib/nutrition/dri/evaluate";
 import { NutritionMissingValueActions } from "@/components/nutrition-missing-value-actions";
+import { MonthlyPfc, WeeklyPfc } from "@/components/pfc-dashboard";
+import { getNutritionPeriod } from "@/lib/nutrition/goal-repository";
+import { isIsoDate, localDate, monthBounds, weekBounds } from "@/lib/nutrition/civil-date";
+import { appEnvironmentId } from "@/lib/app-environment";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +64,7 @@ function hrefFor(range: NutritionRange, nutrient?: NutrientCode | null, day?: st
 export default async function NutritionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; nutrient?: string; day?: string }>;
+  searchParams: Promise<{ range?: string; nutrient?: string; day?: string; view?: string; month?: string; week?: string }>;
 }) {
   const session = await getAppSessionForRsc();
   if (!session) redirect("/login");
@@ -69,6 +73,16 @@ export default async function NutritionPage({
   const range = parseRange(params.range);
   const selectedCode = parseNutrient(params.nutrient);
   const profile = await getProfile(session.accessToken);
+  const view = params.view === "week" ? "week" : params.view === "pfc" ? "pfc" : params.view === "details" || params.range || params.nutrient || params.day ? "details" : "pfc";
+  const sections = <nav className="subnav" aria-label="栄養分析"><Link href="/nutrition?view=pfc" aria-current={view === "pfc" ? "page" : undefined}>月間PFC</Link><Link href="/nutrition?view=week" aria-current={view === "week" ? "page" : undefined}>週間</Link><Link href="/nutrition?view=details&range=7" aria-current={view === "details" ? "page" : undefined}>29項目・改善</Link></nav>;
+  if (view !== "details") {
+    const today = localDate(profile?.time_zone ?? "Asia/Tokyo");
+    const month = params.month && /^\d{4}-\d{2}$/.test(params.month) && isIsoDate(`${params.month}-01`) && params.month <= today.slice(0, 7) ? params.month : today.slice(0, 7);
+    const bounds = view === "pfc" ? monthBounds(month) : weekBounds(isIsoDate(params.week) && params.week <= today ? params.week : today);
+    const period = await getNutritionPeriod(session.accessToken, bounds.start, bounds.end);
+    const binding = { ownerUserId: session.userId, environmentId: appEnvironmentId() };
+    return <main className="app-main nutrition-page"><header className="topbar"><div className="page-heading"><span className="heading-icon"><AppIcon name="nutrition" /></span><div><p className="eyebrow">個人目標と食事記録</p><h1>栄養</h1></div></div></header>{sections}{view === "pfc" ? <MonthlyPfc key={period.start_date} initial={period} binding={binding} /> : <WeeklyPfc key={period.start_date} initial={period} binding={binding} />}</main>;
+  }
   const referenceProfile: NutritionReferenceProfile = {
     birthDate: profile?.birth_date ?? null,
     sex: profile?.sex === "male" || profile?.sex === "female" ? profile.sex : null,
@@ -115,6 +129,7 @@ export default async function NutritionPage({
         </div>
       </header>
       <p className="page-purpose">何がどの食品から摂れているかを確認し、次の献立で見直す点を1つ選びます。</p>
+      {sections}
 
       <nav className="subnav range-nav" aria-label="集計期間">
         {[7, 30, 90].map((days) => (
@@ -129,7 +144,8 @@ export default async function NutritionPage({
       </nav>
 
       <div className="stack nutrition-stack">
-        <NutrientAverages nutrients={analytics.nutrients} range={range} selectedCode={selectedCode} displayReferences={displayReferences} />
+        <NutrientAverages nutrients={STANDARD_NUTRIENT_DEFINITIONS.flatMap((definition) => analytics.nutrients.filter((n) => n.code === definition.code))} range={range} selectedCode={selectedCode} displayReferences={displayReferences} />
+        <details className="card inline-help"><summary>内部管理用ナトリウム</summary><p>標準の29項目は食塩相当量で表示します。ナトリウムの値も保持し、二重計上しません。</p><Link className="button ghost" href={hrefFor(range, "sodium")}>ナトリウムの分析・食品別内訳</Link></details>
         <ActionGuide guide={nutritionGuide(review)} />
         <NutritionReview review={review} />
 
