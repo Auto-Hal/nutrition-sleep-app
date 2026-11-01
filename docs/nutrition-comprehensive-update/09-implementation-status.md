@@ -26,8 +26,9 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P2 30コード基盤 | 基盤・接続完了 | CI 41266753928 replay/pgTAP・662 Vitest・lint/typecheck/build成功。手動/Product/OCR/Chat/Batchは新契約へ接続。実機入力は未検証 |
 | P3 目標・期間読取り | 完了 | CI 41292501211：674 Vitest、lint/typecheck/Deno/build、fresh replay、506 pgTAP、認証済み別接続の同時保存/receipt/export isolation成功。Sleep E2E成功 |
 | P4 体重履歴基盤 | 完了 | CI 41294836278：fresh replay、559 pgTAP、Body/旧プロフィールの実接続同時更新、lint/typecheck/Deno/build成功。Preview適用後も旧snapshot/profile digest一致 |
-| P5 PFC日/月/週 | 実装・検証中 | 境界値/途中記録/参照比較/期間集計19テスト＋同期レース2テスト成功。画面統合のCI検証へ |
-| P6〜P9 | 未着手 | 未実施 |
+| P5 PFC日/月/週 | 完了 | CI 41295693517：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。境界・途中記録・参照比較・集計19テスト、同期レース2テストを追加 |
+| P6 Body画面 | 実装・検証中 | 実測CRUD/プロフィール確認入力/具体的な削除フォールバックのコンポーネントテスト成功。5タブ、推移・移動平均・目標設定を接続 |
+| P7〜P9 | 未着手 | 未実施 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
 

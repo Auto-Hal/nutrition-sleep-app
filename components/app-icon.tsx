@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
-export type AppIconName = "today" | "nutrition" | "sleep" | "settings" | "account" | "sparkles" | "arrow-up-right";
+export type AppIconName = "today" | "nutrition" | "body" | "sleep" | "settings" | "account" | "sparkles" | "arrow-up-right";
 
 const paths: Record<AppIconName, ReactNode> = {
   today: <><rect x="3.5" y="5" width="17" height="16" rx="3" /><path d="M7.5 3v4M16.5 3v4M3.5 10h17M8 15h3" /></>,
   nutrition: <><path d="M5 19c0-7 4-12 14-14 0 10-5 14-12 14H5Z" /><path d="m5 19 9-9M10 14v-4M10 14h4" /></>,
+  body: <><rect x="4" y="3" width="16" height="18" rx="4" /><path d="M8 9a5 5 0 0 1 8 0M12 10l2-3M8 16h8" /></>,
   sleep: <path d="M20.5 14.3A8.8 8.8 0 0 1 9.7 3.5a9 9 0 1 0 10.8 10.8Z" />,
   settings: <><path d="M4 7h5M13 7h7M4 17h9M17 17h3" /><circle cx="11" cy="7" r="2" /><circle cx="15" cy="17" r="2" /></>,
   account: <><circle cx="12" cy="8" r="3" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></>,
