@@ -4,7 +4,20 @@ import {
   parsePreparedTransfer,
   parseTransferPayload,
   type TransferRequest,
+  recentTransfersSchema,
 } from "@/lib/karomiru/model";
+export async function getRecentKaromiruTransfers(
+  accessToken: string,
+  sourceKind: TransferRequest["source_kind"],
+  sourceId: string,
+) {
+  const { data, error } = await createUserClient(accessToken).rpc(
+    "list_karomiru_transfers_v1",
+    { p_source_kind: sourceKind, p_source_id: sourceId },
+  );
+  if (error) throw new Error("転送履歴を取得できませんでした。");
+  return recentTransfersSchema.parse(data);
+}
 export async function getKaromiruSource(
   accessToken: string,
   request: TransferRequest,

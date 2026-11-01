@@ -109,7 +109,9 @@ describe("OCR sharing payload and layout", () => {
     expect(transferDisplayAmount(row)).toBe("0.000000000000001");
     row.amount_numerator = "1";
     row.amount_denominator = "3";
-    expect(transferDisplayAmount(row)).toBe("0.33333333333333333333");
+    expect(transferDisplayAmount(row)).toBe("0.333333333333");
+    expect(row.amount_numerator).toBe("1");
+    expect(row.amount_denominator).toBe("3");
     row.amount_numerator = "0.00000000000000000000001";
     row.amount_denominator = "1";
     expect(transferDisplayAmount(row)).toBeNull();

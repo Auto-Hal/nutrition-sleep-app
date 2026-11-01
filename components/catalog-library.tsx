@@ -1,4 +1,5 @@
 "use client";
+import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -1020,6 +1021,7 @@ export function CatalogLibrary({
                     )}
                   </div>
                   <div className="meal-actions">
+                    {!pending && <KaromiruTransferLink source={item.item_type === "batch" ? "batch" : item.item_type === "product" || item.item_type === "supplement" ? "product" : "catalog"} id={item.id} />}
                     <span className={`pill ${item.active ? "" : "pending"}`}>
                       {item.active ? "有効" : "無効"}
                     </span>

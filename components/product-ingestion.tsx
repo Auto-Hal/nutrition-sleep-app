@@ -1,4 +1,5 @@
 "use client";
+import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NUTRIENT_DEFINITIONS, STANDARD_NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
@@ -674,7 +675,7 @@ export function ProductIngestion({
 
       {scannerOpen && <div className="stack" aria-live="polite"><div className="barcode-camera-shell"><video ref={videoRef} className="barcode-video" muted playsInline /><div className="barcode-guide" aria-hidden="true"><span /></div></div><p className="muted">バーコードを横向きにし、中央の枠いっぱいに入れてください。合わせにくい場合は「バーコードを撮影」の方が確実です。</p><button className="button ghost" type="button" onClick={() => setScannerOpen(false)}>カメラを閉じる</button></div>}
 
-      {localItem && !ocrCandidate && <div className="stack"><div className="catalog-row"><div><strong>{localItem.name}</strong><div className="muted">{localItem.brand ?? "ブランド不明"} · 登録済みLibrary</div><div className="muted">identity: {identitySourceLabel(localItem.product.identity_source)}</div></div></div><label className="button secondary">現物ラベルで更新<input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readLabel(file); event.currentTarget.value = ""; }} /></label></div>}
+      {localItem && !ocrCandidate && <div className="stack"><div className="catalog-row"><div><strong>{localItem.name}</strong><div className="muted">{localItem.brand ?? "ブランド不明"} · 登録済みLibrary</div><div className="muted">identity: {identitySourceLabel(localItem.product.identity_source)}</div></div></div><KaromiruTransferLink source="product" id={localItem.id} /><label className="button secondary">現物ラベルで更新<input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readLabel(file); event.currentTarget.value = ""; }} /></label></div>}
 
       {externalIdentityCandidates.length > 0 && !externalCandidate && !ocrCandidate && <div className="stack"><p className="muted">外部商品DBでexact JANが一致する候補が複数見つかりました。現物の商品名・ブランドと一致するものだけを選んでください。</p>{externalIdentityCandidates.map((candidate) => <div className="catalog-row" key={candidate.source.uri ?? `${candidate.name}:${candidate.brand ?? ""}`}><div><strong>{candidate.name}</strong><div className="muted">{candidate.brand ?? "ブランド不明"} · 外部商品DB</div>{candidate.source.uri && <a href={candidate.source.uri} target="_blank" rel="noreferrer">商品ページで確認</a>}</div><button className="button secondary" type="button" disabled={busy} onClick={() => selectExternalIdentity(candidate)}>このidentityを選択</button></div>)}</div>}
 

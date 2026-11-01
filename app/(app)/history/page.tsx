@@ -4,6 +4,7 @@ import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { localDateInTimeZone } from "@/lib/nutrition/analytics";
 import { getMealHistory, shiftIsoDate } from "@/lib/nutrition/meal-history";
 import { getProfile } from "@/lib/profile";
+import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,7 @@ export default async function HistoryPage() {
                 {dayMeals.map((meal) => (
                   <div className="history-meal" key={meal.id}>
                     <strong>{mealLabels[meal.meal_type]}</strong>
+                    {meal.entries.length > 0 && <KaromiruTransferLink source="meal" id={meal.id} label="食事全体をカロミルへ転送" />}
                     {meal.entries.length > 0 ? (
                       <div className="stack">
                         {meal.entries.map((entry) => {
@@ -98,6 +100,7 @@ export default async function HistoryPage() {
                                 {entry.name} × {entry.quantity}{entry.quantity_unit}
                               </span>
                               <Link className="button ghost" href={editHref}>修正</Link>
+                              <KaromiruTransferLink source="entry" id={entry.id} label="この食品を転送" />
                             </div>
                           );
                         })}

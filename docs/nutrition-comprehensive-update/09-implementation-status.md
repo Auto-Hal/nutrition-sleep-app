@@ -28,7 +28,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P4 体重履歴基盤 | 完了 | CI 41294836278：fresh replay、559 pgTAP、Body/旧プロフィールの実接続同時更新、lint/typecheck/Deno/build成功。Preview適用後も旧snapshot/profile digest一致 |
 | P5 PFC日/月/週 | 完了 | CI 41295693517：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。境界・途中記録・参照比較・集計19テスト、同期レース2テストを追加 |
 | P6 Body画面 | 完了 | CI 41296434510：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。実測CRUD、30/90日、移動平均、目標・連携、5タブを接続 |
-| P7 PNG転送 | 基盤実装・検証中 | 固定payload/手動確認/RLS/export/API/outbox、7/29 PNG rendererを実装。unit成功、DB回帰へ。実機OCR未確認 |
+| P7 PNG転送 | 画面統合・検証中 | 基盤CI 41297687213の605 pgTAP/実接続成功、Preview M5適用済み。全起点からのプレビュー/PNG保存/共有/名前コピー/手動確認を接続。保存・共有で自動確認しないUI回帰も成功。実機OCR未確認 |
 | P8〜P9 | 未着手 | 未実施 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
@@ -41,6 +41,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | 20261101023441_nutrition_30_code_foundation.sql | 20261101025327 / nutrition_30_code_foundation | apply成功、内部30/標準29を照合。既存食品21行・snapshot322行の全旧列digest/件数とlegacy fingerprint digestが前後一致 |
 | 20261101025358_nutrition_goal_history.sql | 20261101092348 / nutrition_goal_history | apply成功、4つのowner SELECT policy確認。新規goal/head/target/day-type全0行、目標バックフィルなし |
 | 20261101092352_body_measurement_history.sql | 20261101095413 / body_measurement_history | apply成功、3つのowner SELECT policy確認。measurement/settings/tombstone/linked profile全0、旧profile/snapshot digest一致 |
+| 20261101101537_karomiru_transfer_snapshots.sql | 20261101103222 / karomiru_transfer_snapshots | CI 41297687213：fresh replay/605 pgTAP/実接続成功後apply。owner SELECT policy、transfer0行、旧profile/snapshot digest前後一致 |
 
 P1適用後security advisorは既存private server-only表のpolicyなしINFO、意図したowner検証付き公開SECURITY DEFINER RPC、既存のleaked password protection設定を報告。追加したprivate helperはauthenticated/anon実行不可。Productionは変更なし。
 
@@ -55,3 +56,16 @@ P3は目標履歴・適用日・split/日別区分・将来予定の置換/取�
 実接続テストの初回は補助SQLの予約語aliasで停止したため修正し、再実行成功。Hostedではなくloopback:54322の使い捨てCI DBだけを許可する実行ガードを設けた。認証済み別接続の同時初回保存は1成功/1 revision_conflict、同じoperationの再送は元receiptを回復する。
 
 P4ではBodyの3テーブル、実測のみのCRUD、明示的なプロフィール連携、削除ID管理、v2 export、認証API/outboxを実装。旧プロフィールRPCとの共通ロック順序を維持するため、直接table DMLを取り消す設計補足を04へ追記。JSのBody単体/APIテストは通過。fresh replay/pgTAP/実接続の競合テストをCIで検証してからPreviewへ適用する。
+
+P7のtransfer payloadはsource amount×選択量の分子/分母を文字列で保存し、量換算の循環小数を画像用の有限表示へ丸めても正本へ逆流させない。画像は端末メモリのみでStorage/outbox/SWへ保存しない。手動確認/取り消しだけをIDs/revisionのoutboxで復旧可能にする。Web Shareは事前生成後の別tap、キャンセルはprepared維持（[MDN](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share)、[WebKit](https://webkit.org/blog/13862/the-user-activation-api/)）。新goal参照計算のmeasurement IDが実際のprofile pointerと一致することもM5で検証する。
+
+## P8/P9で残る統合確認
+
+- 29項目CSV（日/食事/食品、366日、BOM/CRLF/formula escaping、単一DB snapshot）と出力UI。
+- Productの写真なし手動登録・既存値編集、明示的なNa→salt/定義一致C−fiberの算出と由来維持。
+- definition_basis/derivation/source URIの新書込allowlist、単位・化学形態の不一致を新PFC/transferで共通判定。旧DRI互換を維持。
+- Catalog/Product/Meal読取りのページ上限・欠落検出、29項目geometry OCR回帰。
+- PFCのqueue直後の状態更新と端末暫定PFC。確定不明のpending追加分をサーバー合計へ重複加算しない。
+- Todayの入力導線・重複エネルギーカードの整理、iPhone/iPad幅の実画面検証。
+- 認証済み使い捨てDBから実Next API/ブラウザまでのPlaywright、新機能のオフライン復旧、Preview統合/PR本文/本番計画。
+- 物理iPhone、iOS共有・写真保存、カロミル基本7/全29 OCR、実ChatGPT OAuth/確定は未検証。自動テスト合格と区別する。

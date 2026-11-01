@@ -1,4 +1,5 @@
 "use client";
+import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { localDateTimeInput } from "@/lib/nutrition/local-time";
@@ -754,6 +755,7 @@ export function MealLog({
     return (
       <div className="pending-operation" key={entry.id}>
         <span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>
+        {!voidOperation && <KaromiruTransferLink source="entry" id={entry.id} label="この食品を転送" />}
         {voidOperation ? (
           renderVoidOperation(voidOperation, meal)
         ) : (
@@ -830,6 +832,7 @@ export function MealLog({
               <div className="meal-row" key={type}>
                 <div>
                   <strong>{label}</strong>
+                  {meal && meal.entries.length > 0 && <KaromiruTransferLink source="meal" id={meal.id} label="食事全体をカロミルへ転送" />}
                   <div className="meal-items">
                     {meal?.entries.map((entry) => renderConfirmedEntry(meal, entry))}
                     {meal && voidOperations

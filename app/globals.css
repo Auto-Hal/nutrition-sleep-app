@@ -184,6 +184,9 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
 .body-measurement-list article { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
 .body-measurement-list article > div:first-child { display: grid; gap: 5px; }
 .body-measurement-list small { display: block; color: var(--muted); }
+.transfer-preview { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+.transfer-preview img { display: block; width: 100%; height: auto; }
+.transfer-link { font-size: .75rem; white-space: normal; }
 .pfc-state-achieved { background: #e8f5ed; color: #176243; }
 .pfc-state-below, .pfc-state-above, .pfc-state-out_of_range { background: #fff3df; color: #79501d; }
 .pfc-state-hold, .pfc-state-not_recorded, .pfc-state-future { background: #f2f5f5; color: #50636a; }

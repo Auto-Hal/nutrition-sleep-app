@@ -126,6 +126,9 @@ export function parseTransferPayload(value: unknown): TransferPayload {
   const p = payloadSchema.parse(value);
   if (
     p.nutrients.length !== 29 ||
+    p.source.id !== p.request.source_id ||
+    p.source.kind !== p.request.source_kind ||
+    p.mode !== p.request.mode ||
     new Set(p.nutrients.map((r) => r.code)).size !== 29 ||
     p.nutrients.some(
       (r, i) =>
@@ -133,6 +136,9 @@ export function parseTransferPayload(value: unknown): TransferPayload {
         r.unit !== STANDARD_NUTRIENT_DEFINITIONS[i].unit ||
         r.known_entries + r.missing_entries + r.incompatible_entries !==
           r.entries ||
+        r.entries === 0 ||
+        r.evidence.length !== r.entries ||
+        (r.state === "complete" && r.known_entries !== r.entries) ||
         (r.state === "complete") !==
           (r.amount_numerator !== null && r.source_amount !== null),
     )
@@ -155,6 +161,22 @@ export type PreparedTransfer = Omit<
   z.infer<typeof transferSchema>,
   "fixed_payload"
 > & { fixed_payload: TransferPayload };
+export const recentTransfersSchema = z.object({
+  recent: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        revision: z.number().int().positive(),
+        status: z.enum(["prepared", "confirmed", "revoked"]),
+        created_at: z.string(),
+        menu_name: z.string(),
+        mode: z.enum(["basic7", "all29"]),
+      }),
+    )
+    .max(20),
+  has_more: z.boolean(),
+});
+export type RecentTransfers = z.infer<typeof recentTransfersSchema>;
 export function parsePreparedTransfer(value: unknown): PreparedTransfer {
   const t = transferSchema.parse(value);
   return { ...t, fixed_payload: parseTransferPayload(t.fixed_payload) };
@@ -169,7 +191,13 @@ export function transferAmount(row: TransferNutrient) {
 export function transferDisplayAmount(row: TransferNutrient) {
   const value = transferAmount(row);
   if (value === null) return null;
-  const formatted = textDecimal(value, 20);
+  let remainder = value.d;
+  while (remainder % 2n === 0n) remainder /= 2n;
+  while (remainder % 5n === 0n) remainder /= 5n;
+  // Preserve terminating source precision; a repeating fraction needs a finite
+  // OCR representation. Its exact numerator/denominator remain in the payload.
+  let formatted = textDecimal(value, remainder === 1n ? 20 : 12);
+  if (value.n !== 0n && formatted === "0") formatted = textDecimal(value, 20);
   return formatted.length > 28 || (value.n !== 0n && formatted === "0")
     ? null
     : formatted;
