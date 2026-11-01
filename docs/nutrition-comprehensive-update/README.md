@@ -10,7 +10,7 @@
 
 第1段階では設計文書だけを作成した。2026-11-01の追加指示により、設計を正本とした実装・自動検証・Preview反映・PR作成が承認された。以降の実施状況は[実装記録](09-implementation-status.md)を参照する。mainマージ、Production migration、Productionデプロイは新しい明示承認まで禁止。
 
-GitHub、Supabase、Vercelの監査は読み取りだけを行った。DB照会はREAD ONLYトランザクションで、スキーマ・制約・関数定義・権限とグローバル栄養素定義に限定した。食事、体重、睡眠、ユーザーID、資格情報の実値を成果物へ転記していない。
+第1段階のGitHub、Supabase、Vercel監査は読み取りだけを行った。以後のPreviewへの反映は09の台帳へ記録する。監査照会はREAD ONLYトランザクションを使用し、実データの整合性は件数・digestだけで照合する。食事、体重、睡眠、ユーザーID、資格情報の実値を成果物へ転記していない。
 
 PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyとしたが、追加指示により実装ブランチのpush/Preview/PRは承認済み。設計承認・実装開始・Production反映承認は別のゲートである。
 
@@ -29,6 +29,7 @@ PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyと
 | [09-implementation-status.md](09-implementation-status.md) | 重点4項目の補足判断、実装単位の検証・環境反映状況 |
 | [10-preview-acceptance-and-production-plan.md](10-preview-acceptance-and-production-plan.md) | 操作案内、実機確認表、Production承認後の移行・障害対応 |
 | [11-chat-v2-instructions.md](11-chat-v2-instructions.md) | 既存ChatGPT Projectをv2契約へ切り替えるためのコピー用指示 |
+| [12-feature-coverage-and-verification.md](12-feature-coverage-and-verification.md) | 画面・29項目の全経路・数値契約・実用上の制約と受け入れ範囲 |
 
 ## 主要な設計判断
 

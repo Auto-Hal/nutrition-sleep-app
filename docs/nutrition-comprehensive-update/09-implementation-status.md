@@ -144,3 +144,11 @@ SW検査ではテスト側がアプリとは別versionのworkerを同scopeへ登
 SW navigationの自動受け入れはChromium、WebKitは開いている画面からのオフライン入力/復帰を検証する。[PlaywrightのSW対応範囲](https://playwright.dev/docs/service-workers)と[WebKit offline navigationの既知不具合](https://github.com/microsoft/playwright/issues/42775)があるため、Safari/PWAのcold startは実機未確認として残す。
 
 e4c7ca4 / CI 41324573230ではChromiumの全フローが成功。実workerによるoffline shell再読み込み、端末pendingの保持・復帰後1件だけ保存、過去日の参考比較で正式日数不変、PNG/Body/CSV/JSON/Sleepまで通過した。続くWebKitでは共有した合成ownerの保存済み目標1800.000と初期値1800の文字列表記差をテストが拒否したため、末尾の0だけを許容する数値表記の比較へ修正した。全プロジェクト成功までは統合検証完了にしない。
+
+Hosted Preview再確認（2026-11-02）: e4c7ca4のdeployment READY、login 200/no-store、app-versionのSHA一致を確認。app-versionのoutbox_contract_version=1は従来操作の既定値であり、新規操作は明示的なcontract 2を使い、対応集合は1/2である。Vercel接続ツールがアプリ401もprotection失敗と表示するため、同接続の一時共有リンク/cookieで再確認し、栄養period/Catalog/Body/転送の4 APIがアプリJSONのUnauthorized/401を返すことを照合した。保護設定は変更していない。Vercel環境変数はPreview/Productionのtarget/IDが分離していることをmetadataで確認し、値を出力・変更していない。
+
+Previewは内部30、台帳32（既存24＋M1〜M8）、新8表がowner SELECT policy付きRLS/直接DML不可、主要read RPCはSTABLE/invoker/匿名EXECUTE不可、private helper公開0。食品5・栄養21・snapshot322と既存3種digestは継続一致。goal/body/transferは各0で実アカウントへ合成fixtureを投入していない。advisorはprivate server-only表6 INFO、owner検証を要する意図した公開SECURITY DEFINER RPC49 WARN、従来の漏洩パスワード保護1 WARNで、新しいRLS欠落はない。対応背景: [private表policy](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)、[公開definer関数](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)、[パスワード保護](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)。
+
+Production再監査ではmain/公開aliasのSHAは7b2bcea、deployment dpl_6wWY3x49CEv6s4CotFjdXdAsiD3Z READY、内部18・台帳28、新goal/body/transfer/libraryなしを確認。変更操作は行っていない。接続済みブラウザーでHosted認証後のread-only画面も確認しようとしたが、Computer Useは初期化時のkernel assets pathエラーがreset後も続いた。Hostedのログイン後操作は未確認として残し、使い捨てAuth/DBの実ブラウザー成功と区別する。
+
+04a9fc1 / CI 41325213207でもChromium全フローが成功。WebKitはProductのバーコード入力がhydration前に可能で、React初期化により空欄へ戻り、無効な番号と判定される問題を検出した。Productの初期番号・種類・検索/手動/カメラ操作をhydration完了まで無効化する。テストを待ち時間だけで回避せず、実際の早い入力も保護する。ローカルProduct関連23テストとlintを確認後、全E2Eを再実行する。

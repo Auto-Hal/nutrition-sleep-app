@@ -261,6 +261,8 @@ export function ProductIngestion({
   outboxBinding: OutboxBinding;
   requestedProduct?: { barcode: string; requestId: string } | null;
 }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [barcode, setBarcode] = useState("");
   const [itemType, setItemType] = useState<ProductItemType>("product");
   const [externalCandidate, setExternalCandidate] =
@@ -1202,6 +1204,7 @@ export function ProductIngestion({
           <label htmlFor="commercial-item-type">種類</label>
           <select
             id="commercial-item-type"
+            disabled={!ready}
             value={itemType}
             onChange={(event) =>
               setItemType(event.target.value as ProductItemType)
@@ -1215,6 +1218,7 @@ export function ProductIngestion({
           <label htmlFor="product-barcode">JAN / EAN / UPC / GTIN</label>
           <input
             id="product-barcode"
+            disabled={!ready}
             inputMode="numeric"
             autoComplete="off"
             value={barcode}
@@ -1232,7 +1236,7 @@ export function ProductIngestion({
           className="button"
           type="button"
           onClick={() => setScannerOpen(true)}
-          disabled={busy || scannerOpen}
+          disabled={!ready || busy || scannerOpen}
         >
           ライブカメラで読む
         </button>
@@ -1243,6 +1247,7 @@ export function ProductIngestion({
             type="file"
             accept="image/*"
             capture="environment"
+            disabled={!ready || busy}
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) void readBarcodePhoto(file);
@@ -1254,7 +1259,7 @@ export function ProductIngestion({
           className="button secondary"
           type="button"
           onClick={() => void resolveBarcode(barcode)}
-          disabled={busy}
+          disabled={!ready || busy}
         >
           番号で検索
         </button>
@@ -1264,7 +1269,7 @@ export function ProductIngestion({
         <button
           className="button secondary"
           type="button"
-          disabled={busy}
+          disabled={!ready || busy}
           onClick={() => void startManual()}
         >
           写真なしで入力・編集
