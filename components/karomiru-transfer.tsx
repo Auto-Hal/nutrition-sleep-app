@@ -32,7 +32,7 @@ import {
 const label = (code: string) =>
   STANDARD_NUTRIENT_DEFINITIONS.find((n) => n.code === code)?.label ?? code;
 const statusLabel = {
-  prepared: "画像準備済み・外部登録は未確認",
+  prepared: "転送データ準備済み・外部登録は未確認",
   confirmed: "カロミル登録を本人が確認",
   revoked: "転送確認を取り消し済み",
 };

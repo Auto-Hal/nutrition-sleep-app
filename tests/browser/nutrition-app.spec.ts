@@ -76,7 +76,9 @@ test("authenticated nutrition, body and transfer story", async ({
     .length;
   await page.goto("/settings?view=goals");
   await page.locator("#goal-mode").selectOption("custom");
-  await expect(page.locator("#default-goal-energy")).toHaveValue("1800");
+  await expect(page.locator("#default-goal-energy")).toHaveValue(
+    /^1800(?:\.0+)?$/,
+  );
   await expect(
     page.getByText(/目標量：P 112.5 \/ F 40.0 \/ C 247.5 g/),
   ).toBeVisible();

@@ -142,3 +142,5 @@ DRI評価には従来からの成人・プロフィール条件と、新しい�
 SW検査ではテスト側がアプリとは別versionのworkerを同scopeへ登録していたため、競合の可能性を除いてアプリ自身のactivated workerとoffline.html cacheを確認するよう変更した。続く7801c26のCIでは、offline指定でもworkerがオンラインの画面を返すことを検出した。Playwright 1.55の[実装](https://github.com/microsoft/playwright/blob/v1.55.0/packages/playwright-core/src/server/chromium/crServiceWorker.ts)ではPW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTSがないとworker側のoffline設定を行わない。実際のsw.js/offline.htmlを使ったloopback再現で、設定なしではOnline page、設定ありでは「オフラインです」が返ることを確認し、使い捨てrunnerの環境変数へ設定した。
 
 SW navigationの自動受け入れはChromium、WebKitは開いている画面からのオフライン入力/復帰を検証する。[PlaywrightのSW対応範囲](https://playwright.dev/docs/service-workers)と[WebKit offline navigationの既知不具合](https://github.com/microsoft/playwright/issues/42775)があるため、Safari/PWAのcold startは実機未確認として残す。
+
+e4c7ca4 / CI 41324573230ではChromiumの全フローが成功。実workerによるoffline shell再読み込み、端末pendingの保持・復帰後1件だけ保存、過去日の参考比較で正式日数不変、PNG/Body/CSV/JSON/Sleepまで通過した。続くWebKitでは共有した合成ownerの保存済み目標1800.000と初期値1800の文字列表記差をテストが拒否したため、末尾の0だけを許容する数値表記の比較へ修正した。全プロジェクト成功までは統合検証完了にしない。

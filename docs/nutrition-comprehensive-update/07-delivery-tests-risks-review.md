@@ -1,6 +1,6 @@
 # 実装フェーズ・受け入れ・リスク・設計レビュー
 
-2026-11-01。**これは次回以降の実行計画**。今回実行したのはmain/運用metadataの監査と文書検証だけであり、下記の新機能テストやデプロイを完了したという意味ではない。
+2026-11-01に作成した第1段階の計画と受け入れ基準。実装開始の追加承認後の実績は[09](09-implementation-status.md)、Preview受け入れと本番手順は[10](10-preview-acceptance-and-production-plan.md)を参照する。下記の計画上の完了条件を、実際に全て検証済みという意味にはしない。
 
 ## 1. 依存関係と安全な実装単位
 
@@ -175,7 +175,7 @@ Previewを変更できる実装フェーズに移った後、対象project/branc
 6. 承認後だけProduction migration、main merge、Production deployを承認範囲・依存順で行う。
 7. app-version/SHA、deployment READY、移行履歴、ログ、owner機能の非破壊smoke、profile/export/Sleepを確認し記録する。
 
-今回は1〜7を実行していない。現行workflowはPRでPreviewを起動し、Production workflowはpreview GitHub environmentにあるtokenを使用する。環境名だけで承認・接続分離が保証されると判断しない。将来の権限改善は機能変更と分けて提案し、今回の設計でworkflowを勝手に変更しない。
+第1段階では1〜7を実行していない。追加承認後は実装branch/PRで自動検証とPreview反映を実施しており、Production操作は未承認のままである。現行workflowはPRでPreviewを起動し、Production workflowはpreview GitHub environmentにあるtokenを使用する。環境名だけで承認・接続分離が保証されると判断しない。将来の権限改善は機能変更と分けて提案する。
 
 ## 7. 主要リスクと対策
 
@@ -193,7 +193,7 @@ Previewを変更できる実装フェーズに移った後、対象project/branc
 | Hosted履歴/ACLの差 | migration二重適用/予想外権限 | preflightで実DDL照合、無断repairしない |
 | 行上限/複数snapshot | 月/週/exportが欠ける/混在 | 単一JSONB period RPC、全件検査、snapshot export |
 | rollback先が古すぎる | 新table/outbox/新code損失 | 互換bridgeへ戻す、schemaを縮小しない |
-| 自動Preview/Production経路 | 設計PR/mergeだけで環境変更 | 今回push/PRなし、次段階でも対象・権限を再確認 |
+| 自動Preview/Production経路 | PR/mergeだけで環境変更 | 実装branchのPreviewだけ承認済み。main merge/Productionは新たな承認まで禁止 |
 | timezone runtimeの差 | 週境界ずれ | civil-date計算・IANA検証、DB/JS一致fixture |
 
 Supabaseは2026-10-30に一部zoneのtzdata修正を公表している。今回確認したservice 17.6.1.166から、Asia/Tokyo以外の全zoneが正しいとは推測しない。[公式changelog](https://supabase.com/changelog/tzdata-local-time-vancouver-edmonton-casablanca)。対象zoneの検証と必要な運用判断は移行前flightへ記録し、今回アップグレードは行わない。
@@ -237,4 +237,4 @@ Hosted migration履歴/ACLの差の由来、実行時点のprovider schema、iOS
 - Fractionによる設計例の再計算に成功（初期PFC/糖質、90/110境界、月間の加重比、週境界/途中目標変更/残量、Na換算、体重平均）。
 - 最終確認でもremote mainは7b2bcea。mainのアプリ実装を変更していない。
 
-この時点で機能実装・新機能のテスト成功・Preview受け入れ・実iPhone確認・カロミルOCR再確認は**全て未実施**。設計確認後の次の指示があるまで停止する。
+この第1段階完了時点では機能実装・新機能のテスト成功・Preview受け入れ・実iPhone確認・カロミルOCR再確認は全て未実施だった。その後、ユーザーが実装開始を承認している。現在の結果と残る制約は09/10を正本とし、この旧停止条件から作業を巻き戻さない。

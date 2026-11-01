@@ -2,6 +2,8 @@
 
 以下は第1段階で作成した引継ぎ。2026-11-01の追加指示で設計が原則承認され、実装・Preview・PR作成が承認された。重点4項目の補足は03と09を併読する。Productionは引き続き未承認。
 
+**既存作業を再開する場合**: feature/nutrition-comprehensive-update、PR #47、09の最新結果と10の残る受け入れを先に確認する。P0/P1を再実装したり、既に適用済みのPreview M1〜M8を再実行したりしない。以下の「実装開始」は第1段階からの履歴として残す。
+
 ---
 
 Auto-Hal/nutrition-sleep-appの栄養管理総合アップデートを実装してください。
@@ -56,5 +58,5 @@ iPhone/iPad実機とカロミルOCRは本人の検証結果が必要です。実
 - 監査main: 7b2bcea83c97d14aa8b11b06a8f2d0377dbbaec5
 - 監査したProduction: dpl_6wWY3x49CEv6s4CotFjdXdAsiD3Z / READY
 - 監査したPreview: dpl_G4A2jg6owiQBQ7hjVpJHJFjk9k2Y / READY
-- 今回はアプリ実装・migration実行・環境変更・PR作成・merge/deployをしていない
+- 第1段階ではアプリ実装・migration実行・環境変更・PR作成・merge/deployをしていない（追加承認後の実績は09）
 - 数値と表は設計/合成例。実ユーザーの食事/体重/睡眠値は含めていない
