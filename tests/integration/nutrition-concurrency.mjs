@@ -19,7 +19,7 @@ async function asOwner(client, userId) {
 }
 try {
   await pool.query("insert into auth.users(id,email) values($1,$2),($3,$4)", [owner, `${owner}@example.invalid`, other, `${other}@example.invalid`]);
-  const day = (await pool.query("select ((now() at time zone 'Asia/Tokyo')::date)::text day")).rows[0].day;
+  const day = (await pool.query("select ((now() at time zone 'Asia/Tokyo')::date)::text as nutrition_day")).rows[0].nutrition_day;
   const payload = { action: "set", mode: "custom", effective_from: day, time_zone: "Asia/Tokyo", training_weekdays: [], targets: [{ variant: "default", energy_kcal: "1800", protein_bps: 2500, fat_bps: 2000, carbohydrate_bps: 5500, fiber_goal_g: "20", salt_limit_g: "7.50", pfc_tolerance_bps: 1000, energy_tolerance_bps: 1000, calculation_source: "manual" }] };
   clients.push(...await Promise.all([pool.connect(), pool.connect()]));
   await Promise.all(clients.map((client) => asOwner(client, owner)));
