@@ -65,6 +65,8 @@ try {
     owner,
     "Auth fixture must match the allowed owner",
   );
+  const signup=await createClient(api.href,status.ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}}).auth.signUp({email:`forbidden-${randomUUID()}@example.invalid`,password});
+  assert.equal(signup.error?.code,"signup_disabled","Enabling email login must not enable self-signup");
   const other = await admin.auth.admin.createUser({
     email: `other-${randomUUID()}@example.invalid`,
     password,

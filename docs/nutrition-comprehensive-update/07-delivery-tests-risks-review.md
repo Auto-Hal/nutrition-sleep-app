@@ -131,7 +131,7 @@ flowchart TD
 | Playwright E2E | Chromium/WebKit mobile/iPad、実Next＋isolated auth/DBの新フロー。既存合成Sleep検証も残す |
 | docs/契約整合 | code集合30/標準29、APIとDeno/SQL、参照/出力の定義一致 |
 
-CLIの実在コマンド/flagは実行時の--helpで確認する。DB replayはHosted/Productionを指すDATABASE_URLで実行しない。今回は禁止事項に従いこれらのmigration検証を実行していない。
+CLIの実在コマンド/flagは実行時の--helpで確認する。DB replayはHosted/Productionを指すDATABASE_URLで実行しない。第1段階ではmigration検証を実行していない。追加指示後の実行結果は[09](09-implementation-status.md)を参照する。
 
 失敗は原因を修正して必要な層を再実行する。合成ブラウザfixture、mock API、実認証・実DB E2E、実機OCRを同じ「E2E成功」へまとめない。結果にはSHA、環境、コマンド、件数、失敗/未実行、既知warningを付ける。
 

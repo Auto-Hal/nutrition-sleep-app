@@ -113,3 +113,5 @@ queue直後とdrain要求の両方で期間の同期状態を再確認する。�
 初回840c28c/CI 41318831948はアプリ検査・650 pgTAP・実接続まで成功し、ブラウザのログイン段階で401を検出。Authそのもののfixture検証を追加し、ログインフォームをhydration完了まで無効にして、初期HTMLからのnative GET送信もPOST指定で防止した。次のCIで原因を絞って再検証する。Supabase CLIは検証時の2.122.0へ固定する。mainの18項目DBへ合成fixtureを入れてから追加migrationだけを適用し、旧18snapshot/fingerprint/receiptと履歴未作成を照合するupgrade runnerも追加する。
 
 PreviewのMCPは正規の/mcpで未認証401を確認したが、内部HTTP gatewayのURLをOAuth metadataへ使う問題を発見した。公開SUPABASE_URLを基準に修正し、request hostを信用しないURL構築とloopback以外のHTTP拒否を単体/Deno検査する。実ChatGPT OAuth成功とは区別する。
+
+2a867ae CI 41319767273のアプリ検査（744 Vitest/lint/typecheck/Deno/build）・650 pgTAP・同時更新は成功。ブラウザ開始前の新preflightでemail_provider_disabledを特定した。ローカルconfigの[auth.email].enable_signup=falseがメールproviderを無効化していたため、[auth].enable_signup=false（一般登録禁止）と[auth.email].enable_signup=true（既存ユーザーのメールログイン有効）を分け、一般signupが拒否されることもpreflightへ加えた。Hostedへconfig pushは実行しない。根拠: [公式CLI設定](https://supabase.com/docs/guides/local-development/cli/config)、[Supabase CLI issue #7055](https://github.com/supabase/cli/issues/7055)。
