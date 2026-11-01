@@ -16,6 +16,7 @@ export function DataExport({
     [ownerUserId, environmentId],
   );
   const [busy, setBusy] = useState(false);
+  const [schemaVersion, setSchemaVersion] = useState("2");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export function DataExport({
         if (!proceed) return;
       }
 
-      const response = await fetch("/api/export", {
+      const response = await fetch(`/api/export?version=${schemaVersion}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: "{}",
@@ -88,6 +89,7 @@ export function DataExport({
       </div>
 
       {message && <p className="muted profile-status" role="status">{message}</p>}
+      <div className="field"><label htmlFor="export-json-version">JSON形式</label><select id="export-json-version" value={schemaVersion} onChange={(event) => setSchemaVersion(event.target.value)}><option value="2">v2：目標履歴・栄養値の出典を含む</option><option value="1">v1：既存の形式</option></select></div>
       {error && <p className="error-text" role="alert">{error}</p>}
 
       <details className="settings-details">

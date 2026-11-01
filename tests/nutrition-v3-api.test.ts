@@ -5,6 +5,9 @@ vi.mock("@/lib/auth/session", () => ({ getAppSession: session }));
 vi.mock("@/lib/supabase/user", () => ({ createUserClient: () => ({ rpc }) }));
 import { POST as catalogPost } from "@/app/api/catalog/reliable/route";
 import { POST as chatPost } from "@/app/api/chat-registration/route";
+import { POST as goalPost } from "@/app/api/nutrition/goals/reliable/route";
+import { POST as exportPost } from "@/app/api/export/route";
+import { INITIAL_GOAL_TARGET } from "@/lib/nutrition/goals";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
 const origin = "https://preview.example";
@@ -34,5 +37,21 @@ describe("authenticated nutrient schema dispatch", () => {
     expect(response.status).toBe(200);
     expect(rpc.mock.lastCall?.[0]).toBe("confirm_chat_meal_v2");
     expect(rpc.mock.lastCall?.[1].p_payload.catalog).toMatchObject({ item_type: "estimated_dish", nutrients: [expect.objectContaining({ code: "potassium", value_origin: "estimated", contains_estimates: true, quality: "unknown" })] });
+  });
+  it("uses the goal head revision without accepting an owner in the request", async () => {
+    const input = { operation_id, intent_created_at: catalog.intent_created_at, contract_version: 2, expected_revision: 0, goal: { action: "set", mode: "custom", time_zone: "Asia/Tokyo", effective_from: "2026-11-01", training_weekdays: [], targets: [INITIAL_GOAL_TARGET] } };
+    expect((await goalPost(request("/api/nutrition/goals/reliable", input))).status).toBe(201);
+    expect(rpc.mock.lastCall?.[0]).toBe("append_nutrition_goal_v1");
+    expect(rpc.mock.lastCall?.[1].p_expected_revision).toBe(0);
+    expect((await goalPost(request("/api/nutrition/goals/reliable", { ...input, user_id: "another-owner" }))).status).toBe(422);
+    expect((await goalPost(request("/api/nutrition/goals/reliable", { ...input, goal: { ...input.goal, targets: [{ ...INITIAL_GOAL_TARGET, protein_bps: 2499 }] } }))).status).toBe(422);
+  });
+  it("keeps v1 export as the API default and v2 as an explicit selection", async () => {
+    expect((await exportPost(request("/api/export", {}))).status).toBe(200);
+    expect(rpc.mock.lastCall?.[0]).toBe("export_user_data_v1");
+    const response = await exportPost(request("/api/export?version=2", {}));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(rpc.mock.lastCall?.[0]).toBe("export_user_data_v2");
   });
 });

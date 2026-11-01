@@ -2,7 +2,7 @@ export function isIsoDate(value: string | null | undefined): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split("-").map(Number);
   const parsed = new Date(`${value}T00:00:00Z`);
-  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+  return year >= 1 && parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 export function shiftIsoDate(value: string, days: number) {
   if (!isIsoDate(value) || !Number.isInteger(days)) throw new Error("date is invalid");

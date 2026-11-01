@@ -32,20 +32,32 @@ select is(jsonb_array_length(public.get_nutrition_goal_period_v1(current_date-89
 select is(jsonb_array_length(public.get_nutrition_goal_period_v1(current_date,current_date+365)->'rows'),10980,'366-day period does not hit REST row limits');
 select ok((public.get_nutrition_goal_period_v1(current_date,current_date)->'rows'->0->'known_amount')='null'::jsonb,'unrecorded day known amount is null, not zero');
 select is(public.get_nutrition_goal_period_v1(current_date,current_date)->'days'->0->>'record_state','not_recorded','no meal entries is unrecorded');
+select is(public.export_user_data_v2()->>'schema_version','2','new export has its own schema version');
+select is(jsonb_array_length(public.export_user_data_v2()->'goals'->'versions'),4,'goal export includes cancelled and delayed history');
+select is(public.export_user_data_v1()->>'schema_version','1','legacy export keeps its schema contract');
 set constraints all immediate;
 set constraints all deferred;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111202',true);
 set local role authenticated;
 select is((select count(*)::integer from public.nutrition_goal_versions),0,'RLS hides other owners goal history');
 select is(jsonb_array_length(public.get_nutrition_goal_history_v1()->'versions'),0,'history RPC remains owner isolated');
+select is(jsonb_array_length(public.export_user_data_v2()->'goals'->'versions'),0,'export cannot include another owner goals');
 select ok(not has_table_privilege('authenticated','public.nutrition_goal_versions','INSERT'),'table writes require RPC');
 select throws_ok($$select public.get_nutrition_goal_period_v1(current_date,current_date+366)$$,'PT422','invalid_nutrition_period','range limit enforced in invoker context');
 reset role;
 select ok(not has_function_privilege('anon','public.append_nutrition_goal_v1(uuid,integer,timestamptz,integer,jsonb)','EXECUTE'),'anonymous writes denied');
+insert into public.user_profiles(user_id,birth_date,sex,height_cm,weight_kg,weight_updated_on,activity_level,time_zone)
+ values('11111111-1111-4111-8111-111111111202',((now() at time zone 'Asia/Tokyo')::date-interval '30 years')::date,'male',175,70,(now() at time zone 'Asia/Tokyo')::date,'moderate','Asia/Tokyo');
+create temp table auto_goal_command as select c.payload||jsonb_build_object('mode','profile_reference','targets',jsonb_build_array(c.payload->'targets'->0||jsonb_build_object(
+ 'energy_kcal',round(private.phase8_profile_energy_raw(p.user_id,(now() at time zone 'Asia/Tokyo')::date),3)::text,'calculation_source','profile_reference','calculation_inputs',jsonb_build_object(
+ 'formula_version','nih-2015-dri2025-v1','profile_revision',p.revision,'birth_date',p.birth_date,'sex',p.sex,'height_cm',p.height_cm::text,'weight_kg',p.weight_kg::text,'activity_level',p.activity_level,'as_of',(now() at time zone 'Asia/Tokyo')::date,'reference_kcal_raw',private.phase8_profile_energy_raw(p.user_id,(now() at time zone 'Asia/Tokyo')::date)::text,'adopted_energy_kcal',round(private.phase8_profile_energy_raw(p.user_id,(now() at time zone 'Asia/Tokyo')::date),3)::text)))) payload from goal_command c cross join public.user_profiles p where p.user_id='11111111-1111-4111-8111-111111111202';
+select lives_ok($$select public.append_nutrition_goal_v1('30000000-0000-4000-8000-000000001212',2,now(),0,(select payload from auto_goal_command))$$,'profile reference adopts the checked profile and raw estimator');
+select throws_ok($$select public.append_nutrition_goal_v1('30000000-0000-4000-8000-000000001213',2,now(),1,(select jsonb_set(payload,'{targets,0,energy_kcal}','"1800"') from auto_goal_command))$$,'PT409','profile_reference_changed','manual calorie change cannot masquerade as an automatic calculation');
 select set_config('request.jwt.claim.sub','',true);
 delete from auth.users where id='11111111-1111-4111-8111-111111111201';
-select is((select count(*)::integer from public.nutrition_goal_versions),0,'account cascade erases immutable goals');
-select is((select count(*)::integer from public.nutrition_goal_variant_targets),0,'account cascade erases all goal variants');
-select is((select count(*)::integer from public.nutrition_day_type_events),0,'account cascade erases day types');
+select is((select count(*)::integer from public.nutrition_goal_versions where user_id='11111111-1111-4111-8111-111111111201'),0,'account cascade erases immutable goals');
+select is((select count(*)::integer from public.nutrition_goal_variant_targets where user_id='11111111-1111-4111-8111-111111111201'),0,'account cascade erases all goal variants');
+select is((select count(*)::integer from public.nutrition_day_type_events where user_id='11111111-1111-4111-8111-111111111201'),0,'account cascade erases day types');
+select is((select count(*)::integer from public.nutrition_goal_versions where user_id='11111111-1111-4111-8111-111111111202'),1,'account cascade preserves the other owner');
 select * from finish();
 rollback;

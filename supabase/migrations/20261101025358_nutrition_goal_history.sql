@@ -106,6 +106,17 @@ do $security$ declare table_name text; begin
  end loop;
 end $security$;
 
+create or replace function private.phase8_profile_energy_raw(p_user_id uuid,p_as_of date)
+returns numeric language sql stable set search_path=pg_catalog as $$
+ with p as (select *,extract(year from age(p_as_of,birth_date))::integer a from public.user_profiles where user_id=p_user_id),
+ inputs as (select *,case when a>=75 then case activity_level when 'low' then 1.4 when 'moderate' then 1.7 end
+  when a>=65 then case activity_level when 'low' then 1.5 when 'moderate' then 1.7 when 'high' then 1.9 end
+  else case activity_level when 'low' then 1.5 when 'moderate' then 1.75 when 'high' then 2 end end pal from p)
+ select case when a between 18 and 79 and sex in ('male','female') and height_cm>0 and weight_kg>0 then
+  (0.0481*weight_kg+0.0234*height_cm-0.0138*a-case sex when 'male' then 0.4235 else 0.9708 end)*1000/4.186*pal end from inputs
+$$;
+revoke all on function private.phase8_profile_energy_raw(uuid,date) from public,anon,authenticated;
+
 create or replace function public.append_nutrition_goal_v1(
  p_operation_id uuid,p_contract_version integer,p_intent_created_at timestamptz,p_expected_revision integer,p_payload jsonb
 ) returns jsonb language plpgsql security definer set search_path=pg_catalog as $$
@@ -126,7 +137,7 @@ begin
  insert into public.nutrition_goal_heads(user_id) values(owner_id) on conflict do nothing;
  select * into head from public.nutrition_goal_heads where user_id=owner_id for update;
  if head.revision<>p_expected_revision then perform private.phase6_raise_http(409,'revision_conflict'); end if;
- select * into profile from public.user_profiles where user_id=owner_id;
+ select * into profile from public.user_profiles where user_id=owner_id for share;
  zone:=coalesce(profile.time_zone,'Asia/Tokyo');
  if p_payload->>'time_zone' is distinct from zone or not exists(select 1 from pg_timezone_names where name=zone) then
   perform private.phase6_raise_http(409,'profile_time_zone_changed');
@@ -171,6 +182,11 @@ begin
    if target->>'calculation_source'='profile_reference' and (inputs is null or profile.revision is null
     or (inputs->>'profile_revision')::integer is distinct from profile.revision
     or inputs->>'formula_version' is distinct from 'nih-2015-dri2025-v1'
+    or inputs->>'birth_date' is distinct from profile.birth_date::text or inputs->>'sex' is distinct from profile.sex
+    or (inputs->>'height_cm')::numeric is distinct from profile.height_cm or (inputs->>'weight_kg')::numeric is distinct from profile.weight_kg
+    or inputs->>'activity_level' is distinct from profile.activity_level or inputs->>'as_of' is distinct from intent_day::text
+    or (inputs->>'adopted_energy_kcal')::numeric is distinct from (target->>'energy_kcal')::numeric
+    or round(private.phase8_profile_energy_raw(owner_id,intent_day),3) is distinct from (target->>'energy_kcal')::numeric
     or profile.birth_date is null or profile.sex is null or profile.height_cm is null or profile.weight_kg is null or profile.activity_level is null) then
     perform private.phase6_raise_http(409,'profile_reference_changed');
    end if;
@@ -284,7 +300,7 @@ begin
    bool_or(e.quality='unverified') filter(where e.amount is not null and e.comparable) known_unverified_quality,
    bool_and(e.quality='user_verified') filter(where e.amount is not null and e.comparable) known_all_verified,
    bool_or(e.value_origin='estimated' or e.provenance='estimated_dish' or e.contains_estimates) filter(where e.amount is not null and e.comparable) contains_estimates,
-   count(e.entry_id) filter(where e.amount is not null and e.comparable and e.contains_estimates is null and e.value_origin is null) unknown_estimate_entries
+   count(e.entry_id) filter(where e.amount is not null and e.comparable and e.contains_estimates is null) unknown_estimate_entries
   from days d cross join public.nutrient_definitions n
   left join values_with_evidence e on e.meal_date=d.meal_date and e.code=n.code
   group by d.meal_date,n.code,n.unit,d.record_complete,d.entry_count
@@ -311,5 +327,31 @@ begin
 end $$;
 revoke all on function public.get_nutrition_goal_period_v1(date,date) from public,anon,authenticated;
 grant execute on function public.get_nutrition_goal_period_v1(date,date) to authenticated;
+
+-- v1's output contract stays unchanged. STABLE makes its read-only SELECT use
+-- the calling statement snapshot when v2 combines it with new history tables.
+alter function public.export_user_data_v1() stable;
+create or replace function public.export_user_data_v2()
+returns jsonb language plpgsql stable security invoker set search_path=pg_catalog as $$
+declare owner_id uuid:=(select auth.uid()); result jsonb;
+begin
+ if owner_id is null then raise insufficient_privilege; end if;
+ with base as materialized (select public.export_user_data_v1() payload)
+ select b.payload||jsonb_build_object('schema_version',2,'as_of',statement_timestamp(),
+  'definitions',(b.payload->'definitions')||jsonb_build_object('nutrient_schema_version',2,'standard_nutrient_codes',
+    (select jsonb_agg(code order by code) from public.nutrient_definitions where code<>'sodium'),
+    'dri_dataset',(b.payload->'definitions'->'dri_dataset')||'{"revision":"report-corrected-2025-03-25-nutrients-v2"}'::jsonb),
+  'nutrition',(b.payload->'nutrition')||jsonb_build_object(
+   'item_nutrients',coalesce((select jsonb_agg(old||jsonb_build_object('amount',n.amount::text,'value_origin',n.value_origin,'definition_basis',n.definition_basis,'intake_scope',n.intake_scope,'derivation',n.derivation,'contains_estimates',n.contains_estimates) order by n.catalog_item_id,n.nutrient_code)
+    from jsonb_array_elements(b.payload->'nutrition'->'item_nutrients') old join public.item_nutrients n on n.catalog_item_id=(old->>'catalog_item_id')::uuid and n.nutrient_code=old->>'nutrient_code' and n.user_id=owner_id),'[]'::jsonb),
+   'meal_entry_nutrient_snapshots',coalesce((select jsonb_agg(old||jsonb_build_object('amount',s.amount::text,'value_origin',s.value_origin,'definition_basis',s.definition_basis,'intake_scope',s.intake_scope,'derivation',s.derivation,'contains_estimates',s.contains_estimates) order by s.meal_entry_id,s.nutrient_code)
+    from jsonb_array_elements(b.payload->'nutrition'->'meal_entry_nutrient_snapshots') old
+    join public.meal_entry_nutrient_snapshots s on s.meal_entry_id=(old->>'meal_entry_id')::uuid and s.nutrient_code=old->>'nutrient_code'
+    join public.meal_entries e on e.id=s.meal_entry_id and e.user_id=owner_id),'[]'::jsonb)),
+  'goals',public.get_nutrition_goal_history_v1()) into result from base b;
+ return result;
+end $$;
+revoke all on function public.export_user_data_v2() from public,anon,authenticated;
+grant execute on function public.export_user_data_v2() to authenticated;
 reset lock_timeout;
 reset statement_timeout;
