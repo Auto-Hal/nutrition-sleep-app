@@ -12,6 +12,8 @@ import { POST as bodyPost, PATCH as bodyPatch, DELETE as bodyDelete } from "@/ap
 import { POST as bodySettings } from "@/app/api/body/settings/reliable/route";
 import { POST as transferPrepare } from "@/app/api/karomiru/transfers/prepare/route";
 import { POST as transferStatus } from "@/app/api/karomiru/transfers/status/reliable/route";
+import { POST as csvExport } from "@/app/api/export/csv/route";
+import { csvFixture } from "./helpers/csv-fixture";
 import { INITIAL_GOAL_TARGET } from "@/lib/nutrition/goals";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
@@ -88,5 +90,18 @@ describe("authenticated nutrient schema dispatch", () => {
     expect((await transferStatus(request("/api/karomiru/transfers/status/reliable", confirmed))).status).toBe(200);
     expect(rpc.mock.lastCall?.[0]).toBe("update_karomiru_transfer_status_v1");
     expect((await transferStatus(request("/api/karomiru/transfers/status/reliable", { ...confirmed, user_id: "forged" }))).status).toBe(422);
+  });
+  it("exports CSV through one authenticated snapshot RPC and rejects owner fields or truncated results", async () => {
+    const input = { start_date: "2026-10-30", end_date: "2026-10-31", granularity: "food", include_sodium: false };
+    expect((await csvExport(request("/api/export/csv",input,"https://attacker.example"))).status).toBe(403);
+    session.mockResolvedValueOnce(null); expect((await csvExport(request("/api/export/csv",input))).status).toBe(401);
+    rpc.mockResolvedValueOnce({ data: csvFixture(), error: null });
+    const response = await csvExport(request("/api/export/csv",input)); expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/csv"); expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()).slice(0,3))).toEqual([239,187,191]);
+    expect(rpc.mock.lastCall?.[0]).toBe("get_nutrition_csv_source_v1");
+    expect((await csvExport(request("/api/export/csv",{...input,user_id:"forged"}))).status).toBe(422);
+    const broken=csvFixture(); broken.snapshots.pop(); rpc.mockResolvedValueOnce({data:broken,error:null});
+    expect((await csvExport(request("/api/export/csv",input))).status).toBe(503);
   });
 });

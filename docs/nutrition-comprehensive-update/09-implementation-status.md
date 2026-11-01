@@ -28,8 +28,9 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P4 体重履歴基盤 | 完了 | CI 41294836278：fresh replay、559 pgTAP、Body/旧プロフィールの実接続同時更新、lint/typecheck/Deno/build成功。Preview適用後も旧snapshot/profile digest一致 |
 | P5 PFC日/月/週 | 完了 | CI 41295693517：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。境界・途中記録・参照比較・集計19テスト、同期レース2テストを追加 |
 | P6 Body画面 | 完了 | CI 41296434510：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。実測CRUD、30/90日、移動平均、目標・連携、5タブを接続 |
-| P7 PNG転送 | 画面統合・検証中 | 基盤CI 41297687213の605 pgTAP/実接続成功、Preview M5適用済み。全起点からのプレビュー/PNG保存/共有/名前コピー/手動確認を接続。保存・共有で自動確認しないUI回帰も成功。実機OCR未確認 |
-| P8〜P9 | 未着手 | 未実施 |
+| P7 PNG転送 | 実装・自動検証完了 | UI統合CI 41298773341：lint/typecheck/unit/build、fresh replay/605 pgTAP/実接続成功。Preview反映済み。保存・共有で自動確認しない回帰成功。物理iPhone/OCRは未確認 |
+| P8 CSV・入力/品質・UI整理 | CSV実装・検証中 | 単一snapshot source、3粒度、29項目/品質/履歴目標、BOM/CRLF/数式対策を実装 |
+| P9 統合・受け入れ | 未着手 | 未実施 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
 

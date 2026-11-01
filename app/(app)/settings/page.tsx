@@ -54,6 +54,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <DataExport
             ownerUserId={ownerUserId}
             environmentId={environmentId}
+            timeZone={profile?.time_zone ?? "Asia/Tokyo"}
           />
           <section className="card settings-links-card" aria-labelledby="settings-info-title">
             <h2 id="settings-info-title">アプリ情報</h2>

@@ -1,0 +1,27 @@
+begin;
+select no_plan();
+insert into auth.users(id,email) values('11111111-1111-4111-8111-111111111501','csv-a@example.invalid'),('11111111-1111-4111-8111-111111111502','csv-b@example.invalid');
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111501',true);
+create temp table csv_catalog as select public.create_catalog_item_v3(gen_random_uuid(),2,now(),'ingredient','CSV食品',null,100,'g',(select jsonb_agg(jsonb_build_object('code',code,'amount',case when code='copper' then 0 else 1 end,'unit',unit,'provenance','user_entered','quality','user_verified')) from public.nutrient_definitions)) result;
+do $$ declare i integer;begin
+ for i in 1..40 loop perform public.create_meal_entry_v3(gen_random_uuid(),2,now(),(now() at time zone 'Asia/Tokyo')::date,'breakfast',now(),(select(result->>'item_id')::uuid from csv_catalog),10,'g',(public.get_catalog_reference_fingerprint_v3((select(result->>'item_id')::uuid from csv_catalog))->>'reference_fingerprint'));end loop;
+end $$;
+create temp table csv_source as select public.get_nutrition_csv_source_v1((now() at time zone 'Asia/Tokyo')::date-89,(now() at time zone 'Asia/Tokyo')::date) data;
+select is(jsonb_array_length((select data->'snapshots' from csv_source)),1200,'snapshot JSON arrays are not truncated at the REST 1000-row limit');
+select is(jsonb_array_length((select data->'entries' from csv_source)),40,'all active food entries in the selected period');
+select is(jsonb_array_length((select data->'period'->'rows' from csv_source)),2700,'90-day goal/quality period is complete');
+select is((select data->>'as_of' from csv_source),(select data->'period'->>'as_of' from csv_source),'all CSV data and goal evaluation share one statement snapshot');
+select is((select (s->>'amount')::numeric from csv_source,jsonb_array_elements(data->'snapshots')s where s->>'nutrient_code'='protein' limit 1),0.1::numeric,'source uses already scaled immutable intake snapshots');
+select is((select(s->>'amount')::numeric from csv_source,jsonb_array_elements(data->'snapshots')s where s->>'nutrient_code'='copper' limit 1),0::numeric,'explicit zero stays zero');
+select throws_ok($$select public.get_nutrition_csv_source_v1(current_date-366,current_date)$$,'PT422','invalid_nutrition_period','more than 366 days rejected');
+select throws_ok($$select public.get_nutrition_csv_source_v1((now() at time zone 'Asia/Tokyo')::date,(now() at time zone 'Asia/Tokyo')::date+1)$$,'PT422','future_csv_period','future intake CSV period rejected');
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111502',true);
+set local role authenticated;
+select is(public.get_nutrition_csv_source_v1(current_date-89,current_date)->'counts'->>'entries','0','invoker source cannot contain another owner food');
+select is(jsonb_array_length(public.get_nutrition_csv_source_v1(current_date-89,current_date)->'snapshots'),0,'invoker snapshots are owner isolated');
+reset role;
+select ok(not has_function_privilege('anon','public.get_nutrition_csv_source_v1(date,date)','EXECUTE'),'anonymous CSV source denied');
+select is((select provolatile::text from pg_proc where oid='public.get_nutrition_csv_source_v1(date,date)'::regprocedure),'s','read-only source uses STABLE statement snapshot');
+select ok(not(select prosecdef from pg_proc where oid='public.get_nutrition_csv_source_v1(date,date)'::regprocedure),'CSV read respects invoker RLS');
+select * from finish();
+rollback;
