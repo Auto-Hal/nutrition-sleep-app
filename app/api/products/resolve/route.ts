@@ -92,6 +92,11 @@ export async function GET(request: Request) {
     );
   }
 
+  if (url.searchParams.get("localOnly") === "true")
+    return NextResponse.json(
+      { status: "not_found", fallback: "ocr", draft_id: draftId },
+      { headers: { "cache-control": "no-store" } },
+    );
   const external = await fetchOpenFoodFactsProduct(barcode, draftId);
   if (external.status === "found") {
     return NextResponse.json({

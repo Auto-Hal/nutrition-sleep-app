@@ -79,8 +79,9 @@ describe("Phase 3 nutrition label OCR parser", () => {
       { code: "energy", amount: 80, unit: "kcal" },
       { code: "protein", amount: 3.2, unit: "g" },
       { code: "fat", amount: 1.5, unit: "g" },
-      { code: "carbohydrate", amount: 12, unit: "g" },
     ]));
+    expect(parsed.nutrients.some(n=>n.code==="carbohydrate")).toBe(false);
+    expect(parseNutritionLabelText("Total Carbohydrate 12 g").nutrients).toContainEqual({code:"carbohydrate",amount:12,unit:"g"});
   });
 
   it("falls back to one serving when label basis cannot be resolved", () => {

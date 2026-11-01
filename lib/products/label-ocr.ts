@@ -21,7 +21,7 @@ export const LABEL_NUTRIENT_DEFINITIONS: ParserDefinition[] = [
   { code: "energy", labels: ["エネルギー", "エネルキー", "熱量", "energy"], targetUnit: "kcal" },
   { code: "protein", labels: ["たんぱく質", "タンパク質", "蛋白質", "protein"], targetUnit: "g" },
   { code: "fat", labels: ["脂質", "fat"], targetUnit: "g" },
-  { code: "carbohydrate", labels: ["炭水化物", "carbohydrate"], targetUnit: "g" },
+  { code: "carbohydrate", labels: ["炭水化物", "total carbohydrate"], targetUnit: "g" },
   { code: "fiber", labels: ["食物繊維", "食物せんい", "fiber"], targetUnit: "g" },
   { code: "calcium", labels: ["カルシウム", "calcium"], targetUnit: "mg" },
   { code: "iron", labels: ["鉄", "iron"], targetUnit: "mg" },
@@ -123,7 +123,7 @@ function findNutrient(text: string, definition: ParserDefinition): CommercialNut
   // A mass unit alone cannot establish retinol activity equivalence. DFE/IU
   // also cannot be silently reinterpreted as this registry's mass definition.
   if (definition.code === "vitamin_a" && match[3]?.toUpperCase() !== "RAE") return null;
-  if (definition.code === "folate" && match[3]) return null;
+  if (match[3] && !(definition.code === "vitamin_a" && match[3].toUpperCase() === "RAE")) return null;
 
   const converted = convertValue(Number(match[1]), match[2], definition.targetUnit);
   if (converted === null) return null;

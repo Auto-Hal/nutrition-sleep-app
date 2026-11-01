@@ -45,6 +45,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | 20261101101537_karomiru_transfer_snapshots.sql | 20261101103222 / karomiru_transfer_snapshots | CI 41297687213：fresh replay/605 pgTAP/実接続成功後apply。owner SELECT policy、transfer0行、旧profile/snapshot digest前後一致 |
 | 20261101104949_nutrition_csv_snapshot_source.sql | 20261101110940 / nutrition_csv_snapshot_source | CI 41300275315：618 pgTAP成功後apply。STABLE/invoker、匿名実行不可を確認 |
 | 20261101111309_nutrient_evidence_contract_guard.sql | 20261101142723 / nutrient_evidence_contract_guard | 修正後CI 41315976268：642 pgTAP/実接続・731 Vitest・全アプリ検査成功後apply。食品5/栄養21/snapshot322・3種digest前後一致 |
+| 20261101142455_complete_catalog_library_read.sql | 20261101143541 / complete_catalog_library_read | e550993 CI 41316574675：25 files/650 pgTAP/実接続・732 Vitest・全検査成功後apply。3種digest前後一致 |
 
 P1適用後security advisorは既存private server-only表のpolicyなしINFO、意図したowner検証付き公開SECURITY DEFINER RPC、既存のleaked password protection設定を報告。追加したprivate helperはauthenticated/anon実行不可。Productionは変更なし。
 
@@ -88,3 +89,11 @@ Na→saltは2.54/1000、C−fiberは同じ資料・同じ基準量と定義を�
 ## 食品一覧の完全取得
 
 Catalog/Batch/Product解決/Todayの入力候補は、STABLE/invokerの単一JSON RPCへ統合する。30項目×食品数がPostgRESTの1000行上限に達しても切り詰めず、revision・参照fingerprint・栄養の由来・Batch構成を同じsnapshotで返す。件数不一致や重複を検出した応答は編集へ渡さない。SQLで45食品/1350栄養行、0/NULL、owner isolationを確認する。旧「energyだけ先読み」の構造テストはPFC先読みに置き換わるため削除し、全件契約の実値テストを追加した。
+
+## 手動入力・OCRの統合
+
+Productは有効な実物バーコードを入力して「写真なしで入力・編集」から登録/編集できる。Catalog一覧の編集からも同じ経路へ進める。バーコードのない料理は従来のCatalogで管理し、架空の番号を作らない。手動値はユーザー申告が初期値で、変更しないunknown/化学形態/由来/計算根拠を維持する。基準量変更と確認済みProductの置換には、その内容の明示確認を求める。
+
+Catalog/ProductへNa→saltと条件付きC−fiberの明示操作を接続した。計算後の元値・出典の変更では保存を止め、再計算を求める。現物ラベル・共通URL・同じ基準量の確認なしに糖質を埋めない。
+
+表OCRの新29項目合成テストで、従来の曖昧単位判定がugをmgへ誤認する問題を発見し完全一致を先行させた。RAE/DFE/IUの明記を位置情報から保持し、generic A、DFE、IUをRAE/質量へ変換しない。英語Carbohydrateだけでは食物繊維を含むか不明なため、総炭水化物はTotal Carbohydrateの明記を要する。既存の保存値・旧API・過去snapshotは変更しない。物理ラベル撮影の認識率は別途実機確認が必要。

@@ -32,6 +32,7 @@ type LabelAnchor = {
   parserLabel: string;
   text: string;
   unit: string | null;
+  qualifier: string | null;
   box: OcrBox;
   confidence: number | null;
 };
@@ -43,6 +44,7 @@ type ValueCandidate = {
   box: OcrBox;
   amountBox: OcrBox;
   confidence: number | null;
+  qualifier?: string | null;
 };
 
 const ANCHORS: NutrientAnchorDefinition[] = LABEL_NUTRIENT_DEFINITIONS.map((definition) => ({
@@ -158,6 +160,7 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
             parserLabel: definition.parserLabel,
             text: phrase,
             unit: normalizeUnit(phrase),
+            qualifier: chemicalQualifier(phrase),
             box: unionBox(phraseWords.map((word) => word.box)),
             confidence: averageConfidence(phraseWords),
           });
@@ -186,10 +189,12 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
   return [...byCode.values()].sort((a, b) => centerY(a.box) - centerY(b.box));
 }
 
+function chemicalQualifier(value:string){return value.match(/(RAE|DFE|IU)\s*[)）]?$/i)?.[1].toUpperCase()??null;}
 function normalizeUnit(value: string) {
   const unit = value
     .normalize("NFKC")
     .replace(/[μµ]/g, "u")
+    .replace(/(RAE|DFE|IU)\s*[)）]?$/i, "")
     .replace(/[.,:;]$/g, "")
     .replace(/[^a-zA-Z0-9|!]/g, "")
     .trim()
@@ -197,6 +202,8 @@ function normalizeUnit(value: string) {
     .replace(/[|!1i]$/g, "l");
 
   if (unit === "g") return "g";
+  // Exact µg/mg must win before OCR typo tolerance: they differ by one letter.
+  if (["kcal","kj","mg","ug"].includes(unit)) return unit;
 
   for (const expected of ["kcal", "kj", "mg", "ug"] as const) {
     if (unit === expected) return expected;
@@ -224,11 +231,13 @@ function parseCombinedValue(value: string) {
     .replace(/kca[li1]/gi, "kcal")
     .trim();
 
-  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*([^\s]+)$/i);
+  const qualifier=chemicalQualifier(normalized);
+  const body=qualifier?normalized.replace(/(RAE|DFE|IU)\s*[)）]?$/i,"").trim():normalized;
+  const match = body.match(/^([0-9]+(?:\.[0-9]+)?)\s*([^\s]+)$/i);
   if (!match) return null;
   const unit = normalizeUnit(match[2]);
   if (!unit) return null;
-  return { amount: Number(match[1]), unit };
+  return { amount: Number(match[1]), unit, qualifier };
 }
 
 function parseNumber(value: string) {
@@ -382,14 +391,20 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
       box: unionBox([word.box, unitWord.box]),
       amountBox: word.box,
       confidence: averageConfidence([word, unitWord]),
+      qualifier: chemicalQualifier(unitWord.text),
     });
   }
 
-  return candidates;
+  return candidates.map(candidate=>{
+    if(candidate.qualifier)return candidate;
+    const qualifier=document.words.find(w=>chemicalQualifier(w.text)&&Math.abs(centerY(w.box)-centerY(candidate.amountBox))<=Math.max(8,boxHeight(candidate.amountBox)*0.7)&&w.box.minX>=candidate.box.maxX-4&&w.box.minX-candidate.box.maxX<=80);
+    return {...candidate,qualifier:qualifier?chemicalQualifier(qualifier.text):null};
+  });
 }
 
 function parseCandidateForAnchor(anchor: LabelAnchor, candidate: ValueCandidate) {
-  const parsed = parseNutritionLabelText(`${anchor.parserLabel} ${candidate.amount} ${candidate.unit}`);
+  if(anchor.qualifier&&candidate.qualifier&&anchor.qualifier!==candidate.qualifier)return null;
+  const parsed = parseNutritionLabelText(`${anchor.parserLabel} ${candidate.amount} ${candidate.unit} ${candidate.qualifier??anchor.qualifier??""}`);
   return parsed.nutrients.find((nutrient) => nutrient.code === anchor.code) ?? null;
 }
 

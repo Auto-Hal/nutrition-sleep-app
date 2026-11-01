@@ -12,6 +12,12 @@ import {
   type CatalogItemType,
 } from "@/lib/nutrition/catalog";
 import { ProductIngestion } from "@/components/product-ingestion";
+import { NutrientCalculationActions } from "@/components/nutrient-calculation-actions";
+import {
+  applyManualCalculations,
+  type ManualCalculation,
+} from "@/lib/nutrition/manual-calculations";
+import { nutrientWriteSchema } from "@/lib/nutrition/nutrient-schema";
 import {
   createOutboxMutation,
   type OutboxBinding,
@@ -61,21 +67,28 @@ type BatchRecord = {
   }>;
 };
 
-type LibraryMutation = Extract<PendingMutation, {
-  kind:
-    | "catalog_create"
-    | "catalog_update"
-    | "catalog_active"
-    | "batch_create"
-    | "batch_update";
-}>;
+type LibraryMutation = Extract<
+  PendingMutation,
+  {
+    kind:
+      | "catalog_create"
+      | "catalog_update"
+      | "catalog_active"
+      | "batch_create"
+      | "batch_update";
+  }
+>;
 
-function isLibraryMutation(mutation: PendingMutation): mutation is LibraryMutation {
-  return mutation.kind === "catalog_create"
-    || mutation.kind === "catalog_update"
-    || mutation.kind === "catalog_active"
-    || mutation.kind === "batch_create"
-    || mutation.kind === "batch_update";
+function isLibraryMutation(
+  mutation: PendingMutation,
+): mutation is LibraryMutation {
+  return (
+    mutation.kind === "catalog_create" ||
+    mutation.kind === "catalog_update" ||
+    mutation.kind === "catalog_active" ||
+    mutation.kind === "batch_create" ||
+    mutation.kind === "batch_update"
+  );
 }
 
 function mutationStatusLabel(status: PendingMutationStatus) {
@@ -119,8 +132,15 @@ export function CatalogLibrary({
     () => ({ ownerUserId, environmentId }),
     [ownerUserId, environmentId],
   );
-  const [valueOrigin, setValueOrigin] = useState<NonNullable<NutrientMetadata["value_origin"]>>("user_reported");
+  const [valueOrigin, setValueOrigin] =
+    useState<NonNullable<NutrientMetadata["value_origin"]>>("user_reported");
   const [sourceUri, setSourceUri] = useState("");
+  const [basisReviewed, setBasisReviewed] = useState(false);
+  const [calculations, setCalculations] = useState<ManualCalculation[]>([]);
+  const [productRequest, setProductRequest] = useState<{
+    barcode: string;
+    requestId: string;
+  } | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [batches, setBatches] = useState<BatchRecord[]>([]);
   const [mode, setMode] = useState<"item" | "batch">("item");
@@ -143,17 +163,26 @@ export function CatalogLibrary({
   const [components, setComponents] = useState<BatchComponent[]>([
     { catalog_item_id: "", quantity: "1", quantity_unit: "serving" },
   ]);
-  const [pendingMutations, setPendingMutations] = useState<LibraryMutation[]>([]);
+  const [pendingMutations, setPendingMutations] = useState<LibraryMutation[]>(
+    [],
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const response=await fetch("/api/catalog?includeInactive=true",{cache:"no-store"});
-    if(!response.ok)throw new Error("食品を完全に読み込めませんでした。再取得してください。");
-    const payload=await response.json() as {items:CatalogItem[];batches:BatchRecord[]};
-    setItems(payload.items);setBatches(payload.batches);
-    return {items:payload.items,batches:payload.batches};
+    const response = await fetch("/api/catalog?includeInactive=true", {
+      cache: "no-store",
+    });
+    if (!response.ok)
+      throw new Error("食品を完全に読み込めませんでした。再取得してください。");
+    const payload = (await response.json()) as {
+      items: CatalogItem[];
+      batches: BatchRecord[];
+    };
+    setItems(payload.items);
+    setBatches(payload.batches);
+    return { items: payload.items, batches: payload.batches };
   }, []);
 
   const reloadPending = useCallback(async () => {
@@ -177,8 +206,8 @@ export function CatalogLibrary({
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
       if (
-        !detail
-        || ![
+        !detail ||
+        ![
           "catalog_create",
           "catalog_update",
           "catalog_active",
@@ -190,12 +219,16 @@ export function CatalogLibrary({
       }
 
       if (detail.state === "synced") {
-        setPendingMutations((current) => current.filter(
-          (mutation) => mutation.operation_id !== detail.operation_id,
-        ));
+        setPendingMutations((current) =>
+          current.filter(
+            (mutation) => mutation.operation_id !== detail.operation_id,
+          ),
+        );
         setMessage("server成功を確認済み");
         void load().catch(() => {
-          setMessage("server成功を確認済み · 最新表示は次回更新時に反映します。");
+          setMessage(
+            "server成功を確認済み · 最新表示は次回更新時に反映します。",
+          );
         });
         return;
       }
@@ -203,12 +236,18 @@ export function CatalogLibrary({
       void reloadPending();
       if (detail.state === "conflict") {
         setMessage(null);
-        setError("Libraryの現在値が変わっています。サーバー状態と端末の変更を確認してください。");
+        setError(
+          "Libraryの現在値が変わっています。サーバー状態と端末の変更を確認してください。",
+        );
         void load().catch(() => undefined);
       } else if (detail.state === "failed") {
-        setMessage("Libraryの変更は端末に保存済みです。接続回復後に再試行します。");
+        setMessage(
+          "Libraryの変更は端末に保存済みです。接続回復後に再試行します。",
+        );
       } else if (detail.state === "paused_auth") {
-        setMessage("Libraryの変更は端末に保存済みです。同じアカウントで再ログイン後に同期します。");
+        setMessage(
+          "Libraryの変更は端末に保存済みです。同じアカウントで再ログイン後に同期します。",
+        );
       } else if (detail.state === "blocked" || detail.state === "expired") {
         setMessage(null);
         setError("未同期のLibrary変更は自動適用を停止しました。");
@@ -220,6 +259,10 @@ export function CatalogLibrary({
   }, [load, reloadPending]);
 
   function startCreate() {
+    setValueOrigin("user_reported");
+    setSourceUri("");
+    setBasisReviewed(false);
+    setCalculations([]);
     setMode("item");
     setEditing(null);
     setEditingBatch(null);
@@ -236,7 +279,9 @@ export function CatalogLibrary({
   }
 
   function hasPendingEntity(entityKey: string) {
-    return pendingMutations.some((mutation) => mutation.entity_key === entityKey);
+    return pendingMutations.some(
+      (mutation) => mutation.entity_key === entityKey,
+    );
   }
 
   function startEdit(item: CatalogItem) {
@@ -245,7 +290,14 @@ export function CatalogLibrary({
       return;
     }
     if (item.item_type === "product" || item.item_type === "supplement") {
-      setError("市販品・サプリの編集はProduct v2経路から行ってください。");
+      const barcode = (item as CatalogItem & { product?: { barcode?: string } })
+        .product?.barcode;
+      if (barcode)
+        setProductRequest({ barcode, requestId: crypto.randomUUID() });
+      else
+        setError(
+          "商品の番号を上のフォームで入力し、写真なしで入力・編集を選んでください。",
+        );
       return;
     }
     if (item.item_type === "batch") {
@@ -276,6 +328,10 @@ export function CatalogLibrary({
 
     setMode("item");
     setEditing(item);
+    setValueOrigin("user_reported");
+    setSourceUri("");
+    setBasisReviewed(false);
+    setCalculations([]);
     setForm({
       item_type: item.item_type,
       name: item.name,
@@ -304,7 +360,29 @@ export function CatalogLibrary({
       if (!Number.isFinite(servingSize) || servingSize <= 0) {
         throw new Error("基準量を確認してください。");
       }
-      const nutrients = editedNutrientPayload(form.nutrients, editing, valueOrigin, sourceUri.trim() || null);
+      const basisChanged = Boolean(
+        editing &&
+          (servingSize !== editing.serving_size ||
+            form.serving_unit.trim() !== editing.serving_unit),
+      );
+      if (basisChanged && !basisReviewed)
+        throw new Error(
+          "新しい基準量・単位に対して栄養値をすべて確認してください。",
+        );
+      const nutrients = applyManualCalculations(
+        editedNutrientPayload(
+          form.nutrients,
+          editing,
+          valueOrigin,
+          sourceUri.trim() || null,
+          basisChanged,
+        ),
+        calculations,
+      );
+      if (nutrients.some((n) => !nutrientWriteSchema.safeParse(n).success))
+        throw new Error(
+          "栄養値の定義・出典URL・計算根拠を確認してください。公式資料にはURLが必要です。",
+        );
       const operationId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
 
@@ -354,7 +432,11 @@ export function CatalogLibrary({
       startCreate();
       setMessage("端末に保存・未同期");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "保存に失敗しました。",
+      );
     } finally {
       setBusy(false);
     }
@@ -383,7 +465,11 @@ export function CatalogLibrary({
       });
       await queueLibraryMutation(mutation);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "状態更新に失敗しました。");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "状態更新に失敗しました。",
+      );
     } finally {
       setBusy(false);
     }
@@ -404,21 +490,30 @@ export function CatalogLibrary({
         quantity_unit: component.quantity_unit,
       }));
       if (
-        payloadComponents.some((component) =>
-          !component.catalog_item_id
-          || !Number.isFinite(component.quantity)
-          || component.quantity <= 0
+        payloadComponents.some(
+          (component) =>
+            !component.catalog_item_id ||
+            !Number.isFinite(component.quantity) ||
+            component.quantity <= 0,
         )
       ) {
         throw new Error("Batchの構成要素を確認してください。");
       }
 
       for (const component of payloadComponents) {
-        if (!items.some((item) => item.id === component.catalog_item_id && item.active)) {
-          throw new Error("未同期または無効な構成要素はBatchに使用できません。");
+        if (
+          !items.some(
+            (item) => item.id === component.catalog_item_id && item.active,
+          )
+        ) {
+          throw new Error(
+            "未同期または無効な構成要素はBatchに使用できません。",
+          );
         }
         if (hasPendingEntity(entityKeyForCatalog(component.catalog_item_id))) {
-          throw new Error("未同期の変更がある構成要素は、同期後にBatchへ使用してください。");
+          throw new Error(
+            "未同期の変更がある構成要素は、同期後にBatchへ使用してください。",
+          );
         }
       }
 
@@ -471,7 +566,11 @@ export function CatalogLibrary({
         { catalog_item_id: "", quantity: "1", quantity_unit: "serving" },
       ]);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "保存に失敗しました。");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "保存に失敗しました。",
+      );
     } finally {
       setBusy(false);
     }
@@ -517,7 +616,12 @@ export function CatalogLibrary({
         const item = current.items.find(
           (candidate) => candidate.id === mutation.payload.catalog_item_id,
         );
-        if (!item || item.item_type === "product" || item.item_type === "supplement" || item.item_type === "batch") {
+        if (
+          !item ||
+          item.item_type === "product" ||
+          item.item_type === "supplement" ||
+          item.item_type === "batch"
+        ) {
           throw new Error("現在の項目状態では再適用できません。");
         }
         replacement = createOutboxMutation(binding, {
@@ -551,14 +655,19 @@ export function CatalogLibrary({
         if (!batch) throw new Error("現在のBatch状態を取得できません。");
         for (const component of mutation.payload.components) {
           if (
-            !current.items.some((item) => item.id === component.catalog_item_id && item.active)
-            || pendingMutations.some(
+            !current.items.some(
+              (item) => item.id === component.catalog_item_id && item.active,
+            ) ||
+            pendingMutations.some(
               (candidate) =>
-                candidate.operation_id !== mutation.operation_id
-                && candidate.entity_key === entityKeyForCatalog(component.catalog_item_id),
+                candidate.operation_id !== mutation.operation_id &&
+                candidate.entity_key ===
+                  entityKeyForCatalog(component.catalog_item_id),
             )
           ) {
-            throw new Error("構成要素の現在状態を確認してから再適用してください。");
+            throw new Error(
+              "構成要素の現在状態を確認してから再適用してください。",
+            );
           }
         }
         replacement = createOutboxMutation(binding, {
@@ -581,7 +690,11 @@ export function CatalogLibrary({
       setMessage("現在のrevisionに対して再適用を開始しました。");
       requestOutboxDrain();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "再適用できませんでした。");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "再適用できませんでした。",
+      );
     } finally {
       setBusy(false);
     }
@@ -606,20 +719,26 @@ export function CatalogLibrary({
     (item) => item.item_type !== "batch" && item.active,
   );
   const createPending = pendingMutations.filter(
-    (mutation) => mutation.kind === "catalog_create" || mutation.kind === "batch_create",
+    (mutation) =>
+      mutation.kind === "catalog_create" || mutation.kind === "batch_create",
   );
 
   return (
     <div className="stack">
       <ProductIngestion
-        onSaved={async () => { await load(); }}
+        requestedProduct={productRequest}
+        onSaved={async () => {
+          await load();
+        }}
         outboxBinding={binding}
       />
       <section className="card">
         <div className="section-heading">
           <div>
             <h2>Library</h2>
-            <p className="muted">食品・サプリ・外食推定値は現在値として管理します。</p>
+            <p className="muted">
+              食品・サプリ・外食推定値は現在値として管理します。
+            </p>
           </div>
           <div className="form-actions">
             <button
@@ -643,7 +762,11 @@ export function CatalogLibrary({
                   serving_unit: "serving",
                 });
                 setComponents([
-                  { catalog_item_id: "", quantity: "1", quantity_unit: "serving" },
+                  {
+                    catalog_item_id: "",
+                    quantity: "1",
+                    quantity_unit: "serving",
+                  },
                 ]);
                 setMessage(null);
                 setError(null);
@@ -663,7 +786,9 @@ export function CatalogLibrary({
                     ? `Batch「${mutation.payload.name}」`
                     : `項目「${mutation.payload.name}」`}
                 </span>
-                <span className="pill pending">{mutationStatusLabel(mutation.status)}</span>
+                <span className="pill pending">
+                  {mutationStatusLabel(mutation.status)}
+                </span>
                 {mutation.status === "failed" && (
                   <button
                     className="button ghost"
@@ -673,7 +798,8 @@ export function CatalogLibrary({
                     今すぐ再試行
                   </button>
                 )}
-                {(mutation.status === "blocked" || mutation.status === "expired") && (
+                {(mutation.status === "blocked" ||
+                  mutation.status === "expired") && (
                   <button
                     className="button ghost"
                     type="button"
@@ -695,13 +821,17 @@ export function CatalogLibrary({
                 <select
                   id="catalog-type"
                   value={form.item_type}
-                  onChange={(event) => setForm((current) => ({
-                    ...current,
-                    item_type: event.target.value as EditableCatalogItemType,
-                  }))}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      item_type: event.target.value as EditableCatalogItemType,
+                    }))
+                  }
                 >
                   {(["ingredient", "estimated_dish"] as const).map((type) => (
-                    <option key={type} value={type}>{typeLabels[type]}</option>
+                    <option key={type} value={type}>
+                      {typeLabels[type]}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -710,10 +840,12 @@ export function CatalogLibrary({
                 <input
                   id="catalog-name"
                   value={form.name}
-                  onChange={(event) => setForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -723,10 +855,12 @@ export function CatalogLibrary({
                 <input
                   id="catalog-brand"
                   value={form.brand}
-                  onChange={(event) => setForm((current) => ({
-                    ...current,
-                    brand: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      brand: event.target.value,
+                    }))
+                  }
                 />
               </div>
               <div className="field">
@@ -738,23 +872,60 @@ export function CatalogLibrary({
                     min="0.001"
                     step="0.001"
                     value={form.serving_size}
-                    onChange={(event) => setForm((current) => ({
-                      ...current,
-                      serving_size: event.target.value,
-                    }))}
+                    onChange={(event) => {
+                      setBasisReviewed(false);
+                      setForm((current) => ({
+                        ...current,
+                        serving_size: event.target.value,
+                      }));
+                    }}
                   />
                   <input
                     aria-label="基準単位"
                     value={form.serving_unit}
-                    onChange={(event) => setForm((current) => ({
-                      ...current,
-                      serving_unit: event.target.value,
-                    }))}
+                    onChange={(event) => {
+                      setBasisReviewed(false);
+                      setForm((current) => ({
+                        ...current,
+                        serving_unit: event.target.value,
+                      }));
+                    }}
                   />
                 </div>
               </div>
             </div>
-            <div className="grid-2"><div className="field"><label htmlFor="nutrient-origin">変更する値の出典</label><select id="nutrient-origin" value={valueOrigin} onChange={(event) => setValueOrigin(event.target.value as NonNullable<NutrientMetadata["value_origin"]>)}><option value="user_reported">ユーザー申告・入力</option><option value="measured">実測値</option><option value="label">現物の栄養表示</option><option value="official">確認した公式資料</option><option value="database">食品データベース</option><option value="estimated">推定値</option></select></div><div className="field"><label htmlFor="nutrient-source-uri">出典URL（任意）</label><input id="nutrient-source-uri" type="url" value={sourceUri} onChange={(event) => setSourceUri(event.target.value)} /></div></div>
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="nutrient-origin">変更する値の出典</label>
+                <select
+                  id="nutrient-origin"
+                  value={valueOrigin}
+                  onChange={(event) =>
+                    setValueOrigin(
+                      event.target.value as NonNullable<
+                        NutrientMetadata["value_origin"]
+                      >,
+                    )
+                  }
+                >
+                  <option value="user_reported">ユーザー申告・入力</option>
+                  <option value="measured">実測値</option>
+                  <option value="label">現物の栄養表示</option>
+                  <option value="official">確認した公式資料</option>
+                  <option value="database">食品データベース</option>
+                  <option value="estimated">推定値</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="nutrient-source-uri">出典URL（任意）</label>
+                <input
+                  id="nutrient-source-uri"
+                  type="url"
+                  value={sourceUri}
+                  onChange={(event) => setSourceUri(event.target.value)}
+                />
+              </div>
+            </div>
             <fieldset className="nutrient-fieldset">
               <legend>栄養値（基準量あたり。空欄はunknown、0はゼロ）</legend>
               <div className="nutrient-grid">
@@ -769,25 +940,110 @@ export function CatalogLibrary({
                       min="0"
                       step="any"
                       value={form.nutrients[definition.code] ?? ""}
-                      onChange={(event) => setForm((current) => ({
-                        ...current,
-                        nutrients: {
-                          ...current.nutrients,
-                          [definition.code]: event.target.value,
-                        },
-                      }))}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          nutrients: {
+                            ...current.nutrients,
+                            [definition.code]: event.target.value,
+                          },
+                        }))
+                      }
                     />
                   </div>
                 ))}
               </div>
             </fieldset>
-            <details><summary>内部管理用ナトリウム</summary><div className="field"><label htmlFor="nutrient-sodium">ナトリウム（mg）</label><input id="nutrient-sodium" type="number" min="0" step="any" value={form.nutrients.sodium ?? ""} onChange={(event) => setForm((current) => ({ ...current, nutrients: { ...current.nutrients, sodium: event.target.value } }))} /></div><p className="muted">食塩相当量と合算しません。空欄は不明です。</p></details>
+            <details>
+              <summary>内部管理用ナトリウム</summary>
+              <div className="field">
+                <label htmlFor="nutrient-sodium">ナトリウム（mg）</label>
+                <input
+                  id="nutrient-sodium"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.nutrients.sodium ?? ""}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      nutrients: {
+                        ...current.nutrients,
+                        sodium: event.target.value,
+                      },
+                    }))
+                  }
+                />
+              </div>
+              <p className="muted">
+                食塩相当量と合算しません。空欄は不明です。
+              </p>
+            </details>
+            {editing &&
+              (Number(form.serving_size) !== editing.serving_size ||
+                form.serving_unit.trim() !== editing.serving_unit) && (
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={basisReviewed}
+                    onChange={(e) => setBasisReviewed(e.target.checked)}
+                  />
+                  新しい基準量・単位に対してすべての栄養値を確認しました
+                </label>
+              )}
+            <NutrientCalculationActions
+              getNutrients={() =>
+                editedNutrientPayload(
+                  form.nutrients,
+                  editing,
+                  valueOrigin,
+                  sourceUri.trim() || null,
+                  Boolean(
+                    editing &&
+                      (Number(form.serving_size) !== editing.serving_size ||
+                        form.serving_unit.trim() !== editing.serving_unit),
+                  ),
+                )
+              }
+              calculations={calculations}
+              onResult={(c) => {
+                setCalculations((old) => [
+                  ...old.filter((x) => x.nutrient.code !== c.nutrient.code),
+                  c,
+                ]);
+                setForm((old) => ({
+                  ...old,
+                  nutrients: {
+                    ...old.nutrients,
+                    [c.nutrient.code]:
+                      c.nutrient.amount === null
+                        ? ""
+                        : String(c.nutrient.amount),
+                  },
+                }));
+              }}
+              onClear={(code) => {
+                setCalculations((old) =>
+                  old.filter((c) => c.nutrient.code !== code),
+                );
+                setForm((old) => ({
+                  ...old,
+                  nutrients: { ...old.nutrients, [code]: "" },
+                }));
+              }}
+            />
             <div className="form-actions">
               <button
                 className="button"
                 type="button"
                 onClick={() => void saveItem()}
-                disabled={busy || Boolean(editing && hasPendingEntity(entityKeyForCatalog(editing.id)))}
+                disabled={
+                  busy ||
+                  Boolean(
+                    editing &&
+                      hasPendingEntity(entityKeyForCatalog(editing.id)),
+                  )
+                }
               >
                 {busy ? "端末に保存中…" : editing ? "更新する" : "登録する"}
               </button>
@@ -801,10 +1057,12 @@ export function CatalogLibrary({
                 <input
                   id="batch-name"
                   value={batchForm.name}
-                  onChange={(event) => setBatchForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    setBatchForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
                 />
               </div>
               <div className="field">
@@ -812,10 +1070,12 @@ export function CatalogLibrary({
                 <input
                   id="batch-dish"
                   value={batchForm.dish_name}
-                  onChange={(event) => setBatchForm((current) => ({
-                    ...current,
-                    dish_name: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    setBatchForm((current) => ({
+                      ...current,
+                      dish_name: event.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -828,10 +1088,12 @@ export function CatalogLibrary({
                   min="0.001"
                   step="0.001"
                   value={batchForm.servings}
-                  onChange={(event) => setBatchForm((current) => ({
-                    ...current,
-                    servings: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    setBatchForm((current) => ({
+                      ...current,
+                      servings: event.target.value,
+                    }))
+                  }
                 />
               </div>
               <div className="field">
@@ -839,10 +1101,12 @@ export function CatalogLibrary({
                 <input
                   id="batch-unit"
                   value={batchForm.serving_unit}
-                  onChange={(event) => setBatchForm((current) => ({
-                    ...current,
-                    serving_unit: event.target.value,
-                  }))}
+                  onChange={(event) =>
+                    setBatchForm((current) => ({
+                      ...current,
+                      serving_unit: event.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
@@ -856,23 +1120,28 @@ export function CatalogLibrary({
                   <select
                     aria-label={`構成要素${index + 1}`}
                     value={component.catalog_item_id}
-                    onChange={(event) => setComponents((current) =>
-                      current.map((value, position) => {
-                        if (position !== index) return value;
-                        const selected = componentChoices.find(
-                          (item) => item.id === event.target.value,
-                        );
-                        return {
-                          ...value,
-                          catalog_item_id: event.target.value,
-                          quantity_unit: selected?.serving_unit ?? value.quantity_unit,
-                        };
-                      })
-                    )}
+                    onChange={(event) =>
+                      setComponents((current) =>
+                        current.map((value, position) => {
+                          if (position !== index) return value;
+                          const selected = componentChoices.find(
+                            (item) => item.id === event.target.value,
+                          );
+                          return {
+                            ...value,
+                            catalog_item_id: event.target.value,
+                            quantity_unit:
+                              selected?.serving_unit ?? value.quantity_unit,
+                          };
+                        }),
+                      )
+                    }
                   >
                     <option value="">選択してください</option>
                     {componentChoices.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
                     ))}
                   </select>
                   <input
@@ -881,34 +1150,44 @@ export function CatalogLibrary({
                     min="0.001"
                     step="0.001"
                     value={component.quantity}
-                    onChange={(event) => setComponents((current) =>
-                      current.map((value, position) =>
-                        position === index
-                          ? { ...value, quantity: event.target.value }
-                          : value
+                    onChange={(event) =>
+                      setComponents((current) =>
+                        current.map((value, position) =>
+                          position === index
+                            ? { ...value, quantity: event.target.value }
+                            : value,
+                        ),
                       )
-                    )}
+                    }
                   />
                   <input
                     aria-label={`構成単位${index + 1}`}
                     value={component.quantity_unit}
-                    onChange={(event) => setComponents((current) =>
-                      current.map((value, position) =>
-                        position === index
-                          ? { ...value, quantity_unit: event.target.value }
-                          : value
+                    onChange={(event) =>
+                      setComponents((current) =>
+                        current.map((value, position) =>
+                          position === index
+                            ? { ...value, quantity_unit: event.target.value }
+                            : value,
+                        ),
                       )
-                    )}
+                    }
                   />
                 </div>
               ))}
               <button
                 className="button secondary"
                 type="button"
-                onClick={() => setComponents((current) => [
-                  ...current,
-                  { catalog_item_id: "", quantity: "1", quantity_unit: "serving" },
-                ])}
+                onClick={() =>
+                  setComponents((current) => [
+                    ...current,
+                    {
+                      catalog_item_id: "",
+                      quantity: "1",
+                      quantity_unit: "serving",
+                    },
+                  ])
+                }
               >
                 構成要素を追加
               </button>
@@ -919,24 +1198,41 @@ export function CatalogLibrary({
                 type="button"
                 onClick={() => void saveBatch()}
                 disabled={
-                  busy
-                  || componentChoices.length === 0
-                  || Boolean(editingBatch && hasPendingEntity(entityKeyForCatalog(editingBatch.id)))
+                  busy ||
+                  componentChoices.length === 0 ||
+                  Boolean(
+                    editingBatch &&
+                      hasPendingEntity(entityKeyForCatalog(editingBatch.id)),
+                  )
                 }
               >
-                {busy ? "端末に保存中…" : editingBatch ? "Batchを更新する" : "Batchを登録する"}
+                {busy
+                  ? "端末に保存中…"
+                  : editingBatch
+                    ? "Batchを更新する"
+                    : "Batchを登録する"}
               </button>
             </div>
           </div>
         )}
-        {message && <p className="muted" role="status">{message}</p>}
-        {error && <p className="error-text" role="alert">{error}</p>}
+        {message && (
+          <p className="muted" role="status">
+            {message}
+          </p>
+        )}
+        {error && (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        )}
       </section>
 
       <section className="card" aria-labelledby="catalog-list-title">
         <div className="section-heading">
           <h2 id="catalog-list-title">登録済み項目</h2>
-          <span className="pill">{items.filter((item) => item.active).length}件</span>
+          <span className="pill">
+            {items.filter((item) => item.active).length}件
+          </span>
         </div>
         {items.length === 0 ? (
           <div className="empty-state">まだ項目がありません。</div>
@@ -955,7 +1251,8 @@ export function CatalogLibrary({
                   <div>
                     <strong>{item.name}</strong>
                     <div className="muted">
-                      {typeLabels[item.item_type]} · {item.serving_size} {item.serving_unit}
+                      {typeLabels[item.item_type]} · {item.serving_size}{" "}
+                      {item.serving_unit}
                       {item.brand ? ` · ${item.brand}` : ""}
                     </div>
                     {pending && (
@@ -966,11 +1263,13 @@ export function CatalogLibrary({
                         {pending.status === "conflict" && (
                           <>
                             <small className="muted">
-                              サーバー現在値: 「{item.name}」revision {item.revision}
+                              サーバー現在値: 「{item.name}」revision{" "}
+                              {item.revision}
                             </small>
                             <small className="muted">
                               端末の変更: {localIntentSummary(pending)} ／
-                              revision {pending.expected_revision ?? "なし"} を基準
+                              revision {pending.expected_revision ?? "なし"}{" "}
+                              を基準
                             </small>
                             <div className="form-actions">
                               <button
@@ -996,12 +1295,15 @@ export function CatalogLibrary({
                           <button
                             className="button ghost"
                             type="button"
-                            onClick={() => void retryMutation(pending.operation_id)}
+                            onClick={() =>
+                              void retryMutation(pending.operation_id)
+                            }
                           >
                             今すぐ再試行
                           </button>
                         )}
-                        {(pending.status === "blocked" || pending.status === "expired") && (
+                        {(pending.status === "blocked" ||
+                          pending.status === "expired") && (
                           <button
                             className="button ghost"
                             type="button"
@@ -1014,11 +1316,23 @@ export function CatalogLibrary({
                     )}
                   </div>
                   <div className="meal-actions">
-                    {!pending && <KaromiruTransferLink source={item.item_type === "batch" ? "batch" : item.item_type === "product" || item.item_type === "supplement" ? "product" : "catalog"} id={item.id} />}
+                    {!pending && (
+                      <KaromiruTransferLink
+                        source={
+                          item.item_type === "batch"
+                            ? "batch"
+                            : item.item_type === "product" ||
+                                item.item_type === "supplement"
+                              ? "product"
+                              : "catalog"
+                        }
+                        id={item.id}
+                      />
+                    )}
                     <span className={`pill ${item.active ? "" : "pending"}`}>
                       {item.active ? "有効" : "無効"}
                     </span>
-                    {item.item_type !== "product" && item.item_type !== "supplement" && (
+                    {
                       <button
                         className="button secondary"
                         type="button"
@@ -1027,7 +1341,7 @@ export function CatalogLibrary({
                       >
                         編集
                       </button>
-                    )}
+                    }
                     <button
                       className="button ghost"
                       type="button"
