@@ -152,3 +152,7 @@ Previewは内部30、台帳32（既存24＋M1〜M8）、新8表がowner SELECT p
 Production再監査ではmain/公開aliasのSHAは7b2bcea、deployment dpl_6wWY3x49CEv6s4CotFjdXdAsiD3Z READY、内部18・台帳28、新goal/body/transfer/libraryなしを確認。変更操作は行っていない。接続済みブラウザーでHosted認証後のread-only画面も確認しようとしたが、Computer Useは初期化時のkernel assets pathエラーがreset後も続いた。Hostedのログイン後操作は未確認として残し、使い捨てAuth/DBの実ブラウザー成功と区別する。
 
 04a9fc1 / CI 41325213207でもChromium全フローが成功。WebKitはProductのバーコード入力がhydration前に可能で、React初期化により空欄へ戻り、無効な番号と判定される問題を検出した。Productの初期番号・種類・検索/手動/カメラ操作をhydration完了まで無効化する。テストを待ち時間だけで回避せず、実際の早い入力も保護する。ローカルProduct関連23テストとlintを確認後、全E2Eを再実行する。
+
+0a0cee3 / CI 41325948098ではChromium成功、WebKit mobileも機能操作は最後まで成功したが、最後のpageerror検査が中断されたsame-origin period/SW通信を検出した。最小loopbackサーバーで、画面置換中のcatch済みfetchがWebKit pageerrorを出す一方、window error/unhandledrejectionは0であることを再現。[Playwright #43120](https://github.com/microsoft/playwright/issues/43120)の上流報告とも一致する。E2Eは各documentの実JS例外/未処理Promiseを独立監視し、開発用同一originのperiod/SWという狭いnative診断だけを別artifactへ記録する。最後にブラウザーの同一origin period取得200とworker更新成功も必須にし、実障害を一律除外しない。
+
+PwaRuntimeのonline/visibility時updateにも失敗catchとoffline抑止を追加し、中断後の再試行を実コールバックの単体テストで確認した。転送フォームも初期化前にモード/量/名称を変更できないようにし、E2Eではall29 payload/全29行の既知状態を明示照合する。関連13テスト成功、全suite/3ブラウザー/upgradeを再実行する。

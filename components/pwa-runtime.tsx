@@ -8,7 +8,11 @@ type RuntimeVersion = {
   outbox_contract_version: number;
 };
 
-export function PwaRuntime({ initialBuildVersion }: { initialBuildVersion: string }) {
+export function PwaRuntime({
+  initialBuildVersion,
+}: {
+  initialBuildVersion: string;
+}) {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const checkingRef = useRef(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -22,10 +26,10 @@ export function PwaRuntime({ initialBuildVersion }: { initialBuildVersion: strin
         headers: { accept: "application/json" },
       });
       if (!response.ok) return;
-      const payload = await response.json() as RuntimeVersion;
+      const payload = (await response.json()) as RuntimeVersion;
       if (
-        payload.build_version !== initialBuildVersion
-        || payload.outbox_contract_version !== OUTBOX_CONTRACT_VERSION
+        payload.build_version !== initialBuildVersion ||
+        payload.outbox_contract_version !== OUTBOX_CONTRACT_VERSION
       ) {
         setUpdateAvailable(true);
       }
@@ -41,7 +45,9 @@ export function PwaRuntime({ initialBuildVersion }: { initialBuildVersion: strin
 
     let active = true;
     void navigator.serviceWorker
-      .register(`/sw.js?v=${encodeURIComponent(initialBuildVersion)}`, { scope: "/" })
+      .register(`/sw.js?v=${encodeURIComponent(initialBuildVersion)}`, {
+        scope: "/",
+      })
       .then((registration) => {
         if (!active) return;
         registrationRef.current = registration;
@@ -52,13 +58,22 @@ export function PwaRuntime({ initialBuildVersion }: { initialBuildVersion: strin
         // PWA registration failure must not block the online application.
       });
 
+    const updateWorker = async () => {
+      if (!navigator.onLine) return;
+      try {
+        await registrationRef.current?.update();
+      } catch {
+        // Navigation or a connection change can cancel an update. The installed
+        // worker and pending mutations remain usable until a later retry.
+      }
+    };
     const onOnline = () => {
-      void registrationRef.current?.update();
+      void updateWorker();
       void checkVersion();
     };
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void registrationRef.current?.update();
+        void updateWorker();
         void checkVersion();
       }
     };

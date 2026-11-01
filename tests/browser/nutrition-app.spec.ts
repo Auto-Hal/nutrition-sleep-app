@@ -55,6 +55,27 @@ test("authenticated nutrition, body and transfer story", async ({
   context,
 }, info) => {
   const errors: string[] = [];
+  const scriptErrors: string[] = [];
+  await page.exposeFunction(
+    "reportNutritionScriptFailure",
+    (message: string) => {
+      scriptErrors.push(message);
+    },
+  );
+  await page.addInitScript(() => {
+    const report = (message: string) =>
+      (
+        window as typeof window & {
+          reportNutritionScriptFailure: (message: string) => Promise<void>;
+        }
+      ).reportNutritionScriptFailure(message);
+    window.addEventListener("error", (event) => {
+      if (event instanceof ErrorEvent) void report(event.message);
+    });
+    window.addEventListener("unhandledrejection", (event) => {
+      void report(String(event.reason));
+    });
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/login");
   await page.locator("#email").fill(process.env.E2E_LOGIN_EMAIL!);
@@ -311,6 +332,13 @@ test("authenticated nutrition, body and transfer story", async ({
     .getByRole("button", { name: "PNGを準備・プレビュー", exact: true })
     .click();
   const prepared = await (await preparing).json();
+  expect(prepared.transfer.fixed_payload.mode).toBe("all29");
+  expect(prepared.transfer.fixed_payload.nutrients).toHaveLength(29);
+  expect(
+    prepared.transfer.fixed_payload.nutrients.every(
+      (n: { state: string }) => n.state === "complete",
+    ),
+  ).toBe(true);
   const transferId = prepared.transfer.id;
   await expect(
     page.getByRole("link", { name: "PNGを保存", exact: true }),
@@ -372,6 +400,7 @@ test("authenticated nutrition, body and transfer story", async ({
   }
   await page.goto("/nutrition?view=week");
   await expect(page.getByText(/週間/).first()).toBeVisible();
+  await expect(page.getByText(/^同期状態を確認中/)).toHaveCount(0);
   await noOverflow(page);
   await page.goto("/nutrition?view=details&range=90&nutrient=selenium");
   await expect(page.getByText("セレン", { exact: true }).first()).toBeVisible();
@@ -470,5 +499,36 @@ test("authenticated nutrition, body and transfer story", async ({
     data: {},
   });
   expect(forbidden.status()).toBe(403);
-  expect(errors).toEqual([]);
+  // WebKit reports its own cancelled same-origin loads as pageerror even when
+  // fetch catches the rejection and neither JS error event fires (PW #43120).
+  // Keep that narrow native diagnostic visible, while independently failing
+  // every real script error/rejection and every other pageerror.
+  const nativeCancellation =
+    /^\/127\.0\.0\.1:3001\/(?:sw\.js\?v=development|api\/nutrition\/period\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}) due to access control checks\.$/;
+  const diagnostics = info.project.name.startsWith("webkit")
+    ? errors.filter((message) => nativeCancellation.test(message))
+    : [];
+  if (diagnostics.length)
+    await info.attach("webkit-native-navigation-diagnostics", {
+      body: JSON.stringify(diagnostics, null, 2),
+      contentType: "application/json",
+    });
+  // Prove the same APIs and worker are available after navigation/recovery;
+  // native cancellation diagnostics cannot stand in for successful requests.
+  const recovered = await page.evaluate(async (date) => {
+    const response = await fetch(
+      `/api/nutrition/period?start=${date}&end=${date}`,
+      {
+        cache: "no-store",
+      },
+    );
+    const registration = await navigator.serviceWorker.ready;
+    await registration.update();
+    return { status: response.status, worker: registration.active?.state };
+  }, day);
+  expect(recovered).toEqual({ status: 200, worker: "activated" });
+  expect(scriptErrors).toEqual([]);
+  expect(errors.filter((message) => !diagnostics.includes(message))).toEqual(
+    [],
+  );
 });

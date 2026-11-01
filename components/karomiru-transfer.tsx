@@ -384,7 +384,7 @@ export function KaromiruTransfer({
           id="transfer-name"
           maxLength={200}
           value={form.name}
-          disabled={busy}
+          disabled={!ready || busy}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
         {!snapshot && (
@@ -394,7 +394,7 @@ export function KaromiruTransfer({
                 作り置きの対象量
                 <select
                   value={form.batchScope}
-                  disabled={busy}
+                  disabled={!ready || busy}
                   onChange={(e) =>
                     setForm({
                       ...form,
@@ -421,7 +421,7 @@ export function KaromiruTransfer({
                   step="0.001"
                   inputMode="decimal"
                   value={form.quantity}
-                  disabled={busy}
+                  disabled={!ready || busy}
                   onChange={(e) =>
                     setForm({ ...form, quantity: e.target.value })
                   }
@@ -434,7 +434,7 @@ export function KaromiruTransfer({
         <select
           id="transfer-mode"
           value={form.mode}
-          disabled={busy}
+          disabled={!ready || busy}
           onChange={(e) =>
             setForm({ ...form, mode: e.target.value as Form["mode"] })
           }
