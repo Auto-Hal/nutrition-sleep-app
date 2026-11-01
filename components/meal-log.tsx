@@ -23,6 +23,7 @@ import {
 } from "@/lib/offline/outbox-idb";
 import {
   OUTBOX_STATE_EVENT,
+  emitOutboxState,
   requestOutboxDrain,
 } from "@/lib/offline/outbox-events";
 import type { OutboxDrainEvent } from "@/lib/offline/outbox-runtime";
@@ -410,6 +411,7 @@ export function MealLog({
       });
 
       await putOutboxMutation(mutation);
+      emitOutboxState({state:"queued",operation_id:mutation.operation_id});
 
       setLocalOperations((current) => [...current, {
         operationId,

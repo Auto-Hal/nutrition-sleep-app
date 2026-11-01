@@ -97,7 +97,8 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
       <div className="stack today-stack">
         {!historical && <SleepScoreRefresh />}
-        {pfcPeriod && session && <DailyPfcCard key={date} initial={pfcPeriod} binding={{ ownerUserId: session.userId, environmentId: appEnvironmentId() }} />}
+        <a className="button today-meal-shortcut" href="#meals-title">食事を記録</a>
+        {pfcPeriod && session && <DailyPfcCard key={date} initial={pfcPeriod} catalogItems={initialItems} binding={{ ownerUserId: session.userId, environmentId: appEnvironmentId() }} />}
         <ChatGptNutritionLink />
 
         {!historical && pendingDrafts.length > 0 && (

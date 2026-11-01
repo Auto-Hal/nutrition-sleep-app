@@ -3,6 +3,46 @@ import { harness, settle } from "./helpers/component-harness.mjs";
 import { nutritionPeriodFixture } from "./helpers/nutrition-period-fixture";
 import type { useNutritionPeriod } from "@/components/nutrition-period-runtime";
 describe("period snapshot and local outbox reconciliation", () => {
+  it("updates pending rows immediately after a queued event even while the server is offline", async () => {
+    const initial = nutritionPeriodFixture();
+    let rows: unknown[] = [];
+    const events = new Map<string, () => void>();
+    const h = harness({
+      "@/lib/offline/outbox-idb": { listOutboxMutations: async () => rows },
+    });
+    h.context.window.addEventListener = (name: string, fn: () => void) =>
+      events.set(name, fn);
+    h.context.fetchImpl = async () => ({
+      ok: true,
+      json: async () => ({ period: initial }),
+    });
+    const { useNutritionPeriod: usePeriod } = h.load(
+      "components/nutrition-period-runtime.ts",
+    ) as unknown as { useNutritionPeriod: typeof useNutritionPeriod };
+    const render = () =>
+      h.render(
+        () =>
+          usePeriod(initial, {
+            ownerUserId: "synthetic",
+            environmentId: "synthetic",
+          }),
+        {},
+      );
+    render();
+    h.effects[0]();
+    await settle();
+    expect(render().available).toBe(true);
+    rows = [{ operation_id: "queued" }];
+    h.context.fetchImpl = async () => {
+      throw new Error("offline");
+    };
+    events.get("outbox")!();
+    await settle();
+    expect(render().pending).toEqual(rows);
+    expect(render().available).toBe(false);
+    expect(render().period).toEqual(initial);
+    expect(events.has("drain")).toBe(true);
+  });
   it("cannot score until both sources resolve, and ignores superseded responses", async () => {
     const initial = nutritionPeriodFixture(),
       binding = { ownerUserId: "synthetic", environmentId: "synthetic" };

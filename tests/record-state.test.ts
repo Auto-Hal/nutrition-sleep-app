@@ -9,6 +9,13 @@ const todayProps = { date: summary.date, initialItems: [item], initialMeals: [],
 const mealProps = { date: summary.date, initialItems: [item], initialMeals: [], outboxBinding: binding };
 
 describe("confirmed records and provisional UI", () => {
+  it("does not add an unacknowledged pending record to a server total that may already contain it",async()=>{
+    const food={...item,nutrients:[{code:"energy",amount:100,unit:"kcal",quality:"unverified",provenance:"user_entered"}]};
+    const h=harness({"@/lib/offline/outbox-idb":{listOutboxMutations:async()=>[{operation_id:"uncertain",kind:"meal_entry_create",payload:{meal_date:summary.date,catalog_item_id:item.id,quantity:100},status:"in_flight"}]}});
+    h.context.fetchImpl=async()=>({ok:true,json:async()=>({summary:{...summary,energy_known_amount:100,entry_count:1,known_entry_count:1}})});
+    const {TodayInteractive}=h.load("components/today-interactive.tsx");h.render(TodayInteractive,{...todayProps,initialItems:[food]});h.effects.forEach(e=>e());await settle();const text=textOf(h.render(TodayInteractive,{...todayProps,initialItems:[food]}));
+    expect(text).toContain("100");expect(text).not.toContain("200");expect(text).toContain("サーバー合計とは別");expect(text).toContain("未同期");
+  });
   it("does not resurrect a confirmed delta when delayed outbox hydration finishes", async () => {
     let restore: (rows: unknown[]) => void = () => {};
     const h = harness({ "@/lib/offline/outbox-idb": { listOutboxMutations: () => new Promise((resolve) => { restore = resolve; }) } });

@@ -5,7 +5,10 @@ import type {
   PendingMutation,
 } from "@/lib/offline/outbox-contract";
 import { listOutboxMutations } from "@/lib/offline/outbox-idb";
-import { OUTBOX_STATE_EVENT } from "@/lib/offline/outbox-events";
+import {
+  OUTBOX_DRAIN_EVENT,
+  OUTBOX_STATE_EVENT,
+} from "@/lib/offline/outbox-events";
 import {
   parseNutritionPeriod,
   type NutritionPeriod,
@@ -39,7 +42,10 @@ export function useNutritionPeriod(
         fetch(`/api/nutrition/period?start=${start}&end=${end}`, {
           cache: "no-store",
         }),
-        listOutboxMutations(ownerBinding),
+        listOutboxMutations(ownerBinding).then((rows) => {
+          if (sequence.current === seq) setPending(rows);
+          return rows;
+        }),
       ]);
       if (!response.ok)
         throw new Error("同期済みの栄養記録を取得できませんでした。");
@@ -64,12 +70,14 @@ export function useNutritionPeriod(
       if (document.visibilityState === "visible") void refresh();
     };
     window.addEventListener(OUTBOX_STATE_EVENT, refresh);
+    window.addEventListener(OUTBOX_DRAIN_EVENT, refresh);
     window.addEventListener("online", refresh);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       requestSequence.current++;
       window.removeEventListener(OUTBOX_STATE_EVENT, refresh);
+      window.removeEventListener(OUTBOX_DRAIN_EVENT, refresh);
       window.removeEventListener("online", refresh);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisible);

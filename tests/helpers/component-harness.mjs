@@ -48,7 +48,7 @@ function harness(extraModules = {}) {
     '@/components/meal-log': { MealLog: 'MealLog' },
     '@/components/karomiru-transfer-link': { KaromiruTransferLink: 'KaromiruTransferLink' },
     '@/lib/offline/outbox-idb': { listOutboxMutations: async () => [], deleteOutboxMutation: async () => true },
-    '@/lib/offline/outbox-events': { OUTBOX_STATE_EVENT: 'outbox', requestOutboxDrain() {} },
+    '@/lib/offline/outbox-events': { OUTBOX_STATE_EVENT: 'outbox', OUTBOX_DRAIN_EVENT: 'drain', emitOutboxState() {}, requestOutboxDrain() {} },
     '@/lib/offline/outbox-contract': {},
     ...extraModules,
   };

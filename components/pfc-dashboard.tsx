@@ -26,6 +26,11 @@ import {
 import { localDate, shiftIsoDate } from "@/lib/nutrition/civil-date";
 import { resolveGoal } from "@/lib/nutrition/goals";
 import { useNutritionPeriod } from "@/components/nutrition-period-runtime";
+import type { CatalogItem } from "@/lib/nutrition/catalog";
+import {
+  pendingNutritionProgress,
+  PENDING_PROGRESS_CODES,
+} from "@/lib/nutrition/pending-progress";
 const LABELS: Record<TargetCode, string> = {
   energy: "カロリー",
   protein: "P たんぱく質",
@@ -47,7 +52,11 @@ export function pfcAmount(value: Exact | null, places = 1) {
   return value === null
     ? "—"
     : compare(value, fraction(0n)) !== 0 && textDecimal(value, places) === "0"
-      ? textDecimal(value, 8)
+      ? textDecimal(value, 8) === "0"
+        ? value.n > 0n
+          ? "<0.00000001"
+          : ">-0.00000001"
+        : textDecimal(value, 8)
       : textDecimal(value, places);
 }
 const signed = (value: Exact | null) =>
@@ -292,18 +301,39 @@ function RuntimeNotice({
 export function DailyPfcCard({
   initial,
   binding,
+  catalogItems = [],
 }: {
   initial: NutritionPeriod;
   binding: OutboxBinding;
+  catalogItems?: CatalogItem[];
 }) {
   const runtime = useNutritionPeriod(initial, binding);
   const day = evaluatePfcDay(runtime.period, initial.start_date, {
     pending: runtime.pending,
     available: runtime.available,
   });
+  const local = pendingNutritionProgress(
+    runtime.pending,
+    catalogItems,
+    initial.start_date,
+  );
   return (
     <section className="card pfc-daily-card" aria-label="カロリーとPFC">
       <PfcDayDetails day={day} />
+      {local.entries > 0 && (
+        <details className="notice" open>
+          <summary>端末の追加記録 {local.entries}件・未同期の参考小計</summary>
+          <p>
+            {PENDING_PROGRESS_CODES.map(
+              (c) =>
+                `${LABELS[c]} ${pfcAmount(local.values[c].amount)} ${c === "energy" ? "kcal" : "g"}（既知${local.values[c].known}/${local.entries}件）`,
+            ).join(" / ")}
+          </p>
+          <p className="muted">
+            同期の応答が未確認の操作は、すでにサーバーへ保存済みの場合もあります。この小計はサーバーの既知量に足しません。変更された食品や不明値は算出保留。置換・取消操作の差分は含めません。
+          </p>
+        </details>
+      )}
       <ReferenceComparison day={day} period={runtime.period} />
       <RuntimeNotice {...runtime} />
       <Link className="button ghost" href="/nutrition?view=pfc">
