@@ -105,3 +105,7 @@ Catalog/ProductへNa→saltと条件付きC−fiberの明示操作を接続し�
 queue直後とdrain要求の両方で期間の同期状態を再確認する。オフラインでserver取得に失敗してもIndexedDBの追加記録は表示し、正式判定は保留する。端末の追加記録は、参照fingerprintが一致する食品だけを元に既知PFCを計算し、サーバー既知量とは独立した参考小計にする。応答未確認の操作が既にDBへ保存されている場合でも二重加算しない。旧Todayエネルギーの加算表示も同じ理由で分離し、「記録・同期の詳細」へ折り畳む。日々の入力へ直行する「食事を記録」を上部へ配置する。
 
 ローカル742 Vitest（queue/オフライン/不明/古い食品参照/返答消失の回帰を追加）・lint成功。最終CIと認証済みブラウザで統合確認する。
+
+## P9 実アプリの使い捨て統合環境
+
+新しいPlaywright suiteは実Supabase Authで作成した合成ユーザーだけを使い、loopback API:54321/DB:54322以外ではfixture作成前に停止する。実Nextサーバーへ本人用allowed IDを渡し、サービスキーはブラウザにもアプリにも渡さない。テスト終了時は合成Authユーザーを削除し、新しい履歴テーブルのcascadeを確認する。既存Sleepの公開/合成E2Eとは別に、ログイン、目標、写真なしProduct全30、旧HTTP更新の12項目保護、オフライン食事、PFC、実Canvas PNG/保存、Body CRUD/連携、CSV/JSON、睡眠画面をChromium/iPhone WebKit/iPad WebKitで通す。結果は未確定で、CIの最初の失敗箇所から修正する。

@@ -41,7 +41,8 @@ jobs:
       - run: pnpm build
 
   database:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     permissions:
       contents: read
     steps:
@@ -64,5 +65,22 @@ jobs:
         run: node tests/integration/nutrition-concurrency.mjs
         env:
           INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Install Chromium and WebKit for authenticated nutrition flows
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Verify real authenticated nutrition application
+        run: node tests/integration/nutrition-browser.mjs
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Save synthetic nutrition verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nutrition-authenticated-browser-report
+          path: |
+            nutrition-playwright-report/
+            test-results/nutrition-browser/
+            test-results/nutrition-server/
+          retention-days: 7
+          if-no-files-found: ignore
       - if: always()
         run: supabase stop
