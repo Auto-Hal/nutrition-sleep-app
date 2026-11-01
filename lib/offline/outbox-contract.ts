@@ -26,7 +26,11 @@ export type OutboxMutationKind =
   | "product_create"
   | "product_update"
   | "goal_append"
-  | "day_type_append";
+  | "day_type_append"
+  | "body_measurement_create"
+  | "body_measurement_update"
+  | "body_measurement_delete"
+  | "body_settings_update";
 
 export type OutboxBinding = {
   ownerUserId: string;
@@ -159,7 +163,17 @@ export type ProductUpdateOutboxPayload = {
   confirm_verified_overwrite: boolean;
 };
 
+export type BodyMutationOutboxPayload = {
+  measurement_id: string;
+  expected_settings_revision: number;
+  expected_profile_revision: number | null;
+  measurement: import("@/lib/body/model").BodyMeasurementPayload;
+};
 export type OutboxPayloadByKind = {
+  body_measurement_create: BodyMutationOutboxPayload;
+  body_measurement_update: BodyMutationOutboxPayload;
+  body_measurement_delete: Omit<BodyMutationOutboxPayload, "measurement"> & { measurement: { expected_latest_reference?: Array<{ id: string; revision: number }> } };
+  body_settings_update: { expected_profile_revision: number | null; settings: import("@/lib/body/model").BodySettingsPayload };
   goal_append: { goal: import("@/lib/nutrition/goals").GoalCommand };
   day_type_append: import("@/lib/nutrition/goals").DayTypeCommand;
   meal_entry_create: MealEntryOutboxPayload;

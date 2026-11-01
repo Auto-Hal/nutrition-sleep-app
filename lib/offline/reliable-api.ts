@@ -33,6 +33,14 @@ const SAFE_ERROR_CODES = new Set([
   "profile_time_zone_changed",
   "profile_reference_changed",
   "training_goal_required",
+  "invalid_body_payload",
+  "invalid_body_precision",
+  "future_measurement_not_allowed",
+  "measurement_date_exists",
+  "measurement_offset_required",
+  "measurement_date_time_mismatch",
+  "body_measurement_deleted",
+  "body_measurement_not_found",
 ]);
 
 export function reliableMutationError(

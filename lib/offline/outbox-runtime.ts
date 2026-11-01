@@ -75,6 +75,12 @@ function mutationRequest(mutation: PendingMutation): {
   };
 
   switch (mutation.kind) {
+    case "body_measurement_create":
+    case "body_measurement_update":
+    case "body_measurement_delete":
+      return { url: "/api/body/measurements/reliable", init: { method: mutation.kind === "body_measurement_create" ? "POST" : mutation.kind === "body_measurement_update" ? "PATCH" : "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...common, ...mutation.payload, expected_revision: mutation.expected_revision }) } };
+    case "body_settings_update":
+      return { url: "/api/body/settings/reliable", init: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...common, ...mutation.payload, expected_revision: mutation.expected_revision }) } };
     case "goal_append":
     case "day_type_append":
       return {

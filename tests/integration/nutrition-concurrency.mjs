@@ -48,7 +48,31 @@ try {
   const isolated = (await clients[0].query("select public.export_user_data_v2() result")).rows[0].result;
   assert.equal(isolated.goals.versions.length, 0);
   await clients[0].query("commit");
-  console.log("PASS concurrent goal saves, receipt recovery, and authenticated export isolation");
+  await asOwner(clients[0], owner);
+  await clients[0].query("select public.upsert_user_profile(0,null,null,null,60,$1::date,null,null,'Asia/Tokyo')", [day]);
+  const measurementId = randomUUID();
+  const body = { measured_on: day, weight_kg: "62", body_fat_percent: null, measured_at: null, time_zone: "Asia/Tokyo", source: "manual" };
+  await clients[0].query("select public.mutate_body_measurement_v1('create',$1,2,$2,$3,0,0,null,$4::jsonb)", [randomUUID(), createdAt, measurementId, JSON.stringify(body)]);
+  const reference = [{ id: measurementId, revision: 1 }];
+  await clients[0].query("select public.update_body_settings_v1($1,2,$2,0,1,$3::jsonb)", [randomUUID(), createdAt, JSON.stringify({ weight_sync_mode: "latest_measurement", expected_latest_reference: reference, target_weight_kg: null, target_pace_kg_per_week: null })]);
+  await clients[0].query("commit");
+  await Promise.all(clients.map((c) => asOwner(c, owner)));
+  const bodyRace = await Promise.all(clients.map(async (c, index) => {
+    try {
+      await c.query("set local statement_timeout='5s'");
+      if (index === 0) await c.query("select public.mutate_body_measurement_v1('update',$1,2,$2,$3,1,1,2,$4::jsonb)", [randomUUID(), createdAt, measurementId, JSON.stringify({ ...body, weight_kg: "63", expected_latest_reference: reference })]);
+      else await c.query("select public.upsert_user_profile_v2($1,1,$2,2,null,null,null,61,$3::date,null,null,'Asia/Tokyo')", [randomUUID(), createdAt, day]);
+      await c.query("commit"); return { applied: true, index };
+    } catch (error) {
+      await c.query("rollback"); assert.equal(error.code, "PT409", "no lock-order deadlock or lost update is allowed");
+      assert.equal(error.message, "revision_conflict"); return { applied: false, index };
+    }
+  }));
+  assert.equal(bodyRace.filter((r) => r.applied).length, 1);
+  const profile = (await pool.query("select p.weight_kg::text,p.weight_measurement_id,s.weight_sync_mode,m.weight_kg::text measurement_weight from public.user_profiles p join public.body_settings s using(user_id) join public.body_measurements m using(user_id) where p.user_id=$1", [owner])).rows[0];
+  if (bodyRace[0].applied) { assert.equal(Number(profile.weight_kg), 63); assert.equal(profile.weight_measurement_id, measurementId); assert.equal(Number(profile.measurement_weight), 63); assert.equal(profile.weight_sync_mode, "latest_measurement"); }
+  else { assert.equal(Number(profile.weight_kg), 61); assert.equal(profile.weight_measurement_id, null); assert.equal(Number(profile.measurement_weight), 62); assert.equal(profile.weight_sync_mode, "profile_only"); }
+  console.log("PASS concurrent goal saves, receipt recovery, authenticated export isolation, and Body/legacy-profile race");
 } finally {
   for (const client of clients) { try { await client.query("rollback"); } finally { client.release(); } }
   await pool.query("delete from auth.users where id=any($1::uuid[])", [[owner, other]]);

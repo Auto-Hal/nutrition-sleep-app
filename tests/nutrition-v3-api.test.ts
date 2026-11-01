@@ -7,6 +7,8 @@ import { POST as catalogPost } from "@/app/api/catalog/reliable/route";
 import { POST as chatPost } from "@/app/api/chat-registration/route";
 import { POST as goalPost } from "@/app/api/nutrition/goals/reliable/route";
 import { POST as exportPost } from "@/app/api/export/route";
+import { POST as bodyPost, PATCH as bodyPatch, DELETE as bodyDelete } from "@/app/api/body/measurements/reliable/route";
+import { POST as bodySettings } from "@/app/api/body/settings/reliable/route";
 import { INITIAL_GOAL_TARGET } from "@/lib/nutrition/goals";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
@@ -53,5 +55,21 @@ describe("authenticated nutrient schema dispatch", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(rpc.mock.lastCall?.[0]).toBe("export_user_data_v2");
+  });
+  it("requires authenticated same-origin body mutations with exact values and concurrency references", async () => {
+    const body = { operation_id, contract_version: 2, intent_created_at: catalog.intent_created_at, measurement_id: operation_id, expected_revision: 0, expected_settings_revision: 0, expected_profile_revision: null, measurement: { measured_on: "2026-11-01", weight_kg: "70.01", body_fat_percent: null, measured_at: null, time_zone: "Asia/Tokyo", source: "manual" } };
+    expect((await bodyPost(request("/api/body/measurements/reliable", body, "https://attacker.example"))).status).toBe(403);
+    session.mockResolvedValueOnce(null);
+    expect((await bodyPost(request("/api/body/measurements/reliable", body))).status).toBe(401);
+    expect((await bodyPost(request("/api/body/measurements/reliable", body))).status).toBe(201);
+    expect(rpc.mock.lastCall?.[1]).toMatchObject({ p_action: "create", p_payload: { weight_kg: "70.01", body_fat_percent: null } });
+    expect((await bodyPatch(request("/api/body/measurements/reliable", { ...body, expected_revision: 1 }))).status).toBe(200);
+    expect(rpc.mock.lastCall?.[1].p_action).toBe("update");
+    expect((await bodyDelete(request("/api/body/measurements/reliable", { ...body, measurement: {}, expected_revision: 1 }))).status).toBe(200);
+    expect(rpc.mock.lastCall?.[1].p_action).toBe("delete");
+    expect((await bodyPost(request("/api/body/measurements/reliable", { ...body, user_id: "forged" }))).status).toBe(422);
+    expect((await bodyPost(request("/api/body/measurements/reliable", { ...body, measurement: { ...body.measurement, weight_kg: "70.001" } }))).status).toBe(422);
+    expect((await bodySettings(request("/api/body/settings/reliable", { operation_id, contract_version: 2, intent_created_at: catalog.intent_created_at, expected_revision: 0, expected_profile_revision: 3, settings: { target_weight_kg: "75", target_pace_kg_per_week: "0.25", weight_sync_mode: "latest_measurement", expected_latest_reference: [{ id: operation_id, revision: 1 }] } }))).status).toBe(200);
+    expect(rpc.mock.lastCall?.[0]).toBe("update_body_settings_v1");
   });
 });
