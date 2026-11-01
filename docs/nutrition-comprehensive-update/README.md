@@ -4,15 +4,15 @@
 - 対象: Auto-Hal/nutrition-sleep-app
 - 監査基準main: **7b2bcea83c97d14aa8b11b06a8f2d0377dbbaec5**
 - 設計ブランチ: **docs/nutrition-comprehensive-design**
-- 状態: **調査・詳細設計・セルフレビュー完了 / ユーザーの設計確認待ち / 実装未開始**
+- 状態: **第1段階設計は原則承認済み / 第2段階の段階的実装中 / Production未承認**
 
 ## 今回の範囲と停止条件
 
-今回の依頼末尾の「第1段階」を適用した。成果物はこのディレクトリの設計文書だけである。アプリコード・既存migration・workflowは変更していない。migrationの実行、環境設定変更、Preview/Productionデプロイ、実データの変更・削除、mainマージは行っていない。
+第1段階では設計文書だけを作成した。2026-11-01の追加指示により、設計を正本とした実装・自動検証・Preview反映・PR作成が承認された。以降の実施状況は[実装記録](09-implementation-status.md)を参照する。mainマージ、Production migration、Productionデプロイは新しい明示承認まで禁止。
 
 GitHub、Supabase、Vercelの監査は読み取りだけを行った。DB照会はREAD ONLYトランザクションで、スキーマ・制約・関数定義・権限とグローバル栄養素定義に限定した。食事、体重、睡眠、ユーザーID、資格情報の実値を成果物へ転記していない。
 
-PRを開くと現行Preview workflowが起動する。今回はPreview変更禁止を優先し、ブランチをpushせず、PRも作成しない。実装開始、設計承認、Production反映承認は別のゲートである。過去のMVP/Sleep向け承認を本変更に流用しない。
+PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyとしたが、追加指示により実装ブランチのpush/Preview/PRは承認済み。設計承認・実装開始・Production反映承認は別のゲートである。
 
 ## 文書案内
 
@@ -26,6 +26,7 @@ PRを開くと現行Preview workflowが起動する。今回はPreview変更禁�
 | [06-transfer-export-body.md](06-transfer-export-body.md) | カロミルPNG、JSON/CSV、体重プロフィール整合性 |
 | [07-delivery-tests-risks-review.md](07-delivery-tests-risks-review.md) | 実装単位・依存関係・受け入れ・レビュー・リスク・リリース |
 | [08-implementation-handoff.md](08-implementation-handoff.md) | 次回Codexへ渡す実装開始指示 |
+| [09-implementation-status.md](09-implementation-status.md) | 重点4項目の補足判断、実装単位の検証・環境反映状況 |
 
 ## 主要な設計判断
 
@@ -41,6 +42,7 @@ PRを開くと現行Preview workflowが起動する。今回はPreview変更禁�
 10. 体重は1日1件の計測履歴を追加する。プロフィール連動は明示選択し、旧プロフィール値から時系列を生成しない。
 11. JSON v1の構造を残し、新機能を含む完全な新形式をv2で提供する。CSVは日/食事/摂取食品明細を選び、不明を空欄と状態列で表す。
 12. 新しい参照fingerprint/outbox契約を追加し、旧契約のpendingを再解釈しない。旧クライアントの食品編集で新12項目を消さない。
+13. 記録途中の既知量/暫定進捗を常時表示し、正式な達成判定とは分ける。目標開始前の過去日は、明示選択した場合だけ現在の目標との参考比較を提供し、履歴・達成日数・帳尻合わせへ混入させない。
 
 ## 監査で見つかった実装前の重要事項
 

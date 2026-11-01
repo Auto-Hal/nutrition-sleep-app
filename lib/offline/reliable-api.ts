@@ -23,6 +23,8 @@ const SAFE_ERROR_CODES = new Set([
   "serving_basis_requires_full_replacement",
   "verified_overwrite_confirmation_required",
   "batch_rpc_required",
+  "unsupported_nutrient_schema",
+  "upgrade_required_for_serving_basis",
 ]);
 
 export function reliableMutationError(
