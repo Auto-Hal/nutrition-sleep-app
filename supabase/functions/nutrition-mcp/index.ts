@@ -14,6 +14,8 @@ const nutrientCodes = [
   "energy", "protein", "fat", "carbohydrate", "fiber", "calcium", "iron", "zinc",
   "vitamin_a", "vitamin_b1", "vitamin_b2", "vitamin_b6", "vitamin_b12", "vitamin_c",
   "vitamin_d", "vitamin_e", "sodium", "salt_equivalent",
+  "saturated_fat", "n3_fatty_acids", "n6_fatty_acids", "cholesterol", "carbohydrate_excluding_fiber",
+  "potassium", "magnesium", "phosphorus", "copper", "selenium", "molybdenum", "folate",
 ] as const;
 
 const nutrientSchema = z.object({
@@ -24,6 +26,8 @@ const nutrientSchema = z.object({
   quality: z.enum(["verified", "computed", "estimated"]),
   source_uri: z.string().url().nullable().optional(),
   source_observed_at: z.string().datetime().nullable().optional(),
+  definition_basis: z.string().max(160).nullable().optional(),
+  intake_scope: z.enum(["conventional_food", "nonconventional_food", "unknown"]).nullable().optional(),
 }).strict();
 
 const createDraftInputSchema = z.object({
@@ -133,7 +137,8 @@ async function authenticatedClient(request: Request) {
 
 function draftPayload(input: CreateDraftInput) {
   return {
-    schema_version: 1,
+    schema_version: 2,
+    nutrient_schema_version: 2,
     draft_only: true,
     request_id: input.request_id,
     meal: {
@@ -177,7 +182,7 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
     async (rawInput) => {
       const input = createDraftInputSchema.parse(rawInput);
       const payload = draftPayload(input);
-      const { data, error } = await auth.supabase.rpc("create_chat_meal_draft_v1", {
+      const { data, error } = await auth.supabase.rpc("create_chat_meal_draft_v2", {
         p_request_id: input.request_id,
         p_payload: payload,
       });

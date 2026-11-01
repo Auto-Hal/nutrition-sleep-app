@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { NutrientCode } from "@/lib/nutrition/catalog";
+import { LEGACY_NUTRIENT_DEFINITIONS, NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 
-const CHAT_NUTRIENT_CODES = [
+const LEGACY_CHAT_NUTRIENT_CODES = [
   "energy",
   "protein",
   "fat",
@@ -21,9 +21,11 @@ const CHAT_NUTRIENT_CODES = [
   "sodium",
   "salt_equivalent",
 ] as const satisfies readonly NutrientCode[];
+const CHAT_NUTRIENT_CODES = NUTRIENT_DEFINITIONS.map((definition) => definition.code) as [NutrientCode, ...NutrientCode[]];
 
 export const chatNutritionDraftSchema = z.object({
-  schema_version: z.literal(1),
+  schema_version: z.union([z.literal(1), z.literal(2)]),
+  nutrient_schema_version: z.literal(2).optional(),
   draft_only: z.literal(true),
   request_id: z.string().uuid(),
   meal: z.object({
@@ -46,6 +48,8 @@ export const chatNutritionDraftSchema = z.object({
     quality: z.enum(["verified", "computed", "estimated"]),
     source_uri: z.string().url().nullable().optional(),
     source_observed_at: z.string().nullable().optional(),
+    definition_basis: z.string().max(160).nullable().optional(),
+    intake_scope: z.enum(["conventional_food", "nonconventional_food", "unknown"]).nullable().optional(),
   }).strict()).max(CHAT_NUTRIENT_CODES.length).superRefine((nutrients, ctx) => {
     const seen = new Set<string>();
     nutrients.forEach((nutrient, index) => {
@@ -61,7 +65,10 @@ export const chatNutritionDraftSchema = z.object({
   }),
   source_summary: z.string().trim().max(1000).nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.schema_version === 1 && (value.nutrients.length > LEGACY_CHAT_NUTRIENT_CODES.length || value.nutrients.some((n) => !LEGACY_NUTRIENT_DEFINITIONS.some((d) => d.code === n.code)))) ctx.addIssue({ code: "custom", message: "legacy nutrient contract is limited to 18 codes" });
+  if (value.schema_version === 2 && value.nutrient_schema_version !== 2) ctx.addIssue({ code: "custom", message: "nutrient_schema_version 2 required" });
+});
 
 export type ChatNutritionDraft = z.infer<typeof chatNutritionDraftSchema>;
 

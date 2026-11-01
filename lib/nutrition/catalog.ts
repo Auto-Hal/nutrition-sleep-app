@@ -113,3 +113,13 @@ export function nutrientFormValues(item: CatalogItem | null) {
     return [code, value === null || value === undefined ? "" : String(value)];
   }));
 }
+
+/** Unedited evidence must survive a name/serving edit. A changed manual value
+ * is a user report unless the user explicitly selects another source. */
+export function editedNutrientPayload(values: Record<string, string>, item: CatalogItem | null, origin: NonNullable<NutrientMetadata["value_origin"]> = "user_reported", sourceUri: string | null = null) {
+  return nutrientPayload(values).map((nutrient) => {
+    const previous = item?.nutrients.find((n) => n.code === nutrient.code);
+    if (previous && previous.amount === nutrient.amount && previous.unit === nutrient.unit) return { ...previous };
+    return { ...nutrient, provenance: origin === "estimated" ? "estimated_dish" : origin === "database" || origin === "official" ? "approved_external_db" : origin === "label" ? "product_label" : "user_entered", quality: origin === "estimated" ? "unknown" : origin === "database" || origin === "official" ? "unverified" : "user_verified", value_origin: origin, source_uri: sourceUri, contains_estimates: origin === "estimated" };
+  });
+}

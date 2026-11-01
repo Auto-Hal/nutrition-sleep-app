@@ -5,6 +5,9 @@ import { parseNutritionLabelText } from "@/lib/products/label-ocr";
 import { normalizeOpenFoodFactsProduct } from "@/lib/products/open-food-facts";
 import { resolveDri2025 } from "@/lib/nutrition/dri/resolve";
 import { evaluateDriSet } from "@/lib/nutrition/dri/evaluate";
+import { editedNutrientPayload } from "@/lib/nutrition/catalog";
+import { parseChatNutritionDraft } from "@/lib/nutrition/chat-import-contract";
+import { createOutboxMutation } from "@/lib/offline/outbox-contract";
 
 describe("nutrition schema 2 and evidence", () => {
   it("keeps the exact legacy vocabulary and all 29 standard units", () => {
@@ -24,6 +27,19 @@ describe("nutrition schema 2 and evidence", () => {
     expect(nutrientWriteSchema.safeParse({ ...n, unit: "mg" }).success).toBe(false);
     expect(nutrientWriteSchema.safeParse({ ...n, value_origin: "official" }).success).toBe(false);
     expect(nutrientWriteSchema.safeParse({ ...n, amount: Number.NaN }).success).toBe(false);
+  });
+  it("preserves old and new mutation contracts independently", () => {
+    const input = { operationId: "30000000-0000-4000-8000-000000000901", createdAt: "2026-11-01T00:00:00Z", kind: "catalog_create" as const, entityKey: "catalog-create:fixture", payload: { item_type: "ingredient" as const, name: "銅0", brand: null, serving_size: 100, serving_unit: "g", nutrients: [{ code: "copper", amount: 0, unit: "mg", provenance: "user_entered", quality: "user_verified", value_origin: "measured" as const }] } };
+    const binding = { ownerUserId: "11111111-1111-4111-8111-111111111191", environmentId: "supabase:preview" };
+    expect(createOutboxMutation(binding, input).contract_version).toBe(1);
+    expect(createOutboxMutation(binding, { ...input, contractVersion: 2 }).contract_version).toBe(2);
+    expect(createOutboxMutation(binding, { ...input, contractVersion: 2 }).payload.nutrients[0]).toMatchObject({ amount: 0, value_origin: "measured" });
+  });
+  it("keeps explicit manual origin and versioned Chat input", () => {
+    expect(editedNutrientPayload({ copper: "0" }, null, "measured")[0]).toMatchObject({ amount: 0, value_origin: "measured", contains_estimates: false });
+    const draft = { schema_version: 2, nutrient_schema_version: 2, draft_only: true, request_id: "30000000-0000-4000-8000-000000000901", meal: { meal_date: "2026-11-01", meal_type: "lunch", eaten_at: "2026-11-01T03:00:00Z" }, item: { name: "新しい栄養素", item_type: "ingredient", serving_size: 100, serving_unit: "g" }, nutrients: [{ code: "selenium", amount: 2.5, unit: "ug", provenance: "estimated", quality: "estimated" }] };
+    expect(parseChatNutritionDraft(draft).nutrients[0].amount).toBe(2.5);
+    expect(() => parseChatNutritionDraft({ ...draft, schema_version: 1 })).toThrow();
   });
   it("parses all 29 labels without sugar, fatty acid, or vitamin-family confusion", () => {
     const label = STANDARD_NUTRIENT_DEFINITIONS.map((d, i) => `${d.label} ${i + 1} ${d.unit === "ug_rae" ? "µg RAE" : d.unit}`).join("\n");

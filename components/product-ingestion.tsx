@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
+import { NUTRIENT_DEFINITIONS, STANDARD_NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { isValidGtin, normalizeBarcode } from "@/lib/products/barcode";
 import { prepareNutritionLabelImage } from "@/lib/products/image-prep";
 import type { CommercialNutrient } from "@/lib/products/open-food-facts";
@@ -162,6 +162,8 @@ function ocrNutrientPayload(
       code: definition.code,
       amount,
       unit: definition.unit,
+      value_origin: "label" as const,
+      contains_estimates: false,
       provenance: "ocr" as const,
       quality: "user_verified" as const,
       source_uri: null,
@@ -542,6 +544,7 @@ export function ProductIngestion({
     try {
       const operationId = crypto.randomUUID();
       const mutation = createOutboxMutation(outboxBinding, {
+        contractVersion: 2,
         operationId, createdAt: new Date().toISOString(), kind: "product_create",
         entityKey: `product-barcode:${normalizeBarcode(identity.barcode)}`,
         payload: {
@@ -579,6 +582,7 @@ export function ProductIngestion({
       const updatingLocal = Boolean(localItem && localItem.product.barcode === ocrCandidate.barcode);
       if (updatingLocal) {
         const mutation = createOutboxMutation(outboxBinding, {
+        contractVersion: 2,
           operationId, createdAt, kind: "product_update", entityKey: `catalog:${localItem!.id}`,
           payload: { catalog_item_id: localItem!.id, barcode: ocrCandidate.barcode, ...common, active: localItem!.active, replace_all_nutrients: true, confirm_verified_overwrite: true },
           expectedRevision: localItem!.revision,
@@ -586,6 +590,7 @@ export function ProductIngestion({
         await queueProductMutation(mutation);
       } else {
         const mutation = createOutboxMutation(outboxBinding, {
+        contractVersion: 2,
           operationId, createdAt, kind: "product_create", entityKey: `product-barcode:${normalizeBarcode(ocrCandidate.barcode)}`,
           payload: { ...common, item_type: itemType, barcode: ocrCandidate.barcode },
         });
@@ -621,7 +626,8 @@ export function ProductIngestion({
     try {
       const current = await loadLocalProduct(mutation.payload.barcode);
       if (!current || current.id !== mutation.payload.catalog_item_id || current.product.barcode !== mutation.payload.barcode) throw new Error("現在の商品identityが変わっているため、自動では再適用できません。");
-      const replacement = createOutboxMutation(outboxBinding, { operationId: crypto.randomUUID(), createdAt: new Date().toISOString(), kind: "product_update", entityKey: mutation.entity_key, payload: mutation.payload, expectedRevision: current.revision });
+      const replacement = createOutboxMutation(outboxBinding, {
+        contractVersion: mutation.contract_version === 2 ? 2 : 1, operationId: crypto.randomUUID(), createdAt: new Date().toISOString(), kind: "product_update", entityKey: mutation.entity_key, payload: mutation.payload, expectedRevision: current.revision });
       await deleteOutboxMutation(mutation.operation_id); await putOutboxMutation(replacement);
       setPendingProductMutations((rows) => [...rows.filter((candidate) => candidate.operation_id !== mutation.operation_id), replacement]);
       setLocalItem(current); setMessage("現在のrevisionに対して商品変更を再適用しました。"); requestOutboxDrain();
@@ -676,7 +682,7 @@ export function ProductIngestion({
 
       {needsOcr && !ocrCandidate && !externalCandidate && <div className="stack"><p className="muted">商品DBでは安全に特定できませんでした。商品名を入力するため、まず栄養成分表示を撮影してください。</p><label className="button secondary">栄養成分表示を撮影<input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readLabel(file); event.currentTarget.value = ""; }} /></label></div>}
 
-      {ocrCandidate && <div className="form library-form stack">{ocrPreviewUrl && <figure className="ocr-preview-frame"><img className="ocr-preview" src={ocrPreviewUrl} alt="確認用の栄養成分表示" /><figcaption className="muted">この画像とOCR候補を見比べて確認してください。画像は保存しません。</figcaption></figure>}<div className="grid-2"><div className="field"><label htmlFor="ocr-product-name">商品名</label><input id="ocr-product-name" value={ocrCandidate.name} onChange={(event) => markIdentityEdited({ name: event.target.value })} /></div><div className="field"><label htmlFor="ocr-product-brand">メーカー・ブランド（任意）</label><input id="ocr-product-brand" value={ocrCandidate.brand ?? ""} onChange={(event) => { const value = event.target.value || null; markIdentityEdited({ brand: value, manufacturer: value }); }} /></div></div><div className="nutrition-meta">identity出典: {ocrCandidate.identity_source.type === "user_entered" ? "ユーザー確認・入力" : "外部商品DB"}<span aria-hidden="true"> · </span>栄養出典: {ocrCandidate.nutrient_source_provider}（現物ラベルOCR）</div><div className="grid-2"><div className="field"><label htmlFor="ocr-serving-size">表示基準量</label><input id="ocr-serving-size" type="number" min="0.001" step="any" value={ocrCandidate.serving_size} onChange={(event) => setOcrCandidate((current) => current ? { ...current, serving_size: Number(event.target.value) } : current)} /></div><div className="field"><label htmlFor="ocr-serving-unit">表示基準単位</label><input id="ocr-serving-unit" value={ocrCandidate.serving_unit} onChange={(event) => setOcrCandidate((current) => current ? { ...current, serving_unit: event.target.value } : current)} /></div></div><fieldset className="nutrient-fieldset"><legend>OCR結果（現物ラベルと照合してから保存）</legend><div className="nutrient-grid">{NUTRIENT_DEFINITIONS.map((definition) => <div className="field" key={definition.code}><label htmlFor={`ocr-${definition.code}`}>{definition.label}（{definition.unit}）</label><input id={`ocr-${definition.code}`} type="number" min="0" step="any" value={ocrNutrients[definition.code]} onChange={(event) => setOcrNutrients((current) => ({ ...current, [definition.code]: event.target.value }))} /></div>)}</div></fieldset><div className="form-actions"><button className="button" type="button" disabled={busy} onClick={() => void saveOcr()}>identityと現物ラベルを確認して保存</button><label className="button secondary">撮り直す<input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readLabel(file); event.currentTarget.value = ""; }} /></label></div></div>}
+      {ocrCandidate && <div className="form library-form stack">{ocrPreviewUrl && <figure className="ocr-preview-frame"><img className="ocr-preview" src={ocrPreviewUrl} alt="確認用の栄養成分表示" /><figcaption className="muted">この画像とOCR候補を見比べて確認してください。画像は保存しません。</figcaption></figure>}<div className="grid-2"><div className="field"><label htmlFor="ocr-product-name">商品名</label><input id="ocr-product-name" value={ocrCandidate.name} onChange={(event) => markIdentityEdited({ name: event.target.value })} /></div><div className="field"><label htmlFor="ocr-product-brand">メーカー・ブランド（任意）</label><input id="ocr-product-brand" value={ocrCandidate.brand ?? ""} onChange={(event) => { const value = event.target.value || null; markIdentityEdited({ brand: value, manufacturer: value }); }} /></div></div><div className="nutrition-meta">identity出典: {ocrCandidate.identity_source.type === "user_entered" ? "ユーザー確認・入力" : "外部商品DB"}<span aria-hidden="true"> · </span>栄養出典: {ocrCandidate.nutrient_source_provider}（現物ラベルOCR）</div><div className="grid-2"><div className="field"><label htmlFor="ocr-serving-size">表示基準量</label><input id="ocr-serving-size" type="number" min="0.001" step="any" value={ocrCandidate.serving_size} onChange={(event) => setOcrCandidate((current) => current ? { ...current, serving_size: Number(event.target.value) } : current)} /></div><div className="field"><label htmlFor="ocr-serving-unit">表示基準単位</label><input id="ocr-serving-unit" value={ocrCandidate.serving_unit} onChange={(event) => setOcrCandidate((current) => current ? { ...current, serving_unit: event.target.value } : current)} /></div></div><fieldset className="nutrient-fieldset"><legend>OCR結果（現物ラベルと照合してから保存）</legend><div className="nutrient-grid">{STANDARD_NUTRIENT_DEFINITIONS.map((definition) => <div className="field" key={definition.code}><label htmlFor={`ocr-${definition.code}`}>{definition.label}（{definition.unit}）</label><input id={`ocr-${definition.code}`} type="number" min="0" step="any" value={ocrNutrients[definition.code]} onChange={(event) => setOcrNutrients((current) => ({ ...current, [definition.code]: event.target.value }))} /></div>)}</div></fieldset><div className="form-actions"><button className="button" type="button" disabled={busy} onClick={() => void saveOcr()}>identityと現物ラベルを確認して保存</button><label className="button secondary">撮り直す<input className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readLabel(file); event.currentTarget.value = ""; }} /></label></div></div>}
 
       {message && <p className="muted" role="status">{message}</p>}
       {error && <p className="error-text" role="alert">{error}</p>}

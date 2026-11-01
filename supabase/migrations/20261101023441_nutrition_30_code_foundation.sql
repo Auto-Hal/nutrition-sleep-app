@@ -43,8 +43,8 @@ begin
      perform private.phase6_raise_http(422,'invalid_mutation_payload');
    end if;
    update public.item_nutrients set
-     value_origin=n->>'value_origin', definition_basis=n->>'definition_basis', intake_scope=n->>'intake_scope',
-     derivation=nullif(n->'derivation','null'::jsonb), contains_estimates=(n->>'contains_estimates')::boolean
+     value_origin=coalesce(n->>'value_origin',case when n->>'provenance'='estimated_dish' then 'estimated' end), definition_basis=n->>'definition_basis', intake_scope=n->>'intake_scope',
+     derivation=nullif(n->'derivation','null'::jsonb), contains_estimates=case when n->>'provenance'='estimated_dish' or n->>'value_origin'='estimated' then true else (n->>'contains_estimates')::boolean end
    where catalog_item_id=p_item_id and user_id=owner_id and nutrient_code=n->>'code';
  end loop;
 end $$;
@@ -737,6 +737,11 @@ begin
           or existing_nutrient.quality is distinct from next_quality
           or existing_nutrient.source_uri is distinct from next_source_uri
           or existing_nutrient.source_observed_at is distinct from next_source_observed_at
+          or existing_nutrient.value_origin is distinct from nutrient->>'value_origin'
+          or existing_nutrient.definition_basis is distinct from nutrient->>'definition_basis'
+          or existing_nutrient.intake_scope is distinct from nutrient->>'intake_scope'
+          or existing_nutrient.derivation is distinct from nullif(nutrient->'derivation','null'::jsonb)
+          or existing_nutrient.contains_estimates is distinct from (nutrient->>'contains_estimates')::boolean
         );
 
       if verified_change and not p_confirm_verified_overwrite then
@@ -2038,14 +2043,14 @@ begin
     owner_id,
     d.code,
     case
-      when count(bc.id) = count(n.amount)
+      when count(bc.id) = count(n.amount) and count(distinct n.definition_basis)<=1
         then sum(n.amount * (bc.quantity / c.serving_size)) / batch.servings
       else null
     end,
     d.unit,
     'batch_calculation',
     case
-      when count(bc.id) <> count(n.amount) then 'unknown'
+      when count(bc.id) <> count(n.amount) or count(distinct n.definition_basis)>1 then 'unknown'
       when bool_or(coalesce(n.quality, 'unknown') = 'unknown') then 'unknown'
       when bool_or(n.quality = 'unverified') then 'unverified'
       else 'user_verified'
@@ -2659,8 +2664,37 @@ begin
 end;
 $$;
 
+create or replace function public.confirm_chat_meal_v2(p_operation_id uuid,p_intent_created_at timestamptz,p_payload jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog as $$
+declare owner_id uuid := (select auth.uid()); request_hash text; replay jsonb; c jsonb; m jsonb;
+ item public.catalog_items; result jsonb;
+begin
+ if owner_id is null then raise insufficient_privilege; end if;
+ request_hash := private.phase6_sha256_jsonb(jsonb_build_object('payload',p_payload,'intent_created_at',private.phase6_timestamp_text(p_intent_created_at)));
+ replay := private.phase6_prepare_mutation(owner_id,p_operation_id,'chat_confirm_v2',request_hash,p_intent_created_at);
+ if replay is not null then return replay; end if;
+ if jsonb_typeof(p_payload) is distinct from 'object' or pg_column_size(p_payload)>131072 then
+   perform private.phase6_raise_http(422,'invalid_mutation_payload');
+ end if;
+ c:=p_payload->'catalog'; m:=p_payload->'meal';
+ if c->>'item_type' is null or c->>'item_type' not in ('ingredient','estimated_dish')
+ or jsonb_typeof(c->'nutrients') is distinct from 'array' or jsonb_array_length(c->'nutrients')>30
+ or m->>'meal_date' is null or m->>'meal_type' is null or m->>'quantity_unit' is null
+ or (m->>'quantity')::numeric is null or (m->>'quantity')::numeric<=0 then
+   perform private.phase6_raise_http(422,'invalid_mutation_payload');
+ end if;
+ item:=private.phase8_create_catalog_item((c->>'item_type')::public.catalog_item_type,c->>'name',c->>'brand',
+   (c->>'serving_size')::numeric,c->>'serving_unit',c->'nutrients','chat-confirm:'||p_operation_id::text);
+ result:=public.create_meal_entry_v3(md5(p_operation_id::text||':entry')::uuid,2,p_intent_created_at,
+   (m->>'meal_date')::date,(m->>'meal_type')::public.meal_type,(m->>'eaten_at')::timestamptz,item.id,
+   (m->>'quantity')::numeric,m->>'quantity_unit',private.phase8_catalog_reference_fingerprint(owner_id,item.id));
+ perform private.phase6_store_mutation_receipt(owner_id,p_operation_id,'chat_confirm_v2',request_hash,
+   (result->>'entry_id')::uuid,(result->>'meal_revision')::integer,result);
+ return result;
+end $$;
+
 do $grants$ declare f record; begin
- for f in select p.oid::regprocedure signature,n.nspname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where (n.nspname='private' and p.proname=any(array['phase8_create_catalog_item','phase8_update_catalog_item','phase8_create_product_item','phase8_update_product_item','phase8_apply_nutrient_metadata','phase8_catalog_reference_payload','phase8_catalog_reference_fingerprint'])) or (n.nspname='public' and p.proname=any(array['create_catalog_item_v3','update_catalog_item_v3','create_product_item_reliable_v3','update_product_item_reliable_v3','get_catalog_reference_fingerprint_v3','list_catalog_reference_fingerprints_v3','create_meal_entry_v3','replace_meal_entry_v3','create_chat_meal_draft_v2'])) loop
+ for f in select p.oid::regprocedure signature,n.nspname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where (n.nspname='private' and p.proname=any(array['phase8_create_catalog_item','phase8_update_catalog_item','phase8_create_product_item','phase8_update_product_item','phase8_apply_nutrient_metadata','phase8_catalog_reference_payload','phase8_catalog_reference_fingerprint'])) or (n.nspname='public' and p.proname=any(array['create_catalog_item_v3','update_catalog_item_v3','create_product_item_reliable_v3','update_product_item_reliable_v3','get_catalog_reference_fingerprint_v3','list_catalog_reference_fingerprints_v3','create_meal_entry_v3','replace_meal_entry_v3','create_chat_meal_draft_v2','confirm_chat_meal_v2'])) loop
  execute format('revoke all on function %s from public, anon, authenticated',f.signature);
  if f.nspname='public' then execute format('grant execute on function %s to authenticated',f.signature); end if;
  end loop; end $grants$;

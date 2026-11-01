@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 import type { ChatNutritionDraft } from "@/lib/nutrition/chat-import-contract";
 import {
-  catalogPayloadFromChatDraft,
   chatDraftItemTypeNotice,
-  mealPayloadFromChatDraft,
 } from "@/lib/nutrition/chat-import-application";
 import { draftFromLocationHash } from "@/lib/nutrition/chat-import-link";
 
@@ -47,6 +45,7 @@ async function responseError(response: Response, fallback: string) {
 }
 
 export function ChatNutritionImport() {
+  const pendingConfirmation = useRef<string | null>(null);
   const [draft, setDraft] = useState<ChatNutritionDraft | null>(null);
   const [inboxDraftId, setInboxDraftId] = useState<string | null>(null);
   const [mealDate, setMealDate] = useState("");
@@ -124,32 +123,9 @@ export function ChatNutritionImport() {
     setCompletionWarning(null);
 
     try {
-      const catalogResponse = await fetch("/api/catalog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(catalogPayloadFromChatDraft(draft)),
-      });
-      if (!catalogResponse.ok) {
-        throw new Error(await responseError(catalogResponse, "食品項目を作成できませんでした。"));
-      }
-
-      const catalogBody = await catalogResponse.json() as { item?: { id?: string } };
-      const catalogItemId = catalogBody.item?.id;
-      if (!catalogItemId) throw new Error("作成した食品項目を確認できませんでした。");
-
-      const mealResponse = await fetch("/api/meals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mealPayloadFromChatDraft(draft, catalogItemId, {
-          mealDate,
-          mealType,
-          eatenAt: eatenAt.toISOString(),
-          quantity: numericQuantity,
-        })),
-      });
-      if (!mealResponse.ok) {
-        throw new Error(await responseError(mealResponse, "食事に追加できませんでした。"));
-      }
+      pendingConfirmation.current ??= JSON.stringify({ operation_id: draft.request_id, intent_created_at: new Date().toISOString(), draft, meal: { mealDate, mealType, eatenAt: eatenAt.toISOString(), quantity: numericQuantity } });
+      const mealResponse = await fetch("/api/chat-registration", { method: "POST", headers: { "Content-Type": "application/json" }, body: pendingConfirmation.current });
+      if (!mealResponse.ok) throw new Error(await responseError(mealResponse, "食事登録を確認できませんでした。同じ内容で再試行できます。"));
 
       if (inboxDraftId) {
         const statusResponse = await fetch(`/api/chat-drafts/${encodeURIComponent(inboxDraftId)}`, {
@@ -269,7 +245,7 @@ export function ChatNutritionImport() {
 
         {draft.source_summary && <div className="notice"><strong>出典・推定メモ</strong><p>{draft.source_summary}</p></div>}
         {draft.notes && <p className="muted">{draft.notes}</p>}
-        {error && <div className="notice warning"><strong>{error}</strong></div>}
+        {error && <div className="notice warning"><strong>{error}</strong>{pendingConfirmation.current && <p>再試行は最初に確認した内容で行います。重複して新規登録する前に食事履歴を確認してください。</p>}</div>}
 
         {completed ? (
           <div className="notice">

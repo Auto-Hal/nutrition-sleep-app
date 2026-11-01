@@ -112,6 +112,8 @@ function normalizeNutrients(
       code,
       amount: normalized * multiplier,
       unit,
+      value_origin: "database" as const,
+      definition_basis: code === "carbohydrate" ? "total_carbohydrate_including_fiber" : null,
       provenance: "approved_external_db" as const,
       quality: "unverified" as const,
       source_uri: sourceUri,

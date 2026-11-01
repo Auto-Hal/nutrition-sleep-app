@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   NUTRIENT_DEFINITIONS,
   nutrientFormValues,
-  nutrientPayload,
+  editedNutrientPayload,
+  STANDARD_NUTRIENT_DEFINITIONS,
+  type NutrientMetadata,
   type CatalogItem,
   type CatalogItemType,
 } from "@/lib/nutrition/catalog";
@@ -116,6 +118,8 @@ export function CatalogLibrary({
     () => ({ ownerUserId, environmentId }),
     [ownerUserId, environmentId],
   );
+  const [valueOrigin, setValueOrigin] = useState<NonNullable<NutrientMetadata["value_origin"]>>("user_reported");
+  const [sourceUri, setSourceUri] = useState("");
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [batches, setBatches] = useState<BatchRecord[]>([]);
   const [mode, setMode] = useState<"item" | "batch">("item");
@@ -306,7 +310,7 @@ export function CatalogLibrary({
       if (!Number.isFinite(servingSize) || servingSize <= 0) {
         throw new Error("基準量を確認してください。");
       }
-      const nutrients = nutrientPayload(form.nutrients);
+      const nutrients = editedNutrientPayload(form.nutrients, editing, valueOrigin, sourceUri.trim() || null);
       const operationId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
 
@@ -319,6 +323,7 @@ export function CatalogLibrary({
           operationId,
           createdAt,
           kind: "catalog_update",
+          contractVersion: 2,
           entityKey,
           payload: {
             catalog_item_id: editing.id,
@@ -340,6 +345,7 @@ export function CatalogLibrary({
         operationId,
         createdAt,
         kind: "catalog_create",
+        contractVersion: 2,
         entityKey: `catalog-create:${operationId}`,
         payload: {
           item_type: form.item_type,
@@ -524,6 +530,7 @@ export function CatalogLibrary({
           operationId,
           createdAt,
           kind: "catalog_update",
+          contractVersion: mutation.contract_version === 2 ? 2 : 1,
           entityKey: mutation.entity_key,
           payload: mutation.payload,
           expectedRevision: item.revision,
@@ -753,10 +760,11 @@ export function CatalogLibrary({
                 </div>
               </div>
             </div>
+            <div className="grid-2"><div className="field"><label htmlFor="nutrient-origin">変更する値の出典</label><select id="nutrient-origin" value={valueOrigin} onChange={(event) => setValueOrigin(event.target.value as NonNullable<NutrientMetadata["value_origin"]>)}><option value="user_reported">ユーザー申告・入力</option><option value="measured">実測値</option><option value="label">現物の栄養表示</option><option value="official">確認した公式資料</option><option value="database">食品データベース</option><option value="estimated">推定値</option></select></div><div className="field"><label htmlFor="nutrient-source-uri">出典URL（任意）</label><input id="nutrient-source-uri" type="url" value={sourceUri} onChange={(event) => setSourceUri(event.target.value)} /></div></div>
             <fieldset className="nutrient-fieldset">
               <legend>栄養値（基準量あたり。空欄はunknown、0はゼロ）</legend>
               <div className="nutrient-grid">
-                {NUTRIENT_DEFINITIONS.map((definition) => (
+                {STANDARD_NUTRIENT_DEFINITIONS.map((definition) => (
                   <div className="field" key={definition.code}>
                     <label htmlFor={`nutrient-${definition.code}`}>
                       {definition.label}（{definition.unit}）
@@ -779,6 +787,7 @@ export function CatalogLibrary({
                 ))}
               </div>
             </fieldset>
+            <details><summary>内部管理用ナトリウム</summary><div className="field"><label htmlFor="nutrient-sodium">ナトリウム（mg）</label><input id="nutrient-sodium" type="number" min="0" step="any" value={form.nutrients.sodium ?? ""} onChange={(event) => setForm((current) => ({ ...current, nutrients: { ...current.nutrients, sodium: event.target.value } }))} /></div><p className="muted">食塩相当量と合算しません。空欄は不明です。</p></details>
             <div className="form-actions">
               <button
                 className="button"

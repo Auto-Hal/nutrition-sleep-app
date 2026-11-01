@@ -45,9 +45,9 @@ select is(private.phase6_catalog_reference_fingerprint(
  '11111111-1111-4111-8111-111111111181','20000000-0000-4000-8000-000000000801'),
  (select fingerprint from bridge_baseline),'definition extension preserves legacy reference hash');
 
-insert into public.item_nutrients(catalog_item_id,user_id,nutrient_code,amount,unit,provenance,quality,source_uri)
+insert into public.item_nutrients(catalog_item_id,user_id,nutrient_code,amount,unit,provenance,quality,source_uri,value_origin,definition_basis,intake_scope,derivation,contains_estimates)
 select c.id,c.user_id,d.code,case when d.code='copper' then 0 else 12.345678 end,
- d.unit,'approved_external_db','unverified','https://example.invalid/nutrient'
+ d.unit,'approved_external_db','unverified','https://example.invalid/nutrient','database','fixture-total-mass','conventional_food','{"method":"fixture"}'::jsonb,false
 from public.catalog_items c cross join public.nutrient_definitions d
 where c.id in ('20000000-0000-4000-8000-000000000801','20000000-0000-4000-8000-000000000802')
  and not(d.code=any(private.phase8_legacy_nutrient_codes()));

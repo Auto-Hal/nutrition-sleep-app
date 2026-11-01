@@ -394,6 +394,7 @@ export function MealLog({
 
     try {
       const mutation = createMealEntryMutation(outboxBinding, {
+        contractVersion: 2,
         operationId,
         createdAt,
         payload: {

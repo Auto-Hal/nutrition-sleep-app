@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
-import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
+import { LEGACY_NUTRIENT_DEFINITIONS as NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
 const nutrientSchema = z.object({
   code: z.string(), amount: z.number().finite().min(0).nullable(), unit: z.string(),

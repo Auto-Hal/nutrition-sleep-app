@@ -43,6 +43,10 @@ export function catalogPayloadFromChatDraft(draft: ChatNutritionDraft) {
       unit: nutrient.unit,
       provenance: provenanceMap[nutrient.provenance],
       quality: nutrient.provenance === "estimated" ? "unknown" : "unverified",
+      value_origin: nutrient.provenance,
+      definition_basis: nutrient.definition_basis ?? null,
+      intake_scope: nutrient.intake_scope ?? "unknown",
+      contains_estimates: nutrient.provenance === "estimated",
       source_uri: nutrient.source_uri ?? null,
       source_observed_at: normalizedOptionalTimestamp(nutrient.source_observed_at),
     }];

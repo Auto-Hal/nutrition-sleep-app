@@ -13,7 +13,7 @@ export async function getMealLogCatalogItems(accessToken: string): Promise<Catal
       .from("item_nutrients")
       .select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at")
       .eq("nutrient_code", "energy"),
-    client.rpc("list_catalog_reference_fingerprints"),
+    client.rpc("list_catalog_reference_fingerprints_v3"),
   ]);
 
   if (itemsResult.error) throw new Error(itemsResult.error.message);

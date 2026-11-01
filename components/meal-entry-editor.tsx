@@ -87,6 +87,7 @@ export function MealEntryEditor({
         if (!selectedItem?.reference_fingerprint) throw new Error("修正に使える食品を選択してください。");
         const operationId = crypto.randomUUID();
         pendingRequest.current = { operationId, mealDate, body: JSON.stringify({
+          contract_version: 2,
           operation_id: operationId,
           intent_created_at: new Date().toISOString(),
           entry_id: target.entry.id,

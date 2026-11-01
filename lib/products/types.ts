@@ -25,7 +25,7 @@ export type ProductIdentityCandidate = {
   quality: "unverified";
 };
 
-export type ProductNutrientCandidate = {
+export type ProductNutrientCandidate = import("@/lib/nutrition/catalog").NutrientMetadata & {
   code: NutrientCode;
   amount: number | null;
   unit: "kcal" | "g" | "mg" | "ug_rae" | "ug";

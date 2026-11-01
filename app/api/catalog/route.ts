@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
-import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
+import { LEGACY_NUTRIENT_DEFINITIONS as NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
 const typeSchema = z.enum(["ingredient", "estimated_dish"]);
 const nutrientSchema = z.object({
@@ -41,8 +41,8 @@ export async function GET(request: Request) {
   const { data: items, error } = await query;
   if (error) return NextResponse.json({ error: "カタログを取得できませんでした。" }, { status: 500 });
   const ids = (items ?? []).map((item) => item.id);
-  const nutrients = ids.length === 0 ? [] : (await client.from("item_nutrients").select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at").in("catalog_item_id", ids)).data ?? [];
-  const result = (items ?? []).map((item) => ({ ...item, nutrients: nutrients.filter((nutrient) => nutrient.catalog_item_id === item.id) }));
+  const nutrients = ids.length === 0 ? [] : (await client.from("item_nutrients").select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at,value_origin,definition_basis,intake_scope,derivation,contains_estimates").in("catalog_item_id", ids)).data ?? [];
+  const result = (items ?? []).map((item) => ({ ...item, nutrients: nutrients.filter((nutrient) => nutrient.catalog_item_id === item.id).map((nutrient) => ({ ...nutrient, code: nutrient.nutrient_code })) }));
   return NextResponse.json({ items: result });
 }
 
