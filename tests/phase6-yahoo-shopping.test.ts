@@ -140,7 +140,7 @@ describe("Phase 6.5 Yahoo exact-JAN fallback", () => {
   });
 
   it("resolves local then OFF then Yahoo before OCR/manual fallback", () => {
-    const localIndex = resolver.indexOf('.from("products")');
+    const localIndex = resolver.indexOf('getCatalogLibrary(session.accessToken');
     const offIndex = resolver.indexOf("const external = await fetchOpenFoodFactsProduct");
     const yahooIndex = resolver.indexOf("const yahoo = await fetchYahooShoppingIdentity");
     const fallbackIndex = resolver.lastIndexOf('fallback: "ocr"');

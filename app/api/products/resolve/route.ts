@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
-import { createUserClient } from "@/lib/supabase/user";
+import { getCatalogLibrary } from "@/lib/nutrition/catalog-library-data";
 import { isValidGtin, normalizeBarcode } from "@/lib/products/barcode";
 import { fetchOpenFoodFactsProduct } from "@/lib/products/open-food-facts";
 import { fetchYahooShoppingIdentity } from "@/lib/products/yahoo-shopping";
@@ -38,60 +38,58 @@ function effectiveIdentitySource(product: {
 
 export async function GET(request: Request) {
   const session = await getAppSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
   const rawBarcode = url.searchParams.get("barcode") ?? "";
   const barcode = normalizeBarcode(rawBarcode);
   if (!isValidGtin(barcode)) {
-    return NextResponse.json({ error: "バーコードを確認してください。" }, { status: 400 });
+    return NextResponse.json(
+      { error: "バーコードを確認してください。" },
+      { status: 400 },
+    );
   }
 
   const rawDraftId = url.searchParams.get("draft_id");
-  const draftId = rawDraftId && draftIdSchema.safeParse(rawDraftId).success
-    ? rawDraftId
-    : crypto.randomUUID();
+  const draftId =
+    rawDraftId && draftIdSchema.safeParse(rawDraftId).success
+      ? rawDraftId
+      : crypto.randomUUID();
 
-  const client = createUserClient(session.accessToken);
-  const productResult = await client
-    .from("products")
-    .select("catalog_item_id,barcode,manufacturer,package_amount,package_unit,source_type,source_provider,source_uri,source_observed_at,confirmed_at,identity_source_type,identity_source_provider,identity_source_uri,identity_source_observed_at,identity_confirmed_at")
-    .eq("barcode", barcode)
-    .maybeSingle();
-
-  if (productResult.error) {
-    return NextResponse.json({ error: "商品情報を確認できませんでした。" }, { status: 500 });
-  }
-
-  if (productResult.data) {
-    const [itemResult, nutrientsResult] = await Promise.all([
-      client
-        .from("catalog_items")
-        .select("id,item_type,name,brand,serving_size,serving_unit,active,revision")
-        .eq("id", productResult.data.catalog_item_id)
-        .single(),
-      client
-        .from("item_nutrients")
-        .select("nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at")
-        .eq("catalog_item_id", productResult.data.catalog_item_id),
-    ]);
-
-    if (itemResult.error || nutrientsResult.error) {
-      return NextResponse.json({ error: "登録済み商品を読み込めませんでした。" }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      status: "local",
-      draft_id: draftId,
-      item: {
-        ...itemResult.data,
-        product: {
-          ...productResult.data,
-          identity_source: effectiveIdentitySource(productResult.data),
+  try {
+    const library = await getCatalogLibrary(session.accessToken, true);
+    const item = library.items.find((i) => i.product?.barcode === barcode);
+    if (item?.product) {
+      const product = item.product;
+      return NextResponse.json(
+        {
+          status: "local",
+          draft_id: draftId,
+          item: {
+            ...item,
+            product: {
+              ...product,
+              identity_source: effectiveIdentitySource(
+                product as Parameters<typeof effectiveIdentitySource>[0],
+              ),
+            },
+            nutrients: item.nutrients.map((n) => ({
+              ...n,
+              nutrient_code: n.code,
+            })),
+          },
         },
-        nutrients: nutrientsResult.data ?? [],
+        { headers: { "cache-control": "no-store" } },
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      {
+        error: "登録済み商品を完全に読み込めませんでした。再取得してください。",
       },
-    });
+      { status: 503 },
+    );
   }
 
   const external = await fetchOpenFoodFactsProduct(barcode, draftId);
@@ -122,7 +120,11 @@ export async function GET(request: Request) {
     });
   }
   if (yahoo.status === "not_found") {
-    return NextResponse.json({ status: "not_found", fallback: "ocr", draft_id: draftId });
+    return NextResponse.json({
+      status: "not_found",
+      fallback: "ocr",
+      draft_id: draftId,
+    });
   }
 
   return NextResponse.json({

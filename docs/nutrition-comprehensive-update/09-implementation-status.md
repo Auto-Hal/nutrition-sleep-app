@@ -44,6 +44,7 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | 20261101092352_body_measurement_history.sql | 20261101095413 / body_measurement_history | apply成功、3つのowner SELECT policy確認。measurement/settings/tombstone/linked profile全0、旧profile/snapshot digest一致 |
 | 20261101101537_karomiru_transfer_snapshots.sql | 20261101103222 / karomiru_transfer_snapshots | CI 41297687213：fresh replay/605 pgTAP/実接続成功後apply。owner SELECT policy、transfer0行、旧profile/snapshot digest前後一致 |
 | 20261101104949_nutrition_csv_snapshot_source.sql | 20261101110940 / nutrition_csv_snapshot_source | CI 41300275315：618 pgTAP成功後apply。STABLE/invoker、匿名実行不可を確認 |
+| 20261101111309_nutrient_evidence_contract_guard.sql | 20261101142723 / nutrient_evidence_contract_guard | 修正後CI 41315976268：642 pgTAP/実接続・731 Vitest・全アプリ検査成功後apply。食品5/栄養21/snapshot322・3種digest前後一致 |
 
 P1適用後security advisorは既存private server-only表のpolicyなしINFO、意図したowner検証付き公開SECURITY DEFINER RPC、既存のleaked password protection設定を報告。追加したprivate helperはauthenticated/anon実行不可。Productionは変更なし。
 
@@ -81,3 +82,9 @@ Na→saltは2.54/1000、C−fiberは同じ資料・同じ基準量と定義を�
 この単位のローカル検証は731 Vitest、lint（既存img警告1件のみ）、typecheck、Deno check成功。fresh replay/pgTAPとPreview適用はCI確認後に行う。
 
 初回CI 41303982463のアプリ検査は成功。DB検査で新しいhelperの変数名と列名の衝突を検出し、変数名を修正した。旧SQLの文字列を探すテスト1件は、新しい換算helperがNULLを維持する実値検証へ変更した。Previewへは未適用。
+
+修正後0ac4cb7で全検査が通過し、上記のPreview台帳へ反映済み。MCPはPreviewだけv4 ACTIVE（b7f5a1e3187bcba25de71c250fb3d70f67cc2c2767a33eb287e206dcb28698d8）。再デプロイの初回は既存の一時import mapパスを参照して失敗したため、今回のdeno.jsonを明示指定して成功した。Productionは未変更。security advisorは既存のprivate表INFO・意図したowner検証付き公開write RPC・既存パスワード設定の3分類で、新しいRLS欠落はない。
+
+## 食品一覧の完全取得
+
+Catalog/Batch/Product解決/Todayの入力候補は、STABLE/invokerの単一JSON RPCへ統合する。30項目×食品数がPostgRESTの1000行上限に達しても切り詰めず、revision・参照fingerprint・栄養の由来・Batch構成を同じsnapshotで返す。件数不一致や重複を検出した応答は編集へ渡さない。SQLで45食品/1350栄養行、0/NULL、owner isolationを確認する。旧「energyだけ先読み」の構造テストはPFC先読みに置き換わるため削除し、全件契約の実値テストを追加した。

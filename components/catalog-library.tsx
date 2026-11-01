@@ -149,18 +149,11 @@ export function CatalogLibrary({
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [catalogResponse, batchesResponse] = await Promise.all([
-      fetch("/api/catalog?includeInactive=true", { cache: "no-store" }),
-      fetch("/api/batches", { cache: "no-store" }),
-    ]);
-    if (!catalogResponse.ok || !batchesResponse.ok) {
-      throw new Error("Libraryを取得できませんでした。");
-    }
-    const payload = (await catalogResponse.json()) as { items: CatalogItem[] };
-    const batchPayload = (await batchesResponse.json()) as { items: BatchRecord[] };
-    setItems(payload.items);
-    setBatches(batchPayload.items);
-    return { items: payload.items, batches: batchPayload.items };
+    const response=await fetch("/api/catalog?includeInactive=true",{cache:"no-store"});
+    if(!response.ok)throw new Error("食品を完全に読み込めませんでした。再取得してください。");
+    const payload=await response.json() as {items:CatalogItem[];batches:BatchRecord[]};
+    setItems(payload.items);setBatches(payload.batches);
+    return {items:payload.items,batches:payload.batches};
   }, []);
 
   const reloadPending = useCallback(async () => {
