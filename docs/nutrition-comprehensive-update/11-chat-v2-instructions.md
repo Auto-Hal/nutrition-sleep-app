@@ -15,7 +15,8 @@ Catalog/Mealテーブルを直接INSERT/UPDATE/DELETEしたり、複数の下位
 
 payloadはschema_version=2、registration_mode="direct"、request_id=新しいUUID、meal、itemsです。
 mealには本人が指定した現地日付meal_date、breakfast/lunch/dinner/customのmeal_type、
-タイムゾーンを含むISO日時eaten_atを指定します。日時が不明なら本人の確認なしに作らないでください。
+eaten_atを指定する場合はタイムゾーン付きISO日時を使います。
+固定の朝昼夕で時刻が不明ならnullにでき、customでは時刻の本人確認が必要です。未知の日時を作らないでください。
 各itemはname、item_type、serving_size、serving_unit、摂取quantity、nutrientsを持ちます。
 栄養値はserving_sizeあたりです。摂取量に合わせた二重乗算をしないでください。
 

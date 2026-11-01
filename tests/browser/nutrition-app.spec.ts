@@ -189,8 +189,18 @@ test("authenticated nutrition, body and transfer story", async ({
   ).toEqual(additional);
   // The UI saves offline into IndexedDB, then converges to exactly one DB entry.
   await page.goto(`/today?date=${day}`);
-  await page.evaluate(async()=>{await navigator.serviceWorker.register("/sw.js?v=nutrition-acceptance",{scope:"/"});await navigator.serviceWorker.ready;});
-  await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+  if (info.project.name === "chromium") {
+    // Use the app's worker, rather than racing it with a second script/version.
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForFunction(
+      () => navigator.serviceWorker.controller?.state === "activated",
+    );
+    expect(
+      await page.evaluate(async () =>
+        Boolean(await caches.match("/offline.html")),
+      ),
+    ).toBe(true);
+  }
   const lunch = page
     .locator(".meal-row")
     .filter({ has: page.getByText("昼食", { exact: true }) })
@@ -203,15 +213,34 @@ test("authenticated nutrition, body and transfer story", async ({
   await expect(
     page.getByText(/端末の追加記録 1件・未同期の参考小計/),
   ).toBeVisible();
-  await page.reload({waitUntil:"domcontentloaded"});
-  await expect(page.getByRole("heading",{name:"オフラインです",exact:true})).toBeVisible();
-  await expect(page.locator("#pending")).toContainText("未同期の操作が1件");
-  await expect(page.getByText(name,{exact:true})).toHaveCount(0);
+  if (info.project.name === "chromium") {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("heading", { name: "オフラインです", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator("#pending")).toContainText("未同期の操作が1件");
+    await expect(page.getByText(name, { exact: true })).toHaveCount(0);
+  }
   await context.setOffline(false);
-  await page.getByRole("button",{name:"再試行",exact:true}).click();
+  if (info.project.name === "chromium")
+    await page.getByRole("button", { name: "再試行", exact: true }).click();
   await expect(page.locator("#meals-title")).toBeVisible();
-  const cachePaths=await page.evaluate(async()=>{const paths:string[]=[];for(const key of await caches.keys())for(const r of await(await caches.open(key)).keys())paths.push(new URL(r.url).pathname);return paths;});
-  expect(cachePaths.every(p=>p.startsWith("/_next/static/")||["/offline.html","/manifest.webmanifest","/icon.svg"].includes(p))).toBe(true);
+  if (info.project.name === "chromium") {
+    const cachePaths = await page.evaluate(async () => {
+      const paths: string[] = [];
+      for (const key of await caches.keys())
+        for (const r of await (await caches.open(key)).keys())
+          paths.push(new URL(r.url).pathname);
+      return paths;
+    });
+    expect(
+      cachePaths.every(
+        (p) =>
+          p.startsWith("/_next/static/") ||
+          ["/offline.html", "/manifest.webmanifest", "/icon.svg"].includes(p),
+      ),
+    ).toBe(true);
+  }
   await expect
     .poll(async () =>
       Number(
@@ -328,12 +357,14 @@ test("authenticated nutrition, body and transfer story", async ({
     path: info.outputPath("calendar.png"),
     fullPage: true,
   });
-  const previous=new Date(`${day}T12:00:00Z`);previous.setUTCDate(previous.getUTCDate()-1);const previousDay=previous.toISOString().slice(0,10);
-  if(previousDay.slice(0,7)===day.slice(0,7)){
-    await page.getByRole("button",{name:new RegExp(previousDay)}).click();
-    const counts=await page.locator(".pfc-counts").innerText();
-    await page.getByText("現在の目標で参考比較",{exact:true}).click();
-    await page.getByRole("checkbox",{name:/現在の目標と比べる/}).check();
+  const previous = new Date(`${day}T12:00:00Z`);
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  const previousDay = previous.toISOString().slice(0, 10);
+  if (previousDay.slice(0, 7) === day.slice(0, 7)) {
+    await page.getByRole("button", { name: new RegExp(previousDay) }).click();
+    const counts = await page.locator(".pfc-counts").innerText();
+    await page.getByText("現在の目標で参考比較", { exact: true }).click();
+    await page.getByRole("checkbox", { name: /現在の目標と比べる/ }).check();
     await expect(page.getByText(/当時の目標では/).last()).toBeVisible();
     expect(await page.locator(".pfc-counts").innerText()).toBe(counts);
   }

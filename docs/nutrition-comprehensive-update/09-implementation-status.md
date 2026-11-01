@@ -138,3 +138,5 @@ DRI評価には従来からの成人・プロフィール条件と、新しい�
 15aebae CI 41320480365では一般signup拒否・既存Authログイン、目標保存、写真なしProduct30コード、旧HTTP APIで12項目保持まで実ブラウザで通過。オフラインへ切り替えると旧ConnectivityBoundaryが入力画面全体をunmountするため、記録を続けられない問題を検出した。読み込み済み画面はメモリ内に保持し、取得済みの既知分・最新確認不可のbannerを表示する修正を加えた。PFCはofflineイベント直後に正式判定を保留し、未送信小計を別表示する。cold startの静的offline shellと、認証ページ/APIをcacheしない方針は維持する。
 
 1f8f99c CI 41321634231のChromiumでは上記に加え、オフライン入力/復帰でDB1件、PFC完了、29 PNGの実ファイル保存、月/週/詳細、Body編集/連携/削除、全CSV/JSON、Sleep画面まで通過。最終console検査で軽量queuedイベントにpayloadがないことを旧MealLog listenerが想定せず例外を出す問題を検出し、guardと回帰を追加した。全WebKitはこの修正後に実行する。SWを実登録してoffline再読み込み→静的shell→同じoutboxから復帰する検査と、過去日の参考比較で達成日数が変わらないUI検査も追加する。
+
+SW検査の初回はテスト側がアプリとは別versionのworkerを同scopeへ登録し、worker切替とoffline移行が競合した。テストをアプリ自身のactivated workerとoffline.html cacheの確認へ変更する。SW navigationの自動受け入れはChromium、WebKitは開いている画面からのオフライン入力/復帰を検証する。[PlaywrightのSW対応範囲](https://playwright.dev/docs/service-workers)と[WebKit offline navigationの既知不具合](https://github.com/microsoft/playwright/issues/42775)があるため、Safari/PWAのcold startは実機未確認として残す。
