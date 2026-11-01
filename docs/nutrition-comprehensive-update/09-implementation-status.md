@@ -139,4 +139,6 @@ DRI評価には従来からの成人・プロフィール条件と、新しい�
 
 1f8f99c CI 41321634231のChromiumでは上記に加え、オフライン入力/復帰でDB1件、PFC完了、29 PNGの実ファイル保存、月/週/詳細、Body編集/連携/削除、全CSV/JSON、Sleep画面まで通過。最終console検査で軽量queuedイベントにpayloadがないことを旧MealLog listenerが想定せず例外を出す問題を検出し、guardと回帰を追加した。全WebKitはこの修正後に実行する。SWを実登録してoffline再読み込み→静的shell→同じoutboxから復帰する検査と、過去日の参考比較で達成日数が変わらないUI検査も追加する。
 
-SW検査の初回はテスト側がアプリとは別versionのworkerを同scopeへ登録し、worker切替とoffline移行が競合した。テストをアプリ自身のactivated workerとoffline.html cacheの確認へ変更する。SW navigationの自動受け入れはChromium、WebKitは開いている画面からのオフライン入力/復帰を検証する。[PlaywrightのSW対応範囲](https://playwright.dev/docs/service-workers)と[WebKit offline navigationの既知不具合](https://github.com/microsoft/playwright/issues/42775)があるため、Safari/PWAのcold startは実機未確認として残す。
+SW検査ではテスト側がアプリとは別versionのworkerを同scopeへ登録していたため、競合の可能性を除いてアプリ自身のactivated workerとoffline.html cacheを確認するよう変更した。続く7801c26のCIでは、offline指定でもworkerがオンラインの画面を返すことを検出した。Playwright 1.55の[実装](https://github.com/microsoft/playwright/blob/v1.55.0/packages/playwright-core/src/server/chromium/crServiceWorker.ts)ではPW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTSがないとworker側のoffline設定を行わない。実際のsw.js/offline.htmlを使ったloopback再現で、設定なしではOnline page、設定ありでは「オフラインです」が返ることを確認し、使い捨てrunnerの環境変数へ設定した。
+
+SW navigationの自動受け入れはChromium、WebKitは開いている画面からのオフライン入力/復帰を検証する。[PlaywrightのSW対応範囲](https://playwright.dev/docs/service-workers)と[WebKit offline navigationの既知不具合](https://github.com/microsoft/playwright/issues/42775)があるため、Safari/PWAのcold startは実機未確認として残す。

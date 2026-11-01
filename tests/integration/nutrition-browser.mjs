@@ -118,6 +118,9 @@ try {
     E2E_OWNER_ID: owner,
     E2E_OTHER_ID: other.data.user.id,
     E2E_DATABASE_URL: dbUrl,
+    // Playwright 1.55 otherwise leaves service-worker fetches online when the
+    // page context is set offline. Exercise the real cached fallback as well.
+    PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS: "1",
   };
   server = spawn(
     process.execPath,
