@@ -1,4 +1,4 @@
-# 栄養管理総合アップデート 第1段階
+# 栄養管理総合アップデート
 
 - 作成日: 2026-11-01（Asia/Tokyo）
 - 対象: Auto-Hal/nutrition-sleep-app
@@ -27,6 +27,7 @@ PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyと
 | [07-delivery-tests-risks-review.md](07-delivery-tests-risks-review.md) | 実装単位・依存関係・受け入れ・レビュー・リスク・リリース |
 | [08-implementation-handoff.md](08-implementation-handoff.md) | 次回Codexへ渡す実装開始指示 |
 | [09-implementation-status.md](09-implementation-status.md) | 重点4項目の補足判断、実装単位の検証・環境反映状況 |
+| [10-preview-acceptance-and-production-plan.md](10-preview-acceptance-and-production-plan.md) | 操作案内、実機確認表、Production承認後の移行・障害対応 |
 
 ## 主要な設計判断
 

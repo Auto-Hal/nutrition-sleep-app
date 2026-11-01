@@ -72,6 +72,7 @@ export function useNutritionPeriod(
     window.addEventListener(OUTBOX_STATE_EVENT, refresh);
     window.addEventListener(OUTBOX_DRAIN_EVENT, refresh);
     window.addEventListener("online", refresh);
+    window.addEventListener("offline", refresh);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -79,6 +80,7 @@ export function useNutritionPeriod(
       window.removeEventListener(OUTBOX_STATE_EVENT, refresh);
       window.removeEventListener(OUTBOX_DRAIN_EVENT, refresh);
       window.removeEventListener("online", refresh);
+      window.removeEventListener("offline", refresh);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisible);
     };

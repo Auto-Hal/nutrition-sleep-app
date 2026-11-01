@@ -42,6 +42,7 @@ describe("period snapshot and local outbox reconciliation", () => {
     expect(render().available).toBe(false);
     expect(render().period).toEqual(initial);
     expect(events.has("drain")).toBe(true);
+    expect(events.has("offline")).toBe(true);
   });
   it("cannot score until both sources resolve, and ignores superseded responses", async () => {
     const initial = nutritionPeriodFixture(),

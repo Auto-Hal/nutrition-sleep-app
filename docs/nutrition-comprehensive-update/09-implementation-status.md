@@ -29,8 +29,8 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P5 PFC日/月/週 | 完了 | CI 41295693517：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。境界・途中記録・参照比較・集計19テスト、同期レース2テストを追加 |
 | P6 Body画面 | 完了 | CI 41296434510：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。実測CRUD、30/90日、移動平均、目標・連携、5タブを接続 |
 | P7 PNG転送 | 実装・自動検証完了 | UI統合CI 41298773341：lint/typecheck/unit/build、fresh replay/605 pgTAP/実接続成功。Preview反映済み。保存・共有で自動確認しない回帰成功。物理iPhone/OCRは未確認 |
-| P8 CSV・入力/品質・UI整理 | CSV完了・品質契約を検証中 | c1bc20a CI 41300275315：fresh replay/618 pgTAP/実接続・lint/typecheck/unit/Deno/build成功。入力と品質契約の回帰を追加中 |
-| P9 統合・受け入れ | 未着手 | 未実施 |
+| P8 CSV・入力/品質・UI整理 | 実装・層別検証完了 | CSV/入力/品質/完全読取り/未同期PFCまで接続。744 Vitest、650 pgTAP、実接続競合・アプリ検査成功。実機は別 |
+| P9 統合・受け入れ | 実認証ブラウザを検証中 | loopback Auth/Next/DB、mainからのupgrade replay、Preview/実機案内を追加。最初の失敗箇所から修正 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
 
@@ -82,7 +82,7 @@ Na→saltは2.54/1000、C−fiberは同じ資料・同じ基準量と定義を�
 
 この単位のローカル検証は731 Vitest、lint（既存img警告1件のみ）、typecheck、Deno check成功。fresh replay/pgTAPとPreview適用はCI確認後に行う。
 
-初回CI 41303982463のアプリ検査は成功。DB検査で新しいhelperの変数名と列名の衝突を検出し、変数名を修正した。旧SQLの文字列を探すテスト1件は、新しい換算helperがNULLを維持する実値検証へ変更した。Previewへは未適用。
+初回CI 41303982463のアプリ検査は成功。DB検査で新しいhelperの変数名と列名の衝突を検出し、変数名を修正した。旧SQLの文字列を探すテスト1件は、新しい換算helperがNULLを維持する実値検証へ変更した。この初回時点ではPreview未適用で、修正後の適用は次項のとおり。
 
 修正後0ac4cb7で全検査が通過し、上記のPreview台帳へ反映済み。MCPはPreviewだけv4 ACTIVE（b7f5a1e3187bcba25de71c250fb3d70f67cc2c2767a33eb287e206dcb28698d8）。再デプロイの初回は既存の一時import mapパスを参照して失敗したため、今回のdeno.jsonを明示指定して成功した。Productionは未変更。security advisorは既存のprivate表INFO・意図したowner検証付き公開write RPC・既存パスワード設定の3分類で、新しいRLS欠落はない。
 
@@ -115,3 +115,24 @@ queue直後とdrain要求の両方で期間の同期状態を再確認する。�
 PreviewのMCPは正規の/mcpで未認証401を確認したが、内部HTTP gatewayのURLをOAuth metadataへ使う問題を発見した。公開SUPABASE_URLを基準に修正し、request hostを信用しないURL構築とloopback以外のHTTP拒否を単体/Deno検査する。実ChatGPT OAuth成功とは区別する。
 
 2a867ae CI 41319767273のアプリ検査（744 Vitest/lint/typecheck/Deno/build）・650 pgTAP・同時更新は成功。ブラウザ開始前の新preflightでemail_provider_disabledを特定した。ローカルconfigの[auth.email].enable_signup=falseがメールproviderを無効化していたため、[auth].enable_signup=false（一般登録禁止）と[auth.email].enable_signup=true（既存ユーザーのメールログイン有効）を分け、一般signupが拒否されることもpreflightへ加えた。Hostedへconfig pushは実行しない。根拠: [公式CLI設定](https://supabase.com/docs/guides/local-development/cli/config)、[Supabase CLI issue #7055](https://github.com/supabase/cli/issues/7055)。
+
+MCP修正はPreviewだけv5 ACTIVE（df868eda2bc7d06e3e0b7d4b69086699e1681c6be797f6e379081a5fb8b8ba15）へ反映。公開metadata 200、resource HTTPS、/mcp未認証401とHTTPSのWWW-Authenticateを確認した。実ChatGPT OAuthの未確認は残る。
+
+## 設計・実装のセルフレビュー
+
+第三者や栄養専門職による臨床承認を実施したという意味ではない。観点別に読み直し、次を修正・検証した。
+
+| 観点 | 指摘と対応 | 証拠 |
+|---|---|---|
+| 旧クライアント互換 | 全置換で12項目が消える危険、旧fingerprint/receiptの変化 | M1 bridge、旧18契約SQL回帰、upgrade runner |
+| 数値と単位 | 微量正値が0へ丸まる、ugとmgの曖昧OCR一致 | M7 NULL/reason、29行位置OCR、単位完全一致優先 |
+| 化学形態・由来 | DFE/IU/ALA単独/曖昧OFF C/A/Eの混同、推定情報の消失 | code別JSON契約、API/SQL/MCP検証、Batch/計算の由来伝播 |
+| 読取り完全性 | 1000行上限・別HTTP時点の混在 | library/period/CSV単一snapshot、件数/重複検出、1350/2700行回帰 |
+| 正式判定と途中経過 | 未記録0、未同期の重複加算、過去目標の誤表示 | 独立known/recorded、端末小計分離、参考比較opt-in、exact演算 |
+| 同時更新と履歴 | 旧profileとBodyのlost update/lock逆転 | 共通lock順、2実接続で1成功/1 conflict、receipt回復 |
+| セキュリティと運用 | private helper公開、RLS/削除/出力漏れ、環境混在 | revoke/RLS/owner/lifecycle tests、advisor、Preview前後digest、Production読取り監査 |
+| 外部連携の証拠 | share成功を登録完了と表示、内部HTTPがOAuth公開URLへ流出 | 手動確認のみ、status回帰、MCP v5実HTTP確認 |
+
+DRI評価には従来からの成人・プロフィール条件と、新しい形態/摂取源の制限がある。特に葉酸EAR/RDAと、通常食品以外だけを対象とするMg/葉酸ULは現在の集計では参考表示に限定する。形態や対象摂取源を確認できない総量へ基準を当てない。これは個人PFC目標の達成判定とは別である。
+
+15aebae CI 41320480365では一般signup拒否・既存Authログイン、目標保存、写真なしProduct30コード、旧HTTP APIで12項目保持まで実ブラウザで通過。オフラインへ切り替えると旧ConnectivityBoundaryが入力画面全体をunmountするため、記録を続けられない問題を検出した。読み込み済み画面はメモリ内に保持し、取得済みの既知分・最新確認不可のbannerを表示する修正を加えた。PFCはofflineイベント直後に正式判定を保留し、未送信小計を別表示する。cold startの静的offline shellと、認証ページ/APIをcacheしない方針は維持する。
