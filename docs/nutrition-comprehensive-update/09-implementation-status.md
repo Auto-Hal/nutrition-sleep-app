@@ -23,8 +23,9 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 |---|---|---|
 | P0 再監査・追加設計 | 完了 | remote main一致、両Hostedのread-only schema照合 |
 | P1 旧契約bridge | 完了 | CI 41265351899 fresh replay/pgTAP・652 Vitest・lint/typecheck/build成功。Sleep E2E 41265351909成功 |
-| P2 30コード基盤 | 実装中 | 新v3 RPC・nullable evidence・parser/DRI拡張の検証中 |
-| P3〜P9 | 未着手 | 未実施 |
+| P2 30コード基盤 | 基盤・接続完了 | CI 41266753928 replay/pgTAP・662 Vitest・lint/typecheck/build成功。手動/Product/OCR/Chat/Batchは新契約へ接続。実機入力は未検証 |
+| P3 目標・期間読取り | 実装中 | 未検証 |
+| P4〜P9 | 未着手 | 未実施 |
 
 新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
 
@@ -33,7 +34,12 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | リポジトリmigration | Hosted Preview version | 確認 |
 |---|---|---|
 | 20261101022326_nutrition_legacy_nutrient_bridge.sql | 20261101023306 / nutrition_legacy_nutrient_bridge | apply成功、7関数の存在/ACL照合、Batch直接EXECUTE取り消し確認 |
+| 20261101023441_nutrition_30_code_foundation.sql | 20261101025327 / nutrition_30_code_foundation | apply成功、内部30/標準29を照合。既存食品21行・snapshot322行の全旧列digest/件数とlegacy fingerprint digestが前後一致 |
 
 P1適用後security advisorは既存private server-only表のpolicyなしINFO、意図したowner検証付き公開SECURITY DEFINER RPC、既存のleaked password protection設定を報告。追加したprivate helperはauthenticated/anon実行不可。Productionは変更なし。
 
 P2の新規DB書込はv3/contract_version=2に分離する。v1 outboxと18項目fingerprintは継続する。OFFのcarbohydrates-totalのみ総炭水化物候補に使用し、carbohydrates/sugarsを日本の糖質へ無条件変換しない。定義の参照元: [OFF公式nutrient taxonomy](https://github.com/openfoodfacts/openfoodfacts-server/blob/main/taxonomies/nutrients.txt)。
+
+MCP Edge FunctionはPreviewだけversion 3へ反映。Deno 2.5.6型検査成功、resource metadata GET 200、未認証MCP 401＋WWW-Authenticateを確認。SDK 1.25.3ではtop-level securitySchemesが型定義外のため、[公式仕様の互換メタデータ](https://developers.openai.com/plugins/reference)へ宣言を移した。実ChatGPTからのOAuth接続・確定操作は実機受け入れに残る。ProductionのEdge Functionは変更なし。
+
+P2 security advisorの追加10件は意図したowner検証付き公開write/reference RPCのSECURITY DEFINER警告。private coreの直接実行は取り消し、匿名実行不可をSQLテストで確認。新しいRLS欠落の警告はない。

@@ -31,6 +31,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.6
+      - name: Typecheck the nutrition MCP contract
+        run: deno check --config supabase/functions/nutrition-mcp/deno.json supabase/functions/nutrition-mcp/index.ts
       - run: pnpm test
       - run: pnpm verify:env
       - run: pnpm build

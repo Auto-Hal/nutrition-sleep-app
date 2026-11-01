@@ -171,7 +171,9 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
         meal_type: z.enum(["breakfast", "lunch", "dinner", "custom"]),
         item_name: z.string(),
       },
-      securitySchemes: oauthSecurity,
+
+      // SDK 1.25 uses MCP _meta for the documented ChatGPT compatibility mirror.
+      _meta: { securitySchemes: oauthSecurity },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -225,9 +227,9 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
         id: z.string().min(1),
         email: z.string().email().optional(),
       },
-      securitySchemes: oauthSecurity,
+
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-      _meta: { "openai/profile": true },
+      _meta: { "openai/profile": true, securitySchemes: oauthSecurity },
     },
     async () => {
       const profile = {
