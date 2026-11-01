@@ -59,7 +59,15 @@ test("authenticated nutrition, body and transfer story", async ({
   await page.goto("/login");
   await page.locator("#email").fill(process.env.E2E_LOGIN_EMAIL!);
   await page.locator("#password").fill(process.env.E2E_LOGIN_PASSWORD!);
+  const login = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/auth/login") && r.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
+  expect(
+    (await login).status(),
+    "UI login must succeed before any feature checks",
+  ).toBe(200);
   await expect(page).toHaveURL(/\/today/);
   await expect(
     page.getByRole("link", { name: "食事を記録", exact: true }),

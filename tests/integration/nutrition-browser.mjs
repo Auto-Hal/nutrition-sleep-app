@@ -53,6 +53,18 @@ try {
     throw new Error("Cannot create synthetic auth fixture");
   const owner = created.data.user.id;
   users.push(owner);
+  const authCheck = await createClient(api.href, status.ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }).auth.signInWithPassword({ email, password });
+  assert.ok(
+    !authCheck.error,
+    `Synthetic Auth preflight: ${authCheck.error?.code ?? "unknown"}`,
+  );
+  assert.equal(
+    authCheck.data.user?.id,
+    owner,
+    "Auth fixture must match the allowed owner",
+  );
   const other = await admin.auth.admin.createUser({
     email: `other-${randomUUID()}@example.invalid`,
     password,

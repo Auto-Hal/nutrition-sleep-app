@@ -57,7 +57,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.0
       - run: supabase start
       - run: supabase db reset
       - run: supabase test db
@@ -69,6 +69,10 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium webkit
       - name: Verify real authenticated nutrition application
         run: node tests/integration/nutrition-browser.mjs
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Verify an upgrade from main preserves existing contracts and snapshots
+        run: node tests/integration/nutrition-upgrade.mjs
         env:
           INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
       - name: Save synthetic nutrition verification evidence

@@ -5,6 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import basisJson from "./nutrient-basis-contract.json" with { type: "json" };
+import { publicEndpoints } from "./public-endpoints.ts";
 const basisContract = basisJson as Record<string,{unit:string;allowed:string[];incompatible:string[]}>;
 const allBases = [...new Set(Object.values(basisContract).flatMap(v=>[...v.allowed,...v.incompatible]))] as [string,...string[]];
 function safeEvidenceUrl(value:string){try{const u=new URL(value);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)return false;return [...u.searchParams.keys(),...new URLSearchParams(u.hash.slice(1)).keys()].every(key=>{for(let i=0;i<4&&key.includes("%");i++)key=decodeURIComponent(key);return !key.includes("%")&&!/^(?:(?:access[_-]?|refresh[_-]?)?token|secret|api[_-]?key|auth(?:orization)?|password|credential|signature|sig|key|session(?:id)?|x-(?:amz|goog)-(?:credential|signature))$/i.test(key);});}catch{return false;}}
@@ -73,23 +74,14 @@ type JwtClaims = {
 };
 
 function endpoints(request: Request) {
-  const url = new URL(request.url);
-  const prefixIndex = url.pathname.indexOf(FUNCTION_SEGMENT);
-  const functionPath = prefixIndex >= 0
-    ? url.pathname.slice(0, prefixIndex + FUNCTION_SEGMENT.length)
-    : FUNCTION_SEGMENT;
-  const base = `${url.origin}${functionPath}`;
-  return {
-    mcp: `${base}/mcp`,
-    metadata: `${base}/.well-known/oauth-protected-resource`,
-  };
+  return publicEndpoints(SUPABASE_URL,request.url);
 }
 
 function protectedResourceResponse(request: Request) {
-  const { mcp } = endpoints(request);
+  const { mcp,authorizationServer } = endpoints(request);
   return Response.json({
     resource: mcp,
-    authorization_servers: [`${SUPABASE_URL}/auth/v1`],
+    authorization_servers: [authorizationServer],
     scopes_supported: [...OAUTH_SCOPES],
     resource_documentation: "https://github.com/Auto-Hal/nutrition-sleep-app",
   }, {

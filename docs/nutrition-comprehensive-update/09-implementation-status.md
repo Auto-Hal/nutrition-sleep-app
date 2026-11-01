@@ -109,3 +109,7 @@ queue直後とdrain要求の両方で期間の同期状態を再確認する。�
 ## P9 実アプリの使い捨て統合環境
 
 新しいPlaywright suiteは実Supabase Authで作成した合成ユーザーだけを使い、loopback API:54321/DB:54322以外ではfixture作成前に停止する。実Nextサーバーへ本人用allowed IDを渡し、サービスキーはブラウザにもアプリにも渡さない。テスト終了時は合成Authユーザーを削除し、新しい履歴テーブルのcascadeを確認する。既存Sleepの公開/合成E2Eとは別に、ログイン、目標、写真なしProduct全30、旧HTTP更新の12項目保護、オフライン食事、PFC、実Canvas PNG/保存、Body CRUD/連携、CSV/JSON、睡眠画面をChromium/iPhone WebKit/iPad WebKitで通す。結果は未確定で、CIの最初の失敗箇所から修正する。
+
+初回840c28c/CI 41318831948はアプリ検査・650 pgTAP・実接続まで成功し、ブラウザのログイン段階で401を検出。Authそのもののfixture検証を追加し、ログインフォームをhydration完了まで無効にして、初期HTMLからのnative GET送信もPOST指定で防止した。次のCIで原因を絞って再検証する。Supabase CLIは検証時の2.122.0へ固定する。mainの18項目DBへ合成fixtureを入れてから追加migrationだけを適用し、旧18snapshot/fingerprint/receiptと履歴未作成を照合するupgrade runnerも追加する。
+
+PreviewのMCPは正規の/mcpで未認証401を確認したが、内部HTTP gatewayのURLをOAuth metadataへ使う問題を発見した。公開SUPABASE_URLを基準に修正し、request hostを信用しないURL構築とloopback以外のHTTP拒否を単体/Deno検査する。実ChatGPT OAuth成功とは区別する。

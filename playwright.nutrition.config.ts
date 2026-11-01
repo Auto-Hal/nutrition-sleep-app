@@ -4,6 +4,7 @@ export default defineConfig({
   timeout: 300_000,
   expect: { timeout: 30_000 },
   workers: 1,
+  maxFailures: 1,
   retries: 0,
   outputDir: "test-results/nutrition-browser",
   reporter: [
