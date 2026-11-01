@@ -46,11 +46,23 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - uses: supabase/setup-cli@v1
         with:
           version: latest
       - run: supabase start
       - run: supabase db reset
       - run: supabase test db
+      - name: Verify authenticated concurrent nutrition mutations
+        run: node tests/integration/nutrition-concurrency.mjs
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
       - if: always()
         run: supabase stop
