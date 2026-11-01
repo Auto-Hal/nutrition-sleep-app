@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-const { session, rpc } = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn() }));
+const { session, rpc, transferRead } = vi.hoisted(() => ({ session: vi.fn(), rpc: vi.fn(), transferRead: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ getAppSession: session }));
 vi.mock("@/lib/supabase/user", () => ({ createUserClient: () => ({ rpc }) }));
+vi.mock("@/lib/karomiru/repository", () => ({ getKaromiruTransfer: transferRead }));
 import { POST as catalogPost } from "@/app/api/catalog/reliable/route";
 import { POST as chatPost } from "@/app/api/chat-registration/route";
 import { POST as goalPost } from "@/app/api/nutrition/goals/reliable/route";
 import { POST as exportPost } from "@/app/api/export/route";
 import { POST as bodyPost, PATCH as bodyPatch, DELETE as bodyDelete } from "@/app/api/body/measurements/reliable/route";
 import { POST as bodySettings } from "@/app/api/body/settings/reliable/route";
+import { POST as transferPrepare } from "@/app/api/karomiru/transfers/prepare/route";
+import { POST as transferStatus } from "@/app/api/karomiru/transfers/status/reliable/route";
 import { INITIAL_GOAL_TARGET } from "@/lib/nutrition/goals";
 import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
@@ -71,5 +74,19 @@ describe("authenticated nutrient schema dispatch", () => {
     expect((await bodyPost(request("/api/body/measurements/reliable", { ...body, measurement: { ...body.measurement, weight_kg: "70.001" } }))).status).toBe(422);
     expect((await bodySettings(request("/api/body/settings/reliable", { operation_id, contract_version: 2, intent_created_at: catalog.intent_created_at, expected_revision: 0, expected_profile_revision: 3, settings: { target_weight_kg: "75", target_pace_kg_per_week: "0.25", weight_sync_mode: "latest_measurement", expected_latest_reference: [{ id: operation_id, revision: 1 }] } }))).status).toBe(200);
     expect(rpc.mock.lastCall?.[0]).toBe("update_body_settings_v1");
+  });
+  it("prepares only from owner-checked source references and keeps manual confirmation a separate API", async () => {
+    const input = { operation_id, contract_version: 2, intent_created_at: catalog.intent_created_at, request: { source_kind: "entry", source_id: operation_id, mode: "all29", menu_name: "本人が確認した名称" } };
+    expect((await transferPrepare(request("/api/karomiru/transfers/prepare", input, "https://attacker.example"))).status).toBe(403);
+    session.mockResolvedValueOnce(null);
+    expect((await transferPrepare(request("/api/karomiru/transfers/prepare", input))).status).toBe(401);
+    rpc.mockResolvedValueOnce({ data: { transfer_id: operation_id, revision: 1 }, error: null }); transferRead.mockResolvedValue({ id: operation_id, status: "prepared" });
+    const response = await transferPrepare(request("/api/karomiru/transfers/prepare", input));
+    expect(response.status).toBe(201); expect((await response.json()).transfer.status).toBe("prepared"); expect(rpc.mock.lastCall?.[0]).toBe("prepare_karomiru_transfer_v1");
+    expect((await transferPrepare(request("/api/karomiru/transfers/prepare", { ...input, request: { ...input.request, nutrients: [{ amount: 0 }] } }))).status).toBe(422);
+    const confirmed = { operation_id, contract_version: 2, intent_created_at: catalog.intent_created_at, transfer_id: operation_id, expected_revision: 1, status: "confirmed" };
+    expect((await transferStatus(request("/api/karomiru/transfers/status/reliable", confirmed))).status).toBe(200);
+    expect(rpc.mock.lastCall?.[0]).toBe("update_karomiru_transfer_status_v1");
+    expect((await transferStatus(request("/api/karomiru/transfers/status/reliable", { ...confirmed, user_id: "forged" }))).status).toBe(422);
   });
 });

@@ -30,7 +30,8 @@ export type OutboxMutationKind =
   | "body_measurement_create"
   | "body_measurement_update"
   | "body_measurement_delete"
-  | "body_settings_update";
+  | "body_settings_update"
+  | "karomiru_status";
 
 export type OutboxBinding = {
   ownerUserId: string;
@@ -170,6 +171,7 @@ export type BodyMutationOutboxPayload = {
   measurement: import("@/lib/body/model").BodyMeasurementPayload;
 };
 export type OutboxPayloadByKind = {
+  karomiru_status: { transfer_id: string; status: "confirmed" | "revoked" };
   body_measurement_create: BodyMutationOutboxPayload;
   body_measurement_update: BodyMutationOutboxPayload;
   body_measurement_delete: Omit<BodyMutationOutboxPayload, "measurement"> & { measurement: { expected_latest_reference?: Array<{ id: string; revision: number }> } };

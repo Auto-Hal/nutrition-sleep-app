@@ -75,6 +75,8 @@ function mutationRequest(mutation: PendingMutation): {
   };
 
   switch (mutation.kind) {
+    case "karomiru_status":
+      return { url: "/api/karomiru/transfers/status/reliable", init: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...common, ...mutation.payload, expected_revision: mutation.expected_revision }) } };
     case "body_measurement_create":
     case "body_measurement_update":
     case "body_measurement_delete":

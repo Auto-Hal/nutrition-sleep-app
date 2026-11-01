@@ -41,6 +41,14 @@ const SAFE_ERROR_CODES = new Set([
   "measurement_date_time_mismatch",
   "body_measurement_deleted",
   "body_measurement_not_found",
+  "invalid_transfer_request",
+  "invalid_transfer_quantity",
+  "invalid_transfer_name",
+  "snapshot_must_not_be_rescaled",
+  "transfer_source_not_found",
+  "transfer_not_found",
+  "transfer_already_revoked",
+  "immutable_transfer_payload",
 ]);
 
 export function reliableMutationError(
