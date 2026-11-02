@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppIcon } from "@/components/app-icon";
-import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { getViewingSessionForRsc } from "@/lib/public-view/access";
 import { getProfile } from "@/lib/profile";
 import { googleHealthOAuthConfigured } from "@/lib/health/google-health-oauth";
 import { SleepStaleSync } from "@/components/sleep-stale-sync";
@@ -47,7 +47,7 @@ export default async function SleepPage({
 }: {
   searchParams: Promise<{ range?: string; day?: string; google?: string; sync?: string }>;
 }) {
-  const session = await getAppSessionForRsc();
+  const session = await getViewingSessionForRsc();
   if (!session) redirect("/login");
 
   const params = await searchParams;
@@ -68,11 +68,11 @@ export default async function SleepPage({
 
   return (
     <main className="app-main sleep-page">
-      <SleepScoreRefresh />
-      <SleepStaleSync
+      {!session.readOnly && <SleepScoreRefresh />}
+      {!session.readOnly && <SleepStaleSync
         enabled={oauthConfigured && (connection?.status === "connected" || connection?.status === "error")}
         lastSuccessfulSyncAt={connection?.last_successful_sync_at ?? null}
-      />
+      />}
 
       <header className="topbar sleep-topbar">
         <div className="page-heading">
@@ -155,7 +155,7 @@ export default async function SleepPage({
           </div>
         </section>
 
-        <details className="card sleep-provider-card" id="sleep-connection" open={providerNeedsAttention}>
+        {!session.readOnly && <details className="card sleep-provider-card" id="sleep-connection" open={providerNeedsAttention}>
           <summary className="sleep-provider-summary">
             <span>
               <strong>Google Health</strong>
@@ -223,7 +223,7 @@ export default async function SleepPage({
               </form>
             )}
           </div>
-        </details>
+        </details>}
 
         {!connection && analytics.observed_days === 0 && (
           <section className="empty-state compact-empty">睡眠データはまだありません。</section>

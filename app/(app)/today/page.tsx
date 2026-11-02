@@ -5,6 +5,8 @@ import { ChatGptNutritionLink } from "@/components/chatgpt-nutrition-link";
 import { TodayInteractive } from "@/components/today-interactive";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { isPublicViewForRequest } from "@/lib/public-view/access";
+import { PublicToday } from "@/components/public-today";
 import { getNutritionSummaryForDate, localDateInTimeZone } from "@/lib/nutrition/analytics";
 import { getPendingChatMealDrafts } from "@/lib/nutrition/chat-drafts";
 import { isIsoDate } from "@/lib/nutrition/meal-history";
@@ -44,6 +46,7 @@ function formatDateTitle(date: string) {
 }
 
 export default async function TodayPage({ searchParams }: TodayPageProps) {
+  if (await isPublicViewForRequest()) return <PublicToday date={(await searchParams).date} />;
   const session = await getAppSessionForRsc();
   const [profile, initialItems] = session
     ? await Promise.all([

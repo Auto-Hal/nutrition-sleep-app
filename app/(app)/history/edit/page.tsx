@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MealEntryEditor } from "@/components/meal-entry-editor";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 import { localDateInTimeZone } from "@/lib/nutrition/analytics";
@@ -14,7 +15,7 @@ type Props = {
 
 export default async function HistoryEditPage({ searchParams }: Props) {
   const session = await getAppSessionForRsc();
-  if (!session) return null;
+  if (!session) redirect("/login");
 
   const entryId = (await searchParams).entry ?? "";
   const [profile, target, items] = await Promise.all([

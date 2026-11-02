@@ -10,11 +10,14 @@ import { AccountDeletion } from "@/components/account-deletion";
 import { ProviderBrandingSanitizer } from "@/components/provider-branding-sanitizer";
 import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { isPublicViewForRequest } from "@/lib/public-view/access";
+import { PublicSettings } from "@/components/public-settings";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  if (await isPublicViewForRequest()) return <PublicSettings />;
   const session = await getAppSessionForRsc();
   const params = await searchParams;
   const view = params.view === "library" ? "library" : params.view === "goals" ? "goals" : "settings";

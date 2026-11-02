@@ -231,6 +231,19 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
   background: var(--surface);
   box-shadow: 0 10px 32px rgb(0 0 0 / 12%);
 }
+.public-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--border, #dce6e2);
+  font-size: 0.85rem;
+}
+.public-view-header small { color: var(--muted); }
+.public-view-header a { white-space: nowrap; }
+.public-energy { font-size: 2rem; font-weight: 700; margin: 12px 0; }
 .pwa-update-banner p {
   margin: 4px 0 0;
   font-size: 0.86rem;
