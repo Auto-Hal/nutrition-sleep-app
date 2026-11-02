@@ -193,3 +193,7 @@ PwaRuntimeのonline/visibility時updateにも失敗catchとoffline抑止を追�
 追加照合の初回b99d812 / Preview 41371903611は、先頭の旧GitHub Preview secret参照が空で停止した。値を出力せずに設定の有無だけを照合し、実際のデプロイがVercel pullの設定を使うことと区別した。使用されないsecretで実行していた重複`pnpm build`を除き、専用Vercel project選択→Preview設定pull→接続先照合→Vercel build→Preview deployの一つの流れへ整理した。新しいsecretの複製・環境設定の変更は行わない。
 
 続くa2b66d2 / Preview 41372126551ではpull後の照合も停止した。一方、b99d812の自動Git build（dpl_5SdWmFugTreEogVxgCdALB9eMku4）はREADYで、実ビルドログに`Dedicated Supabase URL and database project verified for preview.`を確認した。[Secret/sensitive値は保存後は読取り不可で、deployment内で使用するという公式仕様](https://vercel.com/docs/environment-variables/sensitive-environment-variables)に合わせ、Preview workflowもソースからのリモートビルドへ統一する。CIでsecretを取得・複製しない。checkoutと公開metadataはPR headのSHAへ固定し、`--target=preview`だけを使う。pull後にローカルprebuiltを作る中間案は最終手順ではない。
+
+c51bba0 / [CI 41372632983](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41372632983)で89ファイル/765 Vitest、650 pgTAP、実認証3ブラウザー、fresh/upgrade、同時更新が全成功。[Preview 41372633192](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41372633192)も成功。リモートbuildログで実設定のPreview URL/DB project一致を確認し、同じSHAのdpl_Eh5krdL3o5xMD3g7o7kg4n2LGs7zがREADYになった。
+
+本番の既存prebuilt手順も同じSecret制約とbuild guardの影響を受けるため、将来の承認後用workflowをリモートビルド方式へ揃えた。`workflow_dispatch`だけという手動開始と既存tokenのenvironmentは維持し、mainからの実行だけに制限する。Production workflowの実行、main merge、Production DB/app/Edge変更は行っていない。承認後の実環境でのProduction実行結果を自動テストから推定しない。

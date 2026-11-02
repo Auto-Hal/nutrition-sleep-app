@@ -68,7 +68,7 @@ Hosted Previewの実ユーザーへ合成データを投入していない。破
 4. Productionの実DDL/関数/ACLと台帳を再照合する。ビルドの専用Supabase URL/DB project照合も成功させる。Previewと台帳versionが違うため、db push/repair/resetをしない。リポジトリの追加SQLを1ファイルずつ、Previewと同じ順に適用する。
 5. 下記M1〜M8を順に適用し、各回の成否・transaction・lock/statement timeoutを確認する。途中失敗時は次へ進まず、部分適用の有無を照合する。既存migrationを書き換えない。
 6. M1は旧18 APIを保護するbridge、M2は30コード/v3、M3は目標、M4はBodyと旧profile API共通lock/ACL、M5は転送、M6はCSV、M7は品質/精度、M8は完全library読取り。新アプリは全RPCが揃ってから公開する。
-7. 新アプリのPreviewと同じ確定SHAをmainへ反映してProduction build/deployする。承認された場合だけProduction MCPへ5ファイルをデプロイする。既存verify_jwt=falseでも関数内JWT検証を維持する。
+7. 新アプリのPreviewと同じ確定SHAをmainへ反映してProduction build/deployする。手動Production workflowは承認後にmainから実行し、Secretを保持するVercel内部で照合・buildする。今回そのworkflowを実行していない。承認された場合だけProduction MCPへ5ファイルをデプロイする。既存verify_jwt=falseでも関数内JWT検証を維持する。
 8. Productionのdeployment/version、正常/エラーログ、private helper ACL・RLS・匿名拒否、既存データdigest、旧API/新API、エクスポートを確認する。破壊的fixtureを実アカウントに作らない。
 
 | 単位 | リポジトリSQL |
