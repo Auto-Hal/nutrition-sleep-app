@@ -97,7 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: public-view-browser-report
-          path: test-results/public-view-*.png
+          path: test-results/public-view-*
           retention-days: 7
       - if: always()
         run: supabase stop

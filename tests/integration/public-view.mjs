@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import pg from "pg";
 import { chromium, webkit, devices } from "@playwright/test";
 
@@ -58,6 +59,14 @@ try {
     const browser = await engine.launch();
     try {
       const context = await browser.newContext(device);
+      // Independently observe real JavaScript errors/rejections. WebKit also
+      // emits a native pageerror for a cancelled, handled SW update (#43120),
+      // which must not hide a real exception or a failed worker update.
+      await context.addInitScript(() => {
+        window.__publicScriptErrors = [];
+        window.addEventListener("error", (event) => window.__publicScriptErrors.push(String(event.message)));
+        window.addEventListener("unhandledrejection", (event) => window.__publicScriptErrors.push(String(event.reason)));
+      });
       const page = await context.newPage();
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
@@ -75,6 +84,7 @@ try {
         assert.equal(await page.locator('form[method="post"]').count(), 0);
         assert.equal(await page.getByRole("button", { name: /保存|削除|同期する|接続/ }).count(), 0);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `horizontal overflow ${path}`);
+        assert.deepEqual(await page.evaluate(() => window.__publicScriptErrors), [], `real JavaScript errors ${path}`);
       }
       for (const path of ["/api/meals", "/api/profile", "/api/account/delete", "/api/health/google/sync", "/api/products/reliable"]) {
         const response = await context.request.post(base + path, { data: {}, headers: { Origin: base, Accept: "application/json" } });
@@ -82,7 +92,21 @@ try {
       }
       assert.equal((await context.request.post(base + "/api/export", { data: {}, headers: { Origin: base, Accept: "application/json" } })).status(), 401);
       assert.equal((await context.cookies()).some((c) => c.name === "astra_session"), false);
-      assert.deepEqual(errors, []);
+      const worker = await page.evaluate(async () => {
+        const registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Worker ready timeout")), 15000)),
+        ]);
+        await registration.update();
+        return registration.active?.scriptURL;
+      });
+      assert(worker && new URL(worker).origin === base, "a successful same-origin service worker update is required");
+      assert.deepEqual(await page.evaluate(() => window.__publicScriptErrors), []);
+      const nativeCancellation = /^\/127\.0\.0\.1:3198\/sw\.js\?v=development due to access control checks\.$/;
+      const diagnostics = engine === webkit ? errors.filter((message) => nativeCancellation.test(message)) : [];
+      assert.deepEqual(errors.filter((message) => !diagnostics.includes(message)), []);
+      await mkdir("test-results", { recursive: true });
+      await writeFile(`test-results/public-view-${device.viewport.width}-diagnostics.json`, JSON.stringify({ nativeServiceWorkerCancellations: diagnostics, realScriptErrors: [], workerUpdateSucceeded: true }, null, 2));
       await page.screenshot({ path: `test-results/public-view-${device.viewport.width}.png`, fullPage: true });
       await context.close();
       console.log(`Public read and protected writes passed: ${device.viewport.width}px`);
