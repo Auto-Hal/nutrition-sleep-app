@@ -27,6 +27,11 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify GitHub Preview secrets target the dedicated database
+        run: node scripts/verify-hosted-target.mjs preview
+        env:
+          SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
       - run: pnpm build
         env:
           SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
@@ -41,5 +46,7 @@ jobs:
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
       - run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Verify the actual Vercel Preview target without printing secrets
+        run: node --env-file=.vercel/.env.preview.local scripts/verify-hosted-target.mjs preview
       - run: pnpm dlx vercel@48.2.0 build --target=preview --yes --token=${{ secrets.VERCEL_TOKEN }}
       - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --target=preview --token=${{ secrets.VERCEL_TOKEN }}

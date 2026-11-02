@@ -181,3 +181,11 @@ PwaRuntimeのonline/visibility時updateにも失敗catchとoffline抑止を追�
 自動生成されたToday/月間/Body/転送/29 PNGをiPhone・iPad幅で目視した。最終表示調整では月選択欄が見出しを圧迫しない折返しを加え、入力フォームの表示単位をµg/µg RAEへ揃える。保存code/unitは変更しない。実iOSの保存/共有やカロミルOCR成功をこの目視から推定しない。
 
 現在残る受け入れは、Hosted Previewの認証後操作、物理Safari/PWA、iOS保存/共有、基本7再OCR/全29認識、実ChatGPT/Google Health接続である。詳細とProduction承認後の手順は[10](10-preview-acceptance-and-production-plan.md)、全経路の実装範囲は[12](12-feature-coverage-and-verification.md)を参照する。今回のProduction反映は未承認・未実施。
+
+## 最終表示と環境接続先の照合
+
+311c38d / [CI 41370211612](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41370211612)でも748 Vitest、650 pgTAP、認証付き3ブラウザー、fresh/upgrade、同時更新が全て成功。[Sleep E2E 41370211582](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41370211582)は36件成功。[Preview 41370211560](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41370211560)も成功し、dpl_Bvoo1sSzXYXhjg99i3pfAi3i28gX / nutrition-sleep-mm4hhhus4-tsuno2.vercel.appでversionの完全SHA一致、公開login、主要4 APIのアプリ401、SW no-storeを確認した。実データの3種digestとProductionの従来版も維持されている。
+
+最後の照合で、Vercelのsensitive設定はAPIから値を取得できず、targetのmetadataだけでは実際のURL/DB参照先を証明できないことを確認した。このため`scripts/verify-hosted-target.mjs`を追加し、ビルド環境の中でSupabase URLとDB URIが同じ専用projectを指すことを照合する。値・資格情報を出力せず、ネットワーク接続も行わない。Preview workflowはGitHubのPreview secretsと、Vercel pull後の実設定の両方を検査する。自動Gitデプロイでも`vercel-build`の先頭で同じ照合を行い、workflow経由以外も対象にする。Productionは将来承認されたbuildで自身の専用projectを照合するだけで、今回Productionへ接続・変更する処理ではない。
+
+許容するDB URIは[Supabase公式のdirect/shared/dedicated pooler形式](https://supabase.com/docs/guides/database/connecting-to-postgres)からprojectを特定できるもの。URLのqueryによるhost/user等の上書きや、projectを特定できない接続先は停止する。ローカル開発・使い捨てCI DBはこのHosted用照合から分離する。17件の追加回帰で正しい直接/プール接続、Preview/Productionの取り違え、URL上書き、秘密の非出力を確認した。全体は89ファイル・765件となり、最終headの全チェックはPRへ記録する。

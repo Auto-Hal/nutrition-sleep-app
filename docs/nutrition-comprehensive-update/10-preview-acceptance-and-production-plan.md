@@ -19,6 +19,7 @@ Hosted Previewの実ユーザーへ合成データを投入していない。破
 - [自動検証の確定結果](09-implementation-status.md#自動受け入れの確定結果): 748 Vitest、650 pgTAP、認証付き3ブラウザー、fresh/upgrade replay、既存Sleep E2E成功。
 - Preview DBはM1〜M8まで適用済み、内部30コード、台帳32件。食品5・栄養21行・snapshot322行、栄養/プロフィール/snapshotのdigest不変。
 - Hostedはlogin 200、version SHA、主要4 APIのアプリ401、MCP metadata 200/HTTPS resource/401 challenge、RLS/ACL/private helper非公開を確認。Vercel環境target分離もmetadataで確認。保護や環境変数は変更しない。
+- 接続先の実値はCI内の`verify-hosted-target.mjs`で検査する。GitHubのPreview secrets、Vercel pull後の設定、自動Git buildの入口で専用projectとの一致を要求し、秘密を出力しない。これは設定照合であり、Hostedの認証成功を証明するものではない。
 - Hosted認証後の実ユーザー操作は未確認。接続済みブラウザーが環境のkernel assets pathエラーで初期化できず、実Auth/CRUDの成功は使い捨てDBでの証拠である。
 
 最初に通常のPreviewアカウントでログインし、本人が希望する新目標の適用開始日を確認する。過去の実記録を試験のために編集・削除したり、試験値を実測として登録したりしない。新しい測定履歴がない空状態も正常である。
@@ -64,7 +65,7 @@ Hosted Previewの実ユーザーへ合成データを投入していない。破
 1. 最新main/PR head、最終CI、Previewのdeployment SHA/DB台帳、物理端末結果を確認する。別変更との競合があれば再評価する。
 2. バックアップの復旧時点・復旧手順を既存運用で確認する。実データをリポジトリやCI artifactへ保存しない。
 3. **このアップデートへの新しい明示承認を得る。** 対象はProduction DB migration、mainマージ、Productionアプリ/Edge反映を具体的に示す。設計承認と今回の実装開始指示はこの承認ではない。
-4. Productionの実DDL/関数/ACLと台帳を再照合する。Previewと台帳versionが違うため、db push/repair/resetをしない。リポジトリの追加SQLを1ファイルずつ、Previewと同じ順に適用する。
+4. Productionの実DDL/関数/ACLと台帳を再照合する。ビルドの専用Supabase URL/DB project照合も成功させる。Previewと台帳versionが違うため、db push/repair/resetをしない。リポジトリの追加SQLを1ファイルずつ、Previewと同じ順に適用する。
 5. 下記M1〜M8を順に適用し、各回の成否・transaction・lock/statement timeoutを確認する。途中失敗時は次へ進まず、部分適用の有無を照合する。既存migrationを書き換えない。
 6. M1は旧18 APIを保護するbridge、M2は30コード/v3、M3は目標、M4はBodyと旧profile API共通lock/ACL、M5は転送、M6はCSV、M7は品質/精度、M8は完全library読取り。新アプリは全RPCが揃ってから公開する。
 7. 新アプリのPreviewと同じ確定SHAをmainへ反映してProduction build/deployする。承認された場合だけProduction MCPへ5ファイルをデプロイする。既存verify_jwt=falseでも関数内JWT検証を維持する。
