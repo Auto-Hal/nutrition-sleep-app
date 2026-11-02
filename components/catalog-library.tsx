@@ -1,4 +1,5 @@
 "use client";
+import { nutrientUnitLabel } from "@/lib/nutrition/presentation";
 import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -932,7 +933,7 @@ export function CatalogLibrary({
                 {STANDARD_NUTRIENT_DEFINITIONS.map((definition) => (
                   <div className="field" key={definition.code}>
                     <label htmlFor={`nutrient-${definition.code}`}>
-                      {definition.label}（{definition.unit}）
+                      {definition.label}（{nutrientUnitLabel(definition.unit)}）
                     </label>
                     <input
                       id={`nutrient-${definition.code}`}

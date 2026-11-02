@@ -208,6 +208,9 @@ label.button { display: inline-flex; align-items: center; justify-content: cente
 .inline-form { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 .connectivity-notice { margin: 12px auto; width: min(calc(100% - 32px),1050px); padding: 14px; border: 1px solid #b9cee7; border-radius: 12px; background: #eef6ff; font-size: .85rem; }
 .inline-form input { min-height: 44px; max-width: 155px; }
+.pfc-month-heading { flex-wrap: wrap; align-items: center; }
+.pfc-month-heading h2 { flex-shrink: 0; white-space: nowrap; }
+.pfc-month-heading .inline-form { margin-left: auto; }
 @media (max-width: 360px) { .pfc-calendar { gap: 2px; } .pfc-mini-status { gap: 1px; } .pfc-mini-status > span { padding: 1px; } .pfc-metric { padding: 9px; } }
 
 .pwa-update-banner {

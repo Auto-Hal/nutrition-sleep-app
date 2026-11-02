@@ -12,6 +12,17 @@
 
 Hosted Previewの実ユーザーへ合成データを投入していない。破壊的CRUD/削除/オフラインの自動受け入れは、loopbackの使い捨てSupabase Auth/DBと実Nextで実施する。Hosted Previewの公開ページ、認証拒否、スキーマ・権限・実データの前後digest照合と、物理端末の確認は別の証拠である。
 
+## Previewの確認先と検証状況
+
+- 継続するPreview入口: https://nutrition-sleep-app-git-feature-nutrition-compreh-65baa1-tsuno2.vercel.app （Vercelの保護とアプリ自身のログインがある）。
+- 機能受け入れ通過版: 7b00814 / https://nutrition-sleep-6j0ozabrq-tsuno2.vercel.app / dpl_6gLYr6xf3KkdBgheAzcupx5cG6zJ READY。後続版は入口の`/api/app-version`とPR headを照合する。
+- [自動検証の確定結果](09-implementation-status.md#自動受け入れの確定結果): 748 Vitest、650 pgTAP、認証付き3ブラウザー、fresh/upgrade replay、既存Sleep E2E成功。
+- Preview DBはM1〜M8まで適用済み、内部30コード、台帳32件。食品5・栄養21行・snapshot322行、栄養/プロフィール/snapshotのdigest不変。
+- Hostedはlogin 200、version SHA、主要4 APIのアプリ401、MCP metadata 200/HTTPS resource/401 challenge、RLS/ACL/private helper非公開を確認。Vercel環境target分離もmetadataで確認。保護や環境変数は変更しない。
+- Hosted認証後の実ユーザー操作は未確認。接続済みブラウザーが環境のkernel assets pathエラーで初期化できず、実Auth/CRUDの成功は使い捨てDBでの証拠である。
+
+最初に通常のPreviewアカウントでログインし、本人が希望する新目標の適用開始日を確認する。過去の実記録を試験のために編集・削除したり、試験値を実測として登録したりしない。新しい測定履歴がない空状態も正常である。
+
 ## 操作案内
 
 1. Settings → 食事目標: 初期1800 kcal・25/20/55を確認し、必要に応じて変更。適用開始日・カスタム/プロフィール参考計算/トレーニング別・許容幅を保存する。変更履歴は上書きしない。
@@ -29,6 +40,7 @@ Hosted Previewの実ユーザーへ合成データを投入していない。破
 
 | 操作 | 期待結果 | 結果 |
 |---|---|---|
+| Hosted Previewログイン後 | 本人の既存履歴・プロフィール・新しい空状態が表示される | 未確認 |
 | iPhone Safari/PWA、iPad | 5タブ、目標/PFC/カレンダー/Bodyが読みやすく入力できる | 未確認 |
 | オフライン入力→復帰 | 端末保存、既知の暫定進捗、同期後に1件だけ登録 | 実機未確認 |
 | PNG保存→写真/ファイル、長押しfallback | 1対象1画像、十分な解像度 | 未確認 |

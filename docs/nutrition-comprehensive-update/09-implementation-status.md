@@ -29,10 +29,10 @@ PreviewのBatch再計算実行権は広いが、アプリはBatch RPCから呼�
 | P5 PFC日/月/週 | 完了 | CI 41295693517：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。境界・途中記録・参照比較・集計19テスト、同期レース2テストを追加 |
 | P6 Body画面 | 完了 | CI 41296434510：lint/typecheck/unit/build、fresh replay/559 pgTAP/実接続成功。実測CRUD、30/90日、移動平均、目標・連携、5タブを接続 |
 | P7 PNG転送 | 実装・自動検証完了 | UI統合CI 41298773341：lint/typecheck/unit/build、fresh replay/605 pgTAP/実接続成功。Preview反映済み。保存・共有で自動確認しない回帰成功。物理iPhone/OCRは未確認 |
-| P8 CSV・入力/品質・UI整理 | 実装・層別検証完了 | CSV/入力/品質/完全読取り/未同期PFCまで接続。744 Vitest、650 pgTAP、実接続競合・アプリ検査成功。実機は別 |
-| P9 統合・受け入れ | 実認証ブラウザを検証中 | loopback Auth/Next/DB、mainからのupgrade replay、Preview/実機案内を追加。最初の失敗箇所から修正 |
+| P8 CSV・入力/品質・UI整理 | 実装・自動検証完了 | CSV/入力/品質/完全読取り/未同期PFCまで接続。748 Vitest、650 pgTAP、実接続競合・アプリ検査成功。実機は別 |
+| P9 統合・受け入れ | 自動統合完了・Hosted認証後/実機待ち | 7b00814 / CI 41326997177で3ブラウザーの実Auth/Next/API/DB、mainからのupgrade replay成功。Hosted構造/公開/匿名拒否/digest確認済み |
 
-新機能の実機・外部OCRは未検証。各単位が通過した結果とSHAを順次追記する。
+新機能の実機・外部OCRは未検証。実装・自動検証の完了と、Hosted認証後/物理端末の受け入れを区別する。最終headのチェックは[PR #47](https://github.com/Auto-Hal/nutrition-sleep-app/pull/47/checks)で確認できる。
 
 ## Preview適用台帳
 
@@ -63,15 +63,15 @@ P4ではBodyの3テーブル、実測のみのCRUD、明示的なプロフィー
 
 P7のtransfer payloadはsource amount×選択量の分子/分母を文字列で保存し、量換算の循環小数を画像用の有限表示へ丸めても正本へ逆流させない。画像は端末メモリのみでStorage/outbox/SWへ保存しない。手動確認/取り消しだけをIDs/revisionのoutboxで復旧可能にする。Web Shareは事前生成後の別tap、キャンセルはprepared維持（[MDN](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share)、[WebKit](https://webkit.org/blog/13862/the-user-activation-api/)）。新goal参照計算のmeasurement IDが実際のprofile pointerと一致することもM5で検証する。
 
-## P8/P9で残る統合確認
+## P8/P9の統合確認結果
 
-- 29項目CSV（日/食事/食品、366日、BOM/CRLF/formula escaping、単一DB snapshot）と出力UI。
-- Productの写真なし手動登録・既存値編集、明示的なNa→salt/定義一致C−fiberの算出と由来維持。
-- definition_basis/derivation/source URIの新書込allowlist、単位・化学形態の不一致を新PFC/transferで共通判定。旧DRI互換を維持。
-- Catalog/Product/Meal読取りのページ上限・欠落検出、29項目geometry OCR回帰。
-- PFCのqueue直後の状態更新と端末暫定PFC。確定不明のpending追加分をサーバー合計へ重複加算しない。
-- Todayの入力導線・重複エネルギーカードの整理、iPhone/iPad幅の実画面検証。
-- 認証済み使い捨てDBから実Next API/ブラウザまでのPlaywright、新機能のオフライン復旧、Preview統合/PR本文/本番計画。
+- 完了: 29項目CSV（日/食事/食品、366日、BOM/CRLF/formula escaping、単一DB snapshot）と出力UI。
+- 完了: Productの写真なし手動登録・既存値編集、明示的なNa→salt/定義一致C−fiberの算出と由来維持。
+- 完了: definition_basis/derivation/source URIの新書込allowlist、単位・化学形態の不一致を新PFC/transferで共通判定。旧DRI互換を維持。
+- 完了: Catalog/Product/Meal読取りのページ上限・欠落検出、29項目geometry OCR回帰。
+- 完了: PFCのqueue直後の状態更新と端末暫定PFC。確定不明のpending追加分をサーバー合計へ重複加算しない。
+- ブラウザー確認済み: Todayの入力導線・重複エネルギーカードの整理、iPhone/iPad幅のoverflow検査と画面画像の目視。物理端末は別。
+- 自動統合成功: 使い捨てAuth/DBから実Next/API/ブラウザーまでのPlaywright、オフライン入力/復旧、PNGファイル生成、Body CRUD、CSV/JSON。Hosted Previewは構造/公開/匿名拒否/digest確認の範囲。操作案内・本番計画は10。
 - 物理iPhone、iOS共有・写真保存、カロミル基本7/全29 OCR、実ChatGPT OAuth/確定は未検証。自動テスト合格と区別する。
 
 ## P8 追加の品質契約
@@ -156,3 +156,28 @@ Production再監査ではmain/公開aliasのSHAは7b2bcea、deployment dpl_6wWY3
 0a0cee3 / CI 41325948098ではChromium成功、WebKit mobileも機能操作は最後まで成功したが、最後のpageerror検査が中断されたsame-origin period/SW通信を検出した。最小loopbackサーバーで、画面置換中のcatch済みfetchがWebKit pageerrorを出す一方、window error/unhandledrejectionは0であることを再現。[Playwright #43120](https://github.com/microsoft/playwright/issues/43120)の上流報告とも一致する。E2Eは各documentの実JS例外/未処理Promiseを独立監視し、開発用同一originのperiod/SWという狭いnative診断だけを別artifactへ記録する。最後にブラウザーの同一origin period取得200とworker更新成功も必須にし、実障害を一律除外しない。
 
 PwaRuntimeのonline/visibility時updateにも失敗catchとoffline抑止を追加し、中断後の再試行を実コールバックの単体テストで確認した。転送フォームも初期化前にモード/量/名称を変更できないようにし、E2Eではall29 payload/全29行の既知状態を明示照合する。関連13テスト成功、全suite/3ブラウザー/upgradeを再実行する。
+
+## 自動受け入れの確定結果
+
+機能の通し検証は **7b00814c92065980fe2d5a17a1ca283a426daeb7** で成功。[CI 41326997177](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41326997177)と[Sleep E2E 41326997135](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41326997135)に証拠がある。後続の表示・文書調整もPR最新headの同じ検査対象とする。
+
+| 検査 | 確定結果 |
+|---|---|
+| lint | エラー0。従来のProduct画像に関するimg警告1件 |
+| TypeScript / MCP Deno | 成功 |
+| Vitest | 88ファイル・748件成功 |
+| 環境契約 / production build | 成功 |
+| fresh Supabase migration replay | 使い捨てDBで成功 |
+| pgTAP | 25ファイル・650件成功 |
+| 実認証・同時更新 | 目標の競合/receipt回復、owner別export、Bodyと旧profileの同時保存が成功 |
+| 新Playwright | Chromium、iPhone 13幅WebKit、iPad Mini幅WebKitの3プロジェクト成功 |
+| main相当DBからの更新 | 旧18snapshotの全旧列/行数、参照fingerprint、旧receiptが不変。定義30、新しい架空履歴0を確認 |
+| 既存Sleep E2E | 既存の公開認証画面・合成睡眠画面を3ブラウザーで継続成功 |
+
+新E2Eは、ログイン、目標保存、全30コードのProduct、旧HTTP編集による12項目保護、オフライン食事→DB1件、PFC完了、全29の固定payload/実Canvas PNG保存、名称コピーと手動確認状態、月/週/29詳細、過去日の参考比較、Body CRUD/プロフィール連動、CSV3粒度/JSON v1・v2、Sleep、Origin拒否まで実行する。ブラウザーwindow error/未処理Promiseは0。前項のWebKit native中断診断は別artifactへ残し、最後のperiod 200/worker更新成功を必須にした。
+
+合成ユーザーは終了時に削除し、新goal/body/transfer履歴のcascadeを照合する。Hosted実アカウントへこのfixtureを投入していない。人工値がブラウザー間で合算されるのは同じ合成ownerを順に使うテスト仕様で、実ユーザー値ではない。
+
+自動生成されたToday/月間/Body/転送/29 PNGをiPhone・iPad幅で目視した。最終表示調整では月選択欄が見出しを圧迫しない折返しを加え、入力フォームの表示単位をµg/µg RAEへ揃える。保存code/unitは変更しない。実iOSの保存/共有やカロミルOCR成功をこの目視から推定しない。
+
+現在残る受け入れは、Hosted Previewの認証後操作、物理Safari/PWA、iOS保存/共有、基本7再OCR/全29認識、実ChatGPT/Google Health接続である。詳細とProduction承認後の手順は[10](10-preview-acceptance-and-production-plan.md)、全経路の実装範囲は[12](12-feature-coverage-and-verification.md)を参照する。今回のProduction反映は未承認・未実施。

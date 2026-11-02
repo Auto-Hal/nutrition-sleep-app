@@ -56,7 +56,21 @@ CSVはUTF-8 BOM/CRLF、quote/改行・formula injection対策。DBの単一snaps
 
 ## 受け入れの残り
 
-自動検証は[09の最新結果](09-implementation-status.md)を参照し、未完了を成功扱いにしない。Hosted Previewの実アカウントを破壊的fixtureにせず、実認証CRUDは使い捨てDBで検証する。Hostedはdeployment/version、公開/匿名拒否、スキーマ/ACL/RLS、既存データdigestを確認する。
+7b00814の確定結果は748 Vitest、650 pgTAP、認証付き3ブラウザー、fresh/upgrade replay、既存Sleep E2E成功。[09の証拠](09-implementation-status.md#自動受け入れの確定結果)とPR最新headのcheckを参照する。Hosted Previewの実アカウントを破壊的fixtureにせず、実認証CRUDは使い捨てDBで検証した。Hostedはdeployment/version、公開/匿名拒否、スキーマ/ACL/RLS、既存データdigestを確認した。
+
+| 07の受け入れID | 自動検証の対応 | 実機・外部接続の範囲 |
+|---|---|---|
+| N01〜N04 | 30コード/0・NULL/換算/単位/形態のunit、v3 API、pgTAP成功 | 実ラベル撮影は未確認 |
+| N05〜N07 | 全入力契約、Batch/Chat、旧18DRIとsnapshot保全、fresh/upgrade成功 | 実ChatGPTは未確認。DRI比較制限は下記 |
+| G01〜G04 | 目標計算・100%・履歴・split/profile参考のunit/SQL、実UI保存成功 | 本人の目標選択は未実施 |
+| P01〜P04 | 境界・欠損・暫定進捗・月間合計・行動文言のunit/SQL、3ブラウザー成功 | 物理端末は未確認 |
+| W01〜W04 | 週境界/日別目標/欠損/参考量制限のunit、実週間画面成功 | 物理端末は未確認 |
+| K01〜K02 | 5起点/倍率/欠損/微量、全29 payloadと実Canvas PNG、3ブラウザー成功 | PNGの目視は実施、外部OCRとは別 |
+| K03 | browser download/name copy/状態保持、share cancelのcomponent検査成功 | 実iOS共有・写真/ファイル保存は未確認 |
+| K04 | 自動検証の完了対象にしない | 基本7再試験・全29の実OCRは未確認 |
+| B01〜B03 | CRUD/平均/空状態/連動/競合のunit/SQL、実UI、2接続の競合成功 | 実測の入力は未実施 |
+| X01〜X03 | JSON v1/v2、CSV3粒度、欠損/escaping、owner/Origin/cascade成功 | iOSファイル操作は未確認 |
+| R01〜R02 | 既存全suite、Sleep E2E、outbox/receipt/競合、3ブラウザー復旧成功 | 実Google HealthとSafari cold startは未確認 |
 
 物理iPhone/iPad、Safari/PWA cold start、写真/ファイル保存、iOS共有シートとキャンセル、実カロミル基本7/全29、実ChatGPT OAuth/直接v2、今回の変更を含めた実Google Health同期は[10の確認表](10-preview-acceptance-and-production-plan.md)へ残す。
 

@@ -5,6 +5,10 @@ export type DailyNutritionAmountState = {
   known_amount: number;
 };
 
+export function nutrientUnitLabel(unit: string) {
+  return unit === "ug_rae" ? "µg RAE" : unit === "ug" ? "µg" : unit;
+}
+
 export function dailyDisplayAmount(day: DailyNutritionAmountState) {
   if (day.entry_count === 0) return null;
 

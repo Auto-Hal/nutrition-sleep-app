@@ -4,7 +4,8 @@
 - 対象: Auto-Hal/nutrition-sleep-app
 - 監査基準main: **7b2bcea83c97d14aa8b11b06a8f2d0377dbbaec5**
 - 設計ブランチ: **docs/nutrition-comprehensive-design**
-- 状態: **第1段階設計は原則承認済み / 第2段階の段階的実装中 / Production未承認**
+- 実装ブランチ: **feature/nutrition-comprehensive-update** / [PR #47](https://github.com/Auto-Hal/nutrition-sleep-app/pull/47)
+- 状態: **実装・自動統合検証済み / Preview反映済み / Hosted認証後・実機受け入れ待ち / Production未承認**
 
 ## 今回の範囲と停止条件
 

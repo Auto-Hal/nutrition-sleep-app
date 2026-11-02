@@ -1,4 +1,5 @@
 "use client";
+import { nutrientUnitLabel } from "@/lib/nutrition/presentation";
 import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 import {
   ProductManualEditor,
@@ -1553,7 +1554,7 @@ export function ProductIngestion({
               {STANDARD_NUTRIENT_DEFINITIONS.map((definition) => (
                 <div className="field" key={definition.code}>
                   <label htmlFor={`ocr-${definition.code}`}>
-                    {definition.label}（{definition.unit}）
+                    {definition.label}（{nutrientUnitLabel(definition.unit)}）
                   </label>
                   <input
                     id={`ocr-${definition.code}`}

@@ -1,4 +1,5 @@
 "use client";
+import { nutrientUnitLabel } from "@/lib/nutrition/presentation";
 import { useState } from "react";
 import {
   editedNutrientPayload,
@@ -197,7 +198,7 @@ export function ProductManualEditor({
           {STANDARD_NUTRIENT_DEFINITIONS.map((d) => (
             <div className="field" key={d.code}>
               <label htmlFor={`manual-product-${d.code}`}>
-                {d.label}（{d.unit === "ug_rae" ? "µg RAE" : d.unit}）
+                {d.label}（{nutrientUnitLabel(d.unit)}）
               </label>
               <input
                 id={`manual-product-${d.code}`}

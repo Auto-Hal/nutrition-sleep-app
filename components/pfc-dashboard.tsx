@@ -397,7 +397,7 @@ export function MonthlyPfc({
   return (
     <div className="stack">
       <section className="card">
-        <div className="section-heading compact-heading">
+        <div className="section-heading compact-heading pfc-month-heading">
           <h2>月間PFC</h2>
           <form action="/nutrition" className="inline-form">
             <input type="hidden" name="view" value="pfc" />
