@@ -186,6 +186,8 @@ PwaRuntimeのonline/visibility時updateにも失敗catchとoffline抑止を追�
 
 311c38d / [CI 41370211612](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41370211612)でも748 Vitest、650 pgTAP、認証付き3ブラウザー、fresh/upgrade、同時更新が全て成功。[Sleep E2E 41370211582](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41370211582)は36件成功。[Preview 41370211560](https://github.com/Auto-Hal/nutrition-sleep-app/actions/runs/41370211560)も成功し、dpl_Bvoo1sSzXYXhjg99i3pfAi3i28gX / nutrition-sleep-mm4hhhus4-tsuno2.vercel.appでversionの完全SHA一致、公開login、主要4 APIのアプリ401、SW no-storeを確認した。実データの3種digestとProductionの従来版も維持されている。
 
-最後の照合で、Vercelのsensitive設定はAPIから値を取得できず、targetのmetadataだけでは実際のURL/DB参照先を証明できないことを確認した。このため`scripts/verify-hosted-target.mjs`を追加し、ビルド環境の中でSupabase URLとDB URIが同じ専用projectを指すことを照合する。値・資格情報を出力せず、ネットワーク接続も行わない。Preview workflowはGitHubのPreview secretsと、Vercel pull後の実設定の両方を検査する。自動Gitデプロイでも`vercel-build`の先頭で同じ照合を行い、workflow経由以外も対象にする。Productionは将来承認されたbuildで自身の専用projectを照合するだけで、今回Productionへ接続・変更する処理ではない。
+最後の照合で、Vercelのsensitive設定はAPIから値を取得できず、targetのmetadataだけでは実際のURL/DB参照先を証明できないことを確認した。このため`scripts/verify-hosted-target.mjs`を追加し、ビルド環境の中でSupabase URLとDB URIが同じ専用projectを指すことを照合する。値・資格情報を出力せず、ネットワーク接続も行わない。Preview workflowはVercel pull後の実設定を検査する。自動Gitデプロイでも`vercel-build`の先頭で同じ照合を行い、workflow経由以外も対象にする。Productionは将来承認されたbuildで自身の専用projectを照合するだけで、今回Productionへ接続・変更する処理ではない。
 
 許容するDB URIは[Supabase公式のdirect/shared/dedicated pooler形式](https://supabase.com/docs/guides/database/connecting-to-postgres)からprojectを特定できるもの。URLのqueryによるhost/user等の上書きや、projectを特定できない接続先は停止する。ローカル開発・使い捨てCI DBはこのHosted用照合から分離する。17件の追加回帰で正しい直接/プール接続、Preview/Productionの取り違え、URL上書き、秘密の非出力を確認した。全体は89ファイル・765件となり、最終headの全チェックはPRへ記録する。
+
+追加照合の初回b99d812 / Preview 41371903611は、先頭の旧GitHub Preview secret参照が空で停止した。値を出力せずに設定の有無だけを照合し、実際のデプロイがVercel pullの設定を使うことと区別した。使用されないsecretで実行していた重複`pnpm build`を除き、専用Vercel project選択→Preview設定pull→接続先照合→Vercel build→Preview deployの一つの流れへ整理した。新しいsecretの複製・環境設定の変更は行わない。

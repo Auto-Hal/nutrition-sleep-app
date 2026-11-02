@@ -27,17 +27,6 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify GitHub Preview secrets target the dedicated database
-        run: node scripts/verify-hosted-target.mjs preview
-        env:
-          SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
-          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
-      - run: pnpm build
-        env:
-          SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PREVIEW_SUPABASE_PUBLISHABLE_KEY }}
-          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
-          APP_SESSION_ENCRYPTION_KEY: ${{ secrets.PREVIEW_APP_SESSION_ENCRYPTION_KEY }}
       - name: Select the dedicated Vercel project
         shell: bash
         run: |
