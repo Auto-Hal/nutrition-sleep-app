@@ -1,5 +1,7 @@
 # 実装範囲と受け入れ結果
 
+最新状態（2026-11-02）: [13の本番リリース記録](13-production-release-2026-11-02.md)のとおり、追加の明示承認後に総合更新を本番反映済み。以下は実装時の対応表・制限の記録である。最終実装81519dbの自動検証は787 Vitest/650 pgTAP・認証付き3環境・公開閲覧3環境・Sleep 36件が成功している。
+
 2026-11-02。PR [#47](https://github.com/Auto-Hal/nutrition-sleep-app/pull/47)、branch `feature/nutrition-comprehensive-update`。設計は01〜08、実行証拠と最終SHAは[09](09-implementation-status.md)、実機確認とProduction手順は[10](10-preview-acceptance-and-production-plan.md)を参照する。Productionは未承認・未反映。
 
 ## 画面と操作
