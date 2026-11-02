@@ -2,7 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppIcon } from "@/components/app-icon";
-import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { getViewingSessionForRsc } from "@/lib/public-view/access";
 import { NUTRIENT_DEFINITIONS, type NutrientCode } from "@/lib/nutrition/catalog";
 import { getNutritionAnalytics, getNutritionDayDrilldown, type NutritionRange } from "@/lib/nutrition/analytics";
 import { NutrientAverages, formatEvidenceRange, formatNutrientAmount as formatAmount } from "@/components/nutrient-averages";
@@ -62,7 +62,7 @@ export default async function NutritionPage({
 }: {
   searchParams: Promise<{ range?: string; nutrient?: string; day?: string }>;
 }) {
-  const session = await getAppSessionForRsc();
+  const session = await getViewingSessionForRsc();
   if (!session) redirect("/login");
 
   const params = await searchParams;
@@ -286,7 +286,7 @@ export default async function NutritionPage({
                               {entry.quantity} {entry.quantity_unit}
                               {entry.item_type === "supplement" ? " · サプリ" : ""}
                             </div>
-                            {entry.amount === null && <NutritionMissingValueActions entryId={entry.id} />}
+                            {entry.amount === null && !session.readOnly && <NutritionMissingValueActions entryId={entry.id} />}
                           </div>
                           <div className="nutrition-day-value">
                             <strong>{formatAmount(entry.amount, entry.unit)}</strong>

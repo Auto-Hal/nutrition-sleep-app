@@ -1,6 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { getViewingSessionForRsc } from "@/lib/public-view/access";
 import { localDateInTimeZone } from "@/lib/nutrition/analytics";
 import { getMealHistory, shiftIsoDate } from "@/lib/nutrition/meal-history";
 import { getProfile } from "@/lib/profile";
@@ -24,7 +24,7 @@ function formatDate(value: string) {
 }
 
 export default async function HistoryPage() {
-  const session = await getAppSessionForRsc();
+  const session = await getViewingSessionForRsc();
   if (!session) return null;
 
   const profile = await getProfile(session.accessToken);
@@ -41,7 +41,7 @@ export default async function HistoryPage() {
         <div>
           <p className="eyebrow">History</p>
           <h1>食事履歴</h1>
-          <p className="muted">過去30日の登録を確認できます。食品ごとに修正でき、過去日への追加登録も可能です。</p>
+          <p className="muted">過去30日の登録を確認できます。</p>
         </div>
         <Link className="button ghost" href="/today">今日へ戻る</Link>
       </header>
@@ -50,8 +50,8 @@ export default async function HistoryPage() {
         <section className="card stack" aria-labelledby="history-date-title">
           <div>
             <p className="eyebrow">Backdate</p>
-            <h2 id="history-date-title">別の日を登録・修正</h2>
-            <p className="muted">日付を指定すると、その日の記録画面を開けます。30日より前の日付も指定できます。</p>
+            <h2 id="history-date-title">別の日を表示</h2>
+            <p className="muted">日付を指定すると、その日の記録を開けます。30日より前の日付も指定できます。</p>
           </div>
           <form className="form" action="/today" method="get">
             <div className="field">
@@ -97,7 +97,7 @@ export default async function HistoryPage() {
                               <span className="muted">
                                 {entry.name} × {entry.quantity}{entry.quantity_unit}
                               </span>
-                              <Link className="button ghost" href={editHref}>修正</Link>
+                              {!session.readOnly && <Link className="button ghost" href={editHref}>修正</Link>}
                             </div>
                           );
                         })}

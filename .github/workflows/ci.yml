@@ -47,5 +47,27 @@ jobs:
       - run: supabase start
       - run: supabase db reset
       - run: supabase test db
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Build disposable public viewer acceptance app
+        run: pnpm build
+      - name: Verify public reads, owner isolation and protected writes
+        run: node tests/integration/public-view.mjs
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Save synthetic public viewer screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-view-browser-report
+          path: test-results/public-view-*.png
+          retention-days: 7
       - if: always()
         run: supabase stop
