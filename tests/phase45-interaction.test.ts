@@ -136,11 +136,6 @@ describe("Phase 4.5 Today nutrition refresh", () => {
 
 
 describe("Phase 4.5 optimistic Today energy", () => {
-  it("preloads only energy nutrients for immediate feedback", () => {
-    const source = readFileSync(resolve(process.cwd(), "lib/nutrition/today-data.ts"), "utf8");
-    expect(source).toContain('.eq("nutrient_code", "energy")');
-    expect(source).toContain("Promise.all([");
-  });
 
   it("marks local outbox nutrition as provisional until reconciliation", () => {
     const source = readFileSync(resolve(process.cwd(), "components/today-interactive.tsx"), "utf8");

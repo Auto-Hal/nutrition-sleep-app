@@ -6,6 +6,7 @@ import { createUserClient } from "@/lib/supabase/user";
 
 const schema = z.object({
   operation_id: z.string().uuid(),
+  contract_version: z.union([z.literal(1), z.literal(2)]).default(1),
   intent_created_at: z.string().datetime(),
   entry_id: z.string().uuid(),
   expected_source_meal_revision: z.number().int().positive(),
@@ -47,9 +48,9 @@ export async function POST(request: Request) {
   }
 
   const payload = parsed.data;
-  const { data, error } = await createUserClient(session.accessToken).rpc("replace_meal_entry_v2", {
+  const { data, error } = await createUserClient(session.accessToken).rpc(payload.contract_version === 2 ? "replace_meal_entry_v3" : "replace_meal_entry_v2", {
     p_operation_id: payload.operation_id,
-    p_contract_version: 1,
+    p_contract_version: payload.contract_version,
     p_intent_created_at: payload.intent_created_at,
     p_entry_id: payload.entry_id,
     p_expected_source_meal_revision: payload.expected_source_meal_revision,

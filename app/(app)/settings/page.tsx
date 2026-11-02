@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppIcon } from "@/components/app-icon";
+import { NutritionGoalSettings } from "@/components/nutrition-goal-settings";
+import { getGoalHistory } from "@/lib/nutrition/goal-repository";
 import { ProfileForm } from "@/components/profile-form";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { CatalogLibrary } from "@/components/catalog-library";
@@ -8,15 +10,18 @@ import { AccountDeletion } from "@/components/account-deletion";
 import { ProviderBrandingSanitizer } from "@/components/provider-branding-sanitizer";
 import { accountDeletionAdminEnv } from "@/lib/env";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { isPublicViewForRequest } from "@/lib/public-view/access";
+import { PublicSettings } from "@/components/public-settings";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  if (await isPublicViewForRequest()) return <PublicSettings />;
   const session = await getAppSessionForRsc();
   const params = await searchParams;
-  const view = params.view === "library" ? "library" : "settings";
-  const profile = session ? await getProfile(session.accessToken) : null;
+  const view = params.view === "library" ? "library" : params.view === "goals" ? "goals" : "settings";
+  const [profile, goalHistory] = session ? await Promise.all([getProfile(session.accessToken), view === "goals" ? getGoalHistory(session.accessToken) : Promise.resolve(null)]) : [null, null];
   const ownerUserId = session?.userId ?? "";
   const environmentId = appEnvironmentId();
 
@@ -34,6 +39,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </header>
       <nav className="subnav settings-subnav" aria-label="設定メニュー">
         <Link href="/settings" aria-current={view === "settings" ? "page" : undefined}>プロフィール</Link>
+        <Link href="/settings?view=goals" aria-current={view === "goals" ? "page" : undefined}>食事目標</Link>
         <Link href="/settings?view=library" aria-current={view === "library" ? "page" : undefined}>ライブラリ</Link>
       </nav>
       {view === "library" ? (
@@ -41,7 +47,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           ownerUserId={ownerUserId}
           environmentId={environmentId}
         />
-      ) : (
+      ) : view === "goals" && goalHistory ? <NutritionGoalSettings binding={{ ownerUserId, environmentId }} profile={profile} initialHistory={goalHistory} /> : (
         <div className="stack settings-stack">
           <ProfileForm
             initialProfile={profile}
@@ -51,6 +57,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <DataExport
             ownerUserId={ownerUserId}
             environmentId={environmentId}
+            timeZone={profile?.time_zone ?? "Asia/Tokyo"}
           />
           <section className="card settings-links-card" aria-labelledby="settings-info-title">
             <h2 id="settings-info-title">アプリ情報</h2>

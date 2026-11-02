@@ -1,4 +1,5 @@
 export const OUTBOX_CONTRACT_VERSION = 1;
+export const SUPPORTED_OUTBOX_CONTRACT_VERSIONS = [1, 2] as const;
 export const OUTBOX_AUTO_REPLAY_DAYS = 30;
 export const MUTATION_RECEIPT_RETENTION_DAYS = 90;
 export const OUTBOX_LEASE_MS = 30_000;
@@ -23,7 +24,14 @@ export type OutboxMutationKind =
   | "batch_update"
   | "meal_entry_void"
   | "product_create"
-  | "product_update";
+  | "product_update"
+  | "goal_append"
+  | "day_type_append"
+  | "body_measurement_create"
+  | "body_measurement_update"
+  | "body_measurement_delete"
+  | "body_settings_update"
+  | "karomiru_status";
 
 export type OutboxBinding = {
   ownerUserId: string;
@@ -57,7 +65,7 @@ export type ProfileOutboxPayload = {
   time_zone: string;
 };
 
-export type NutrientOutboxValue = {
+export type NutrientOutboxValue = import("@/lib/nutrition/catalog").NutrientMetadata & {
   code: string;
   amount: number | null;
   unit: string;
@@ -156,7 +164,20 @@ export type ProductUpdateOutboxPayload = {
   confirm_verified_overwrite: boolean;
 };
 
+export type BodyMutationOutboxPayload = {
+  measurement_id: string;
+  expected_settings_revision: number;
+  expected_profile_revision: number | null;
+  measurement: import("@/lib/body/model").BodyMeasurementPayload;
+};
 export type OutboxPayloadByKind = {
+  karomiru_status: { transfer_id: string; status: "confirmed" | "revoked" };
+  body_measurement_create: BodyMutationOutboxPayload;
+  body_measurement_update: BodyMutationOutboxPayload;
+  body_measurement_delete: Omit<BodyMutationOutboxPayload, "measurement"> & { measurement: { expected_latest_reference?: Array<{ id: string; revision: number }> } };
+  body_settings_update: { expected_profile_revision: number | null; settings: import("@/lib/body/model").BodySettingsPayload };
+  goal_append: { goal: import("@/lib/nutrition/goals").GoalCommand };
+  day_type_append: import("@/lib/nutrition/goals").DayTypeCommand;
   meal_entry_create: MealEntryOutboxPayload;
   fixed_meal_state: FixedMealStateOutboxPayload;
   profile_upsert: ProfileOutboxPayload;
@@ -197,6 +218,7 @@ export type PendingMutation = {
 }[OutboxMutationKind];
 
 export type OutboxMutationInput<K extends OutboxMutationKind> = {
+  contractVersion?: 1 | 2;
   operationId: string;
   createdAt: string;
   kind: K;
@@ -208,6 +230,7 @@ export type OutboxMutationInput<K extends OutboxMutationKind> = {
 };
 
 export type MealEntryMutationInput = {
+  contractVersion?: 1 | 2;
   operationId: string;
   createdAt: string;
   payload: MealEntryOutboxPayload;
@@ -276,7 +299,7 @@ export function createOutboxMutation<K extends OutboxMutationKind>(
 
   const mutation = {
     operation_id: input.operationId,
-    contract_version: OUTBOX_CONTRACT_VERSION,
+    contract_version: input.contractVersion ?? OUTBOX_CONTRACT_VERSION,
     environment_id: binding.environmentId,
     owner_user_id: binding.ownerUserId,
     entity_key: input.entityKey.trim(),
@@ -316,6 +339,7 @@ export function createMealEntryMutation(
     : `fixed-meal:${input.payload.meal_date}:${input.payload.meal_type}`;
 
   return createOutboxMutation(binding, {
+    contractVersion: input.contractVersion,
     operationId: input.operationId,
     createdAt: input.createdAt,
     kind: "meal_entry_create",

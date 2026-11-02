@@ -100,9 +100,9 @@ describe("Phase 3 product ingestion", () => {
   });
 
   it("models local-first resolution and external/OCR fallbacks", () => {
-    expect(resolver).toContain('.from("products")');
-    expect(resolver.indexOf('.from("products")')).toBeLessThan(resolver.indexOf("const external = await fetchOpenFoodFactsProduct"));
-    expect(resolver).toContain('status: "not_found", fallback: "ocr"');
+    expect(resolver).toContain('getCatalogLibrary(session.accessToken');
+    expect(resolver.indexOf('getCatalogLibrary(session.accessToken')).toBeLessThan(resolver.indexOf("const external = await fetchOpenFoodFactsProduct"));
+    expect(resolver).toMatch(/status: "not_found",\s*fallback: "ocr"/);
     expect(resolver).toContain('status: "external_unavailable"');
     expect(resolver).toContain('fallback: "ocr"');
   });

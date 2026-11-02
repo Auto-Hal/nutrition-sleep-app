@@ -1,8 +1,11 @@
 import { ChatNutritionImport } from "@/components/chat-nutrition-import";
+import { redirect } from "next/navigation";
+import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 
 export const dynamic = "force-dynamic";
 
-export default function NutritionImportPage() {
+export default async function NutritionImportPage() {
+  if (!(await getAppSessionForRsc())) redirect("/login");
   return (
     <main className="app-main">
       <header className="topbar">

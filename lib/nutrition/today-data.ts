@@ -1,55 +1,9 @@
+import { getCatalogLibrary } from "@/lib/nutrition/catalog-library-data";
 import type { CatalogItem, Meal } from "@/lib/nutrition/catalog";
 import { createUserClient } from "@/lib/supabase/user";
 
 export async function getMealLogCatalogItems(accessToken: string): Promise<CatalogItem[]> {
-  const client = createUserClient(accessToken);
-  const [itemsResult, energyResult, fingerprintResult] = await Promise.all([
-    client
-      .from("catalog_items")
-      .select("id,user_id,item_type,name,brand,serving_size,serving_unit,active,revision")
-      .eq("active", true)
-      .order("updated_at", { ascending: false }),
-    client
-      .from("item_nutrients")
-      .select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at")
-      .eq("nutrient_code", "energy"),
-    client.rpc("list_catalog_reference_fingerprints"),
-  ]);
-
-  if (itemsResult.error) throw new Error(itemsResult.error.message);
-  if (energyResult.error) throw new Error(energyResult.error.message);
-  if (fingerprintResult.error) throw new Error(fingerprintResult.error.message);
-
-  const fingerprintByItem = new Map(
-    ((fingerprintResult.data ?? []) as Array<{
-      catalog_item_id: string;
-      reference_fingerprint: string;
-    }>).map((row) => [row.catalog_item_id, row.reference_fingerprint]),
-  );
-
-  return (itemsResult.data ?? []).map((item) => ({
-    id: item.id,
-    user_id: item.user_id,
-    item_type: item.item_type,
-    name: item.name,
-    brand: item.brand,
-    serving_size: Number(item.serving_size),
-    serving_unit: item.serving_unit,
-    active: item.active,
-    revision: item.revision,
-    reference_fingerprint: fingerprintByItem.get(item.id) ?? null,
-    nutrients: (energyResult.data ?? [])
-      .filter((nutrient) => nutrient.catalog_item_id === item.id)
-      .map((nutrient) => ({
-        code: "energy" as const,
-        amount: nutrient.amount === null ? null : Number(nutrient.amount),
-        unit: nutrient.unit,
-        provenance: nutrient.provenance,
-        quality: nutrient.quality,
-        source_uri: nutrient.source_uri,
-        source_observed_at: nutrient.source_observed_at,
-      })),
-  })) as CatalogItem[];
+  return (await getCatalogLibrary(accessToken)).items;
 }
 
 export async function getMealsForDate(accessToken: string, date: string): Promise<Meal[]> {

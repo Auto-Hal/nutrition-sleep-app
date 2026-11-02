@@ -1,25 +1,9 @@
 import type { Meal } from "@/lib/nutrition/catalog";
 import { createUserClient } from "@/lib/supabase/user";
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { isIsoDate } from "@/lib/nutrition/civil-date";
+export { isIsoDate, shiftIsoDate } from "@/lib/nutrition/civil-date";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export function isIsoDate(value: string | null | undefined): value is string {
-  if (!value || !DATE_RE.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  return parsed.getUTCFullYear() === year
-    && parsed.getUTCMonth() === month - 1
-    && parsed.getUTCDate() === day;
-}
-
-export function shiftIsoDate(value: string, days: number) {
-  if (!isIsoDate(value)) throw new Error("date is invalid");
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
 
 function normalizedEntry(entry: Record<string, unknown>): Meal["entries"][number] & { meal_id: string } {
   const catalog = Array.isArray(entry.catalog_items) ? entry.catalog_items[0] : entry.catalog_items;

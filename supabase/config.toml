@@ -14,6 +14,8 @@ port = 54323
 
 [auth]
 enabled = true
+# Global signup policy; invited/admin-created users can still sign in.
+enable_signup = false
 site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["http://localhost:3000"]
 
@@ -23,7 +25,9 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = true
 
 [auth.email]
-enable_signup = false
+# This switch enables the email provider itself in the local CLI runtime.
+# Public signup remains disabled by [auth].enable_signup above.
+enable_signup = true
 enable_confirmations = false
 
 [storage]

@@ -27,7 +27,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data, error } = await createUserClient(session.accessToken)
     .from("user_profiles")
-    .select("user_id,birth_date,sex,height_cm,weight_kg,weight_updated_on,activity_level,nutrition_goal_note,time_zone,revision")
+    .select("user_id,birth_date,sex,height_cm,weight_kg,weight_updated_on,activity_level,nutrition_goal_note,time_zone,revision,weight_measurement_id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: "プロフィールを取得できませんでした。" }, { status: 500 });
   return NextResponse.json({ profile: data });

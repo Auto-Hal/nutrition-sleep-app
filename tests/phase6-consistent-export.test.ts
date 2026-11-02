@@ -36,7 +36,7 @@ describe("Phase 6.8 consistent export", () => {
   it("returns a private no-store JSON attachment through an authenticated same-origin POST", () => {
     expect(route).toContain("isAllowedOrigin(request)");
     expect(route).toContain("getAppSession()");
-    expect(route).toContain('.rpc("export_user_data_v1")');
+    expect(route).toContain('version === "2" ? "export_user_data_v2" : "export_user_data_v1"');
     expect(route).toContain('"content-type": "application/json; charset=utf-8"');
     expect(route).toContain('"cache-control": "private, no-store, max-age=0"');
     expect(route).toContain("nutrition-sleep-export-");

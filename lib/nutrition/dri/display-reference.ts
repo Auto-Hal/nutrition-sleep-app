@@ -55,7 +55,7 @@ export function estimateProfileEnergy(profile: NutritionReferenceProfile, localD
       const bmr = (0.0481 * weightKg + 0.0234 * heightCm - 0.0138 * resolution.age - constant) * 1000 / 4.186;
       const kcal = Math.round(bmr * pal / 50) * 50;
       if (Number.isFinite(kcal) && kcal > 0) {
-        return { kcal, basis: "registered_body" as const, reason: null, age: resolution.age, heightCm, weightKg };
+        return { kcal, rawKcal: bmr * pal, basis: "registered_body" as const, reason: null, age: resolution.age, heightCm, weightKg };
       }
       reason = "推定に使う身長・体重を確認してください。";
     }
@@ -63,6 +63,7 @@ export function estimateProfileEnergy(profile: NutritionReferenceProfile, localD
   const reference = resolution.references.find((item) => item.metric === "EER_REFERENCE");
   return {
     kcal: reference?.value ?? null,
+    rawKcal: null,
     basis: reference?.value !== undefined ? "reference_body" as const : null,
     reason: reason ?? resolution.unavailableReason,
     age: resolution.age,
@@ -107,7 +108,7 @@ function displayReference(profile: DriProfile, localDate: string, code: Nutrient
   let amount = describeGoal(preferred);
   let detail: string | null = null;
   if (preferred.unit === "percent_energy" && preferred.lower !== undefined && preferred.upper !== undefined && energy.kcal !== null) {
-    const kcalPerGram = code === "fat" ? 9 : 4;
+    const kcalPerGram = (code === "fat" || code === "saturated_fat") ? 9 : 4;
     const lower = Math.round(energy.kcal * preferred.lower / 100 / kcalPerGram);
     const upper = Math.round(energy.kcal * preferred.upper / 100 / kcalPerGram);
     amount = `約 ${lower}〜${upper} g`;

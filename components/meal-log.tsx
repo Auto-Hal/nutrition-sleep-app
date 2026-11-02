@@ -1,4 +1,5 @@
 "use client";
+import { KaromiruTransferLink } from "@/components/karomiru-transfer-link";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { localDateTimeInput } from "@/lib/nutrition/local-time";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/offline/outbox-idb";
 import {
   OUTBOX_STATE_EVENT,
+  emitOutboxState,
   requestOutboxDrain,
 } from "@/lib/offline/outbox-events";
 import type { OutboxDrainEvent } from "@/lib/offline/outbox-runtime";
@@ -198,7 +200,7 @@ export function MealLog({
   useEffect(() => {
     const onState = (event: Event) => {
       const detail = (event as CustomEvent<OutboxDrainEvent>).detail;
-      if (!detail) return;
+      if (!detail?.payload || typeof detail.payload !== "object") return;
       if ("meal_date" in detail.payload && detail.payload.meal_date !== date) return;
       if (detail.kind === "meal_entry_void" && "meal_id" in detail.payload) {
         const mealId = detail.payload.meal_id;
@@ -394,6 +396,7 @@ export function MealLog({
 
     try {
       const mutation = createMealEntryMutation(outboxBinding, {
+        contractVersion: 2,
         operationId,
         createdAt,
         payload: {
@@ -408,6 +411,7 @@ export function MealLog({
       });
 
       await putOutboxMutation(mutation);
+      emitOutboxState({state:"queued",operation_id:mutation.operation_id});
 
       setLocalOperations((current) => [...current, {
         operationId,
@@ -753,6 +757,7 @@ export function MealLog({
     return (
       <div className="pending-operation" key={entry.id}>
         <span>{entry.name} × {entry.quantity}{entry.quantity_unit}</span>
+        {!voidOperation && <KaromiruTransferLink source="entry" id={entry.id} label="この食品を転送" />}
         {voidOperation ? (
           renderVoidOperation(voidOperation, meal)
         ) : (
@@ -829,6 +834,7 @@ export function MealLog({
               <div className="meal-row" key={type}>
                 <div>
                   <strong>{label}</strong>
+                  {meal && meal.entries.length > 0 && <KaromiruTransferLink source="meal" id={meal.id} label="食事全体をカロミルへ転送" />}
                   <div className="meal-items">
                     {meal?.entries.map((entry) => renderConfirmedEntry(meal, entry))}
                     {meal && voidOperations

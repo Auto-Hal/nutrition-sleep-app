@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { NUTRIENT_DEFINITIONS, nutrientPayload } from "@/lib/nutrition/catalog";
+import { LEGACY_NUTRIENT_DEFINITIONS as NUTRIENT_DEFINITIONS, nutrientPayload } from "@/lib/nutrition/catalog";
 
 const root = process.cwd();
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");

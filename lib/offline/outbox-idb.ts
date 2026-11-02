@@ -1,5 +1,5 @@
 import {
-  OUTBOX_CONTRACT_VERSION,
+  SUPPORTED_OUTBOX_CONTRACT_VERSIONS,
   OUTBOX_LEASE_MS,
   assertSafeOutboxValue,
   deriveLegacyEntityKey,
@@ -88,7 +88,7 @@ function normalizeRecord(record: PendingMutation, nowIso: string): PendingMutati
     expected_absence: legacy.expected_absence ?? null,
   } as PendingMutation;
 
-  if (migrated.contract_version === OUTBOX_CONTRACT_VERSION) return migrated;
+  if (SUPPORTED_OUTBOX_CONTRACT_VERSIONS.some((version) => version === migrated.contract_version)) return migrated;
   return {
     ...migrated,
     status: "blocked",

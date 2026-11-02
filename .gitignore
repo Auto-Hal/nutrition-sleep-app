@@ -13,3 +13,4 @@ test-results/
 *.local
 coverage/
 *.tsbuildinfo
+nutrition-playwright-report/

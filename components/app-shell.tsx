@@ -14,6 +14,7 @@ import { countUnsyncedOutbox, pauseOutboxForBinding } from "@/lib/offline/outbox
 const tabs = [
   { href: "/today", label: "今日", icon: "today" },
   { href: "/nutrition", label: "栄養", icon: "nutrition" },
+  { href: "/body", label: "からだ", icon: "body" },
   { href: "/sleep", label: "睡眠", icon: "sleep" },
   { href: "/settings", label: "設定", icon: "settings" },
 ] as const satisfies ReadonlyArray<{ href: Route; label: string; icon: AppIconName }>;

@@ -25,6 +25,7 @@ vi.mock("@/lib/sleep/analytics", async (original) => {
 vi.mock("@/lib/nutrition/analytics", async (original) => ({ ...await original<typeof import("@/lib/nutrition/analytics")>(), getNutritionSummaryForDate: async () => null }));
 vi.mock("@/lib/nutrition/today-data", () => ({ getMealLogCatalogItems: async () => [], getMealsForDate: async () => [] }));
 vi.mock("@/lib/nutrition/chat-drafts", () => ({ getPendingChatMealDrafts: async () => [] }));
+vi.mock("@/lib/nutrition/goal-repository", () => ({ getNutritionPeriod: async () => null }));
 vi.mock("@/components/today-interactive", () => ({ TodayInteractive: () => React.createElement("div", null, "栄養登録を維持") }));
 vi.mock("@/components/app-icon", () => ({ AppIcon: () => null }));
 vi.mock("@/lib/app-environment", () => ({ appEnvironmentId: () => "synthetic-preview" }));
@@ -47,8 +48,8 @@ function source(): RawSleepSession[] {
 }
 
 beforeAll(() => vi.stubGlobal("React", React));
-afterAll(() => vi.unstubAllGlobals());
-beforeEach(() => { state.authenticated = true; state.loadError = false; state.calls = []; });
+afterAll(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+beforeEach(() => { vi.stubEnv("APP_PUBLIC_READ_ENABLED", "false"); state.authenticated = true; state.loadError = false; state.calls = []; });
 
 describe("authenticated server-page integration with synthetic sleep records", () => {
   it.each([7, 30, 90])("renders the %d-day sleep score, trends, details and original sync actions", async (range) => {

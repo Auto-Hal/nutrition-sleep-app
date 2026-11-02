@@ -1,4 +1,4 @@
-import { parseNutritionLabelText, type LabelBasis } from "@/lib/products/label-ocr";
+import { LABEL_NUTRIENT_DEFINITIONS, parseNutritionLabelText, type LabelBasis } from "@/lib/products/label-ocr";
 import type { OcrBox, OcrDocument, OcrLine, OcrWord } from "@/lib/products/ocr-document";
 import type { CommercialNutrient } from "@/lib/products/open-food-facts";
 
@@ -32,6 +32,7 @@ type LabelAnchor = {
   parserLabel: string;
   text: string;
   unit: string | null;
+  qualifier: string | null;
   box: OcrBox;
   confidence: number | null;
 };
@@ -43,28 +44,12 @@ type ValueCandidate = {
   box: OcrBox;
   amountBox: OcrBox;
   confidence: number | null;
+  qualifier?: string | null;
 };
 
-const ANCHORS: NutrientAnchorDefinition[] = [
-  { code: "energy", labels: ["エネルギー", "熱量", "energy"], parserLabel: "エネルギー" },
-  { code: "protein", labels: ["たんぱく質", "タンパク質", "蛋白質", "protein"], parserLabel: "たんぱく質" },
-  { code: "fat", labels: ["脂質", "fat"], parserLabel: "脂質" },
-  { code: "carbohydrate", labels: ["炭水化物", "carbohydrate"], parserLabel: "炭水化物" },
-  { code: "fiber", labels: ["食物繊維", "食物せんい", "fiber"], parserLabel: "食物繊維" },
-  { code: "calcium", labels: ["カルシウム", "calcium"], parserLabel: "カルシウム" },
-  { code: "iron", labels: ["鉄", "iron"], parserLabel: "鉄" },
-  { code: "zinc", labels: ["亜鉛", "zinc"], parserLabel: "亜鉛" },
-  { code: "vitamin_a", labels: ["ビタミンA", "vitamin A"], parserLabel: "ビタミンA" },
-  { code: "vitamin_b1", labels: ["ビタミンB1", "vitamin B1"], parserLabel: "ビタミンB1" },
-  { code: "vitamin_b2", labels: ["ビタミンB2", "vitamin B2"], parserLabel: "ビタミンB2" },
-  { code: "vitamin_b6", labels: ["ビタミンB6", "vitamin B6"], parserLabel: "ビタミンB6" },
-  { code: "vitamin_b12", labels: ["ビタミンB12", "vitamin B12"], parserLabel: "ビタミンB12" },
-  { code: "vitamin_c", labels: ["ビタミンC", "vitamin C"], parserLabel: "ビタミンC" },
-  { code: "vitamin_d", labels: ["ビタミンD", "vitamin D"], parserLabel: "ビタミンD" },
-  { code: "vitamin_e", labels: ["ビタミンE", "vitamin E"], parserLabel: "ビタミンE" },
-  { code: "sodium", labels: ["ナトリウム", "sodium"], parserLabel: "ナトリウム" },
-  { code: "salt_equivalent", labels: ["食塩相当量", "食塩 相当量", "salt equivalent"], parserLabel: "食塩相当量" },
-];
+const ANCHORS: NutrientAnchorDefinition[] = LABEL_NUTRIENT_DEFINITIONS.map((definition) => ({
+  code: definition.code, labels: definition.labels, parserLabel: definition.labels[0],
+}));
 
 function normalizeToken(value: string) {
   return value
@@ -115,7 +100,7 @@ function labelMatches(phrase: string, label: string) {
   }
 
   const vitaminFamily = normalizedLabel.startsWith("ビタミン") || normalizedLabel.startsWith("vitamin");
-  if (vitaminFamily) return false;
+  if (vitaminFamily || /n[\s-]*[36]/i.test(normalizedLabel)) return false;
 
   // Fuzzy matching is intentionally limited to longer known nutrition labels.
   // It repairs one-character OCR noise without making short labels such as 鉄 ambiguous.
@@ -175,6 +160,7 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
             parserLabel: definition.parserLabel,
             text: phrase,
             unit: normalizeUnit(phrase),
+            qualifier: chemicalQualifier(phrase),
             box: unionBox(phraseWords.map((word) => word.box)),
             confidence: averageConfidence(phraseWords),
           });
@@ -203,10 +189,12 @@ function findLabelAnchors(document: OcrDocument): LabelAnchor[] {
   return [...byCode.values()].sort((a, b) => centerY(a.box) - centerY(b.box));
 }
 
+function chemicalQualifier(value:string){return value.match(/(RAE|DFE|IU)\s*[)）]?$/i)?.[1].toUpperCase()??null;}
 function normalizeUnit(value: string) {
   const unit = value
     .normalize("NFKC")
     .replace(/[μµ]/g, "u")
+    .replace(/(RAE|DFE|IU)\s*[)）]?$/i, "")
     .replace(/[.,:;]$/g, "")
     .replace(/[^a-zA-Z0-9|!]/g, "")
     .trim()
@@ -214,6 +202,8 @@ function normalizeUnit(value: string) {
     .replace(/[|!1i]$/g, "l");
 
   if (unit === "g") return "g";
+  // Exact µg/mg must win before OCR typo tolerance: they differ by one letter.
+  if (["kcal","kj","mg","ug"].includes(unit)) return unit;
 
   for (const expected of ["kcal", "kj", "mg", "ug"] as const) {
     if (unit === expected) return expected;
@@ -241,11 +231,13 @@ function parseCombinedValue(value: string) {
     .replace(/kca[li1]/gi, "kcal")
     .trim();
 
-  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*([^\s]+)$/i);
+  const qualifier=chemicalQualifier(normalized);
+  const body=qualifier?normalized.replace(/(RAE|DFE|IU)\s*[)）]?$/i,"").trim():normalized;
+  const match = body.match(/^([0-9]+(?:\.[0-9]+)?)\s*([^\s]+)$/i);
   if (!match) return null;
   const unit = normalizeUnit(match[2]);
   if (!unit) return null;
-  return { amount: Number(match[1]), unit };
+  return { amount: Number(match[1]), unit, qualifier };
 }
 
 function parseNumber(value: string) {
@@ -399,14 +391,20 @@ function findValueCandidates(document: OcrDocument): ValueCandidate[] {
       box: unionBox([word.box, unitWord.box]),
       amountBox: word.box,
       confidence: averageConfidence([word, unitWord]),
+      qualifier: chemicalQualifier(unitWord.text),
     });
   }
 
-  return candidates;
+  return candidates.map(candidate=>{
+    if(candidate.qualifier)return candidate;
+    const qualifier=document.words.find(w=>chemicalQualifier(w.text)&&Math.abs(centerY(w.box)-centerY(candidate.amountBox))<=Math.max(8,boxHeight(candidate.amountBox)*0.7)&&w.box.minX>=candidate.box.maxX-4&&w.box.minX-candidate.box.maxX<=80);
+    return {...candidate,qualifier:qualifier?chemicalQualifier(qualifier.text):null};
+  });
 }
 
 function parseCandidateForAnchor(anchor: LabelAnchor, candidate: ValueCandidate) {
-  const parsed = parseNutritionLabelText(`${anchor.parserLabel} ${candidate.amount} ${candidate.unit}`);
+  if(anchor.qualifier&&candidate.qualifier&&anchor.qualifier!==candidate.qualifier)return null;
+  const parsed = parseNutritionLabelText(`${anchor.parserLabel} ${candidate.amount} ${candidate.unit} ${candidate.qualifier??anchor.qualifier??""}`);
   return parsed.nutrients.find((nutrient) => nutrient.code === anchor.code) ?? null;
 }
 

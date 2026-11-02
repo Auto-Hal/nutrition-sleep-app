@@ -90,7 +90,7 @@ export function TodayInteractive({
             continue;
           }
           restored[row.operation_id] = provisionalNutritionDelta(
-            itemById.get(row.payload.catalog_item_id),
+            row.reference_fingerprint===itemById.get(row.payload.catalog_item_id)?.reference_fingerprint?itemById.get(row.payload.catalog_item_id):undefined,
             row.payload.quantity,
           );
         }
@@ -198,38 +198,17 @@ export function TodayInteractive({
     }
   }, [refreshSummary]);
 
-  const displayedSummary = useMemo(() => {
-    const deltas = Object.values(pendingNutrition);
-    if (deltas.length === 0) return summary;
-
-    const entryCount = (summary?.entry_count ?? 0) + deltas.length;
-    const knownDeltaCount = deltas.filter((delta) => delta.energyKnown).length;
-    const knownEntryCount = (summary?.known_entry_count ?? 0) + knownDeltaCount;
-    const energyDelta = deltas.reduce(
-      (sum, delta) => sum + (delta.energyKnown ? delta.energyAmount ?? 0 : 0),
-      0,
-    );
-    const energyKnownAmount = knownEntryCount > 0
-      ? (summary?.energy_known_amount ?? 0) + energyDelta
-      : null;
-
-    return {
-      date,
-      record_complete: summary?.record_complete ?? false,
-      energy_known_amount: energyKnownAmount,
-      energy_coverage_complete:
-        (summary?.energy_coverage_complete ?? true)
-        && deltas.every((delta) => delta.energyKnown),
-      entry_count: entryCount,
-      known_entry_count: knownEntryCount,
-    } satisfies TodayNutritionSummary;
-  }, [date, pendingNutrition, summary]);
+  // A pending receipt can already be applied on the server. Keep it separate.
+  const displayedSummary = summary;
+  const knownPending=Object.values(pendingNutrition).filter(d=>d.energyKnown);
+  const pendingKnownEnergy=knownPending.length?knownPending.reduce((sum,d)=>sum+(d.energyAmount??0),0):null;
 
   const pendingCount = Object.keys(pendingNutrition).length;
 
   return (
     <>
-      <section className="card today-summary-card" aria-labelledby="today-nutrition-title" aria-busy={refreshing || undefined}>
+      <details open={pendingCount>0||undefined} className="card today-summary-card" aria-labelledby="today-nutrition-title" aria-busy={refreshing || undefined}>
+        <summary>記録・同期の詳細</summary>
         <div className="section-heading compact-heading">
           <div>
             <h2 id="today-nutrition-title">{nutritionTitleForDate(date)}</h2>
@@ -256,6 +235,7 @@ export function TodayInteractive({
           <div className="empty-state compact-empty">食事を記録するとここに集計します。</div>
         )}
 
+        {pendingCount>0&&<p className="muted">端末の追加記録の既知分 {formatEnergy(pendingKnownEnergy)} kcal（サーバー合計とは別）</p>}
         {pendingCount > 0 && (
           <p
             className="muted sync-status"
@@ -273,7 +253,7 @@ export function TodayInteractive({
           <summary>表示について</summary>
           <p>エネルギー値が不明な項目は合計に含めません。未同期の記録は同期後に確定します。</p>
         </details>
-      </section>
+      </details>
 
       <MealLog
         date={date}

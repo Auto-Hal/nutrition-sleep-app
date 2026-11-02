@@ -4,7 +4,7 @@ import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
 import { isValidGtin } from "@/lib/products/barcode";
-import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
+import { LEGACY_NUTRIENT_DEFINITIONS as NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
 const identitySourceTypeSchema = z.enum([
   "manufacturer_official",

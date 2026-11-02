@@ -1,3 +1,4 @@
+import { getCatalogLibrary } from "@/lib/nutrition/catalog-library-data";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
@@ -15,13 +16,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getAppSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const client = createUserClient(session.accessToken);
-  const { data: items, error } = await client.from("catalog_items").select("id,user_id,item_type,name,brand,serving_size,serving_unit,active,revision").eq("item_type", "batch").order("updated_at", { ascending: false });
-  if (error) return NextResponse.json({ error: "Batchを取得できませんでした。" }, { status: 500 });
-  const ids = (items ?? []).map((item) => item.id);
-  const components = ids.length === 0 ? [] : (await client.from("batch_components").select("batch_id,catalog_item_id,quantity,quantity_unit,position").in("batch_id", ids).order("position")).data ?? [];
-  const batches = ids.length === 0 ? [] : (await client.from("batches").select("catalog_item_id,dish_name,servings").in("catalog_item_id", ids)).data ?? [];
-  return NextResponse.json({ items: (items ?? []).map((item) => ({ ...item, batch: batches.find((batch) => batch.catalog_item_id === item.id) ?? null, components: components.filter((component) => component.batch_id === item.id) })) });
+  try {
+    const data=await getCatalogLibrary(session.accessToken,true);
+    return NextResponse.json({items:data.batches},{headers:{"cache-control":"no-store"}});
+  } catch { return NextResponse.json({error:"Batchを完全に読み込めませんでした。再取得してください。"},{status:503}); }
 }
 
 export async function POST(request: Request) {

@@ -58,7 +58,7 @@ describe("Phase 6.10 PWA shell and version recovery", () => {
   });
 
   it("does not present stale authenticated health UI as current while offline", () => {
-    expect(connectivity).toContain("以前表示していたサーバーデータは現在の状態として表示しません");
+    expect(connectivity).toContain("現在の完全な記録や正式な達成判定ではありません");
     expect(connectivity).toContain("countUnsyncedOutbox(binding)");
     expect(offline).toContain("認証済みの画面やAPI結果をキャッシュから現在値として表示することはありません");
   });

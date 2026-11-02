@@ -11,6 +11,8 @@ const provenanceMap = {
   label: "product_label",
   estimated: "estimated_dish",
   user_reported: "user_entered",
+  measured: "user_entered",
+  calculated: "user_entered",
 } as const;
 
 function catalogItemType(itemType: ChatNutritionDraft["item"]["item_type"]) {
@@ -31,21 +33,38 @@ function normalizedOptionalTimestamp(value: string | null | undefined) {
 
 export function catalogPayloadFromChatDraft(draft: ChatNutritionDraft) {
   const nutrients = draft.nutrients.flatMap((nutrient) => {
-    if (nutrient.amount === null) return [];
+    if (draft.schema_version === 1 && nutrient.amount === null) return [];
     const expectedUnit = nutrientUnits.get(nutrient.code);
     if (!expectedUnit || expectedUnit !== nutrient.unit) {
       throw new Error(`${nutrient.code} の単位を確認してください。`);
     }
 
-    return [{
-      code: nutrient.code,
-      amount: nutrient.amount,
-      unit: nutrient.unit,
-      provenance: provenanceMap[nutrient.provenance],
-      quality: nutrient.provenance === "estimated" ? "unknown" : "unverified",
-      source_uri: nutrient.source_uri ?? null,
-      source_observed_at: normalizedOptionalTimestamp(nutrient.source_observed_at),
-    }];
+    return [
+      {
+        code: nutrient.code,
+        amount: nutrient.amount,
+        unit: nutrient.unit,
+        provenance: provenanceMap[nutrient.provenance],
+        quality: nutrient.provenance === "estimated" ? "unknown" : "unverified",
+        value_origin:
+          draft.schema_version === 1 &&
+          nutrient.provenance === "official" &&
+          !nutrient.source_uri
+            ? null
+            : nutrient.provenance,
+        definition_basis: nutrient.definition_basis ?? null,
+        intake_scope: nutrient.intake_scope ?? "unknown",
+        contains_estimates:
+          nutrient.provenance === "estimated"
+            ? true
+            : (nutrient.contains_estimates ?? null),
+        derivation: nutrient.derivation ?? null,
+        source_uri: nutrient.source_uri ?? null,
+        source_observed_at: normalizedOptionalTimestamp(
+          nutrient.source_observed_at,
+        ),
+      },
+    ];
   });
 
   return {
@@ -72,12 +91,16 @@ export function mealPayloadFromChatDraft(
   overrides: ChatMealOverrides = {},
 ) {
   const quantity = overrides.quantity ?? draft.item.serving_size;
-  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("量を確認してください。");
+  if (!Number.isFinite(quantity) || quantity <= 0)
+    throw new Error("量を確認してください。");
 
   return {
     meal_date: overrides.mealDate ?? draft.meal.meal_date,
     meal_type: overrides.mealType ?? draft.meal.meal_type,
-    eaten_at: normalizedTimestamp(overrides.eatenAt ?? draft.meal.eaten_at, "食事時刻"),
+    eaten_at: normalizedTimestamp(
+      overrides.eatenAt ?? draft.meal.eaten_at,
+      "食事時刻",
+    ),
     catalog_item_id: catalogItemId,
     quantity,
     quantity_unit: draft.item.serving_unit,
@@ -86,7 +109,10 @@ export function mealPayloadFromChatDraft(
 }
 
 export function chatDraftItemTypeNotice(draft: ChatNutritionDraft) {
-  if (draft.item.item_type === "product" || draft.item.item_type === "supplement") {
+  if (
+    draft.item.item_type === "product" ||
+    draft.item.item_type === "supplement"
+  ) {
     return "製品識別情報は作成せず、今回の食事用の項目として登録します。JAN/OCRによる正式な製品登録とは分離されます。";
   }
   return null;

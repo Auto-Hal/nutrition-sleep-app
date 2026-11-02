@@ -21,7 +21,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await createUserClient(session.accessToken).rpc("export_user_data_v1");
+  const version = new URL(request.url).searchParams.get("version") ?? "1";
+  if (version !== "1" && version !== "2") return NextResponse.json({ error: "書き出し形式を確認してください。" }, { status: 400 });
+  const result = await createUserClient(session.accessToken).rpc(version === "2" ? "export_user_data_v2" : "export_user_data_v1");
   if (result.error) {
     return NextResponse.json(
       { error: "データを書き出せませんでした。", error_code: "export_failed" },

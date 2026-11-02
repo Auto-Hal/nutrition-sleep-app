@@ -1,9 +1,10 @@
+import { getCatalogLibrary } from "@/lib/nutrition/catalog-library-data";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAppSession } from "@/lib/auth/session";
 import { createUserClient } from "@/lib/supabase/user";
 import { isAllowedOrigin } from "@/lib/security/request";
-import { NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
+import { LEGACY_NUTRIENT_DEFINITIONS as NUTRIENT_DEFINITIONS } from "@/lib/nutrition/catalog";
 
 const typeSchema = z.enum(["ingredient", "estimated_dish"]);
 const nutrientSchema = z.object({
@@ -33,17 +34,11 @@ async function ownedClient() {
 }
 
 export async function GET(request: Request) {
-  const client = await ownedClient();
-  if (!client) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const includeInactive = new URL(request.url).searchParams.get("includeInactive") === "true";
-  let query = client.from("catalog_items").select("id,user_id,item_type,name,brand,serving_size,serving_unit,active,revision,updated_at").order("updated_at", { ascending: false });
-  if (!includeInactive) query = query.eq("active", true);
-  const { data: items, error } = await query;
-  if (error) return NextResponse.json({ error: "カタログを取得できませんでした。" }, { status: 500 });
-  const ids = (items ?? []).map((item) => item.id);
-  const nutrients = ids.length === 0 ? [] : (await client.from("item_nutrients").select("catalog_item_id,nutrient_code,amount,unit,provenance,quality,source_uri,source_observed_at").in("catalog_item_id", ids)).data ?? [];
-  const result = (items ?? []).map((item) => ({ ...item, nutrients: nutrients.filter((nutrient) => nutrient.catalog_item_id === item.id) }));
-  return NextResponse.json({ items: result });
+  const session = await getAppSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    return NextResponse.json(await getCatalogLibrary(session.accessToken,new URL(request.url).searchParams.get("includeInactive")==="true"),{headers:{"cache-control":"no-store"}});
+  } catch { return NextResponse.json({error:"食品を完全に読み込めませんでした。再取得してください。"},{status:503}); }
 }
 
 export async function POST(request: Request) {

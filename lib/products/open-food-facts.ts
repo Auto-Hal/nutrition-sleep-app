@@ -36,7 +36,7 @@ const NUTRIENT_MAP: Array<{
   { code: "energy", offKey: "energy-kcal", unit: "kcal", multiplier: 1 },
   { code: "protein", offKey: "proteins", unit: "g", multiplier: 1 },
   { code: "fat", offKey: "fat", unit: "g", multiplier: 1 },
-  { code: "carbohydrate", offKey: "carbohydrates", unit: "g", multiplier: 1 },
+  { code: "carbohydrate", offKey: "carbohydrates-total", unit: "g", multiplier: 1 },
   { code: "fiber", offKey: "fiber", unit: "g", multiplier: 1 },
   { code: "calcium", offKey: "calcium", unit: "mg", multiplier: 1_000 },
   { code: "iron", offKey: "iron", unit: "mg", multiplier: 1_000 },
@@ -52,6 +52,18 @@ const NUTRIENT_MAP: Array<{
   { code: "vitamin_e", offKey: "vitamin-e", unit: "mg", multiplier: 1_000 },
   { code: "sodium", offKey: "sodium", unit: "mg", multiplier: 1_000 },
   { code: "salt_equivalent", offKey: "salt", unit: "g", multiplier: 1 },
+  { code: "saturated_fat", offKey: "saturated-fat", unit: "g", multiplier: 1 },
+  { code: "n3_fatty_acids", offKey: "omega-3-fat", unit: "g", multiplier: 1 },
+  { code: "n6_fatty_acids", offKey: "omega-6-fat", unit: "g", multiplier: 1 },
+  { code: "cholesterol", offKey: "cholesterol", unit: "mg", multiplier: 1_000 },
+  { code: "potassium", offKey: "potassium", unit: "mg", multiplier: 1_000 },
+  { code: "magnesium", offKey: "magnesium", unit: "mg", multiplier: 1_000 },
+  { code: "phosphorus", offKey: "phosphorus", unit: "mg", multiplier: 1_000 },
+  { code: "copper", offKey: "copper", unit: "mg", multiplier: 1_000 },
+  { code: "selenium", offKey: "selenium", unit: "ug", multiplier: 1_000_000 },
+  { code: "molybdenum", offKey: "molybdenum", unit: "ug", multiplier: 1_000_000 },
+  // sugars is not Japanese 糖質; generic OFF folates may be DFE. Neither is
+  // imported without a matching chemical definition.
 ];
 
 function finiteNonNegative(value: unknown) {
@@ -100,6 +112,8 @@ function normalizeNutrients(
       code,
       amount: normalized * multiplier,
       unit,
+      value_origin: "database" as const,
+      definition_basis: code === "carbohydrate" ? "total_carbohydrate_including_fiber" : null,
       provenance: "approved_external_db" as const,
       quality: "unverified" as const,
       source_uri: sourceUri,

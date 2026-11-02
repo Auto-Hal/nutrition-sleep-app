@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { requiredServerEnv } from "@/lib/env";
+import { publicReadFetch } from "@/lib/public-view/database";
 
 const JWT_CLOCK_SKEW_RETRY_DELAYS_MS = [650, 1_250, 2_000] as const;
 
@@ -41,7 +42,7 @@ export function createUserClient(accessToken: string) {
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
       headers: { Authorization: `Bearer ${accessToken}` },
-      fetch: createJwtClockSkewRetryFetch(),
+      fetch: accessToken === "internal:public-read-only" ? publicReadFetch : createJwtClockSkewRetryFetch(),
     },
   });
 }

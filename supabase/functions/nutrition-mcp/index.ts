@@ -4,6 +4,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import basisJson from "./nutrient-basis-contract.json" with { type: "json" };
+import { publicEndpoints } from "./public-endpoints.ts";
+const basisContract = basisJson as Record<string,{unit:string;allowed:string[];incompatible:string[]}>;
+const allBases = [...new Set(Object.values(basisContract).flatMap(v=>[...v.allowed,...v.incompatible]))] as [string,...string[]];
+function safeEvidenceUrl(value:string){try{const u=new URL(value);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)return false;return [...u.searchParams.keys(),...new URLSearchParams(u.hash.slice(1)).keys()].every(key=>{for(let i=0;i<4&&key.includes("%");i++)key=decodeURIComponent(key);return !key.includes("%")&&!/^(?:(?:access[_-]?|refresh[_-]?)?token|secret|api[_-]?key|auth(?:orization)?|password|credential|signature|sig|key|session(?:id)?|x-(?:amz|goog)-(?:credential|signature))$/i.test(key);});}catch{return false;}}
+const evidenceUrl=z.string().url().max(1000).refine(safeEvidenceUrl,"Use a public HTTP(S) source URL without credentials.");
+const calculationInput=z.object({code:z.string(),amount:z.string().max(128).regex(/^\d+(?:\.\d+)?$/),unit:z.enum(["kcal","g","mg","ug","ug_rae"]),quality:z.enum(["unknown","unverified","user_verified"]),value_origin:z.string().nullable(),definition_basis:z.string().nullable(),contains_estimates:z.boolean().nullable(),source_uri:evidenceUrl.nullable(),source_observed_at:z.string().datetime({offset:true}).nullable()}).strict();
+const calculation=z.object({method:z.enum(["sodium_to_salt","total_carbohydrate_minus_fiber","external_calculation"]),version:z.literal(1),inputs:z.array(calculationInput).max(30),reason:z.literal("below_storage_precision").optional(),source_basis:z.literal("same_label_same_serving").optional(),same_source_confirmed:z.boolean().optional(),factor_numerator:z.string().max(128).optional(),factor_denominator:z.string().max(128).optional()}).strict();
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -14,23 +22,29 @@ const nutrientCodes = [
   "energy", "protein", "fat", "carbohydrate", "fiber", "calcium", "iron", "zinc",
   "vitamin_a", "vitamin_b1", "vitamin_b2", "vitamin_b6", "vitamin_b12", "vitamin_c",
   "vitamin_d", "vitamin_e", "sodium", "salt_equivalent",
+  "saturated_fat", "n3_fatty_acids", "n6_fatty_acids", "cholesterol", "carbohydrate_excluding_fiber",
+  "potassium", "magnesium", "phosphorus", "copper", "selenium", "molybdenum", "folate",
 ] as const;
 
 const nutrientSchema = z.object({
   code: z.enum(nutrientCodes),
   amount: z.number().finite().nonnegative().nullable(),
   unit: z.string().trim().min(1).max(24),
-  provenance: z.enum(["official", "database", "label", "estimated", "user_reported"]),
+  provenance: z.enum(["official", "database", "label", "estimated", "user_reported", "measured", "calculated"]),
   quality: z.enum(["verified", "computed", "estimated"]),
-  source_uri: z.string().url().nullable().optional(),
-  source_observed_at: z.string().datetime().nullable().optional(),
-}).strict();
+  source_uri: evidenceUrl.nullable().optional(),
+  source_observed_at: z.string().datetime({offset:true}).nullable().optional(),
+  definition_basis: z.enum(allBases).nullable().optional(),
+  intake_scope: z.enum(["conventional_food", "nonconventional_food", "unknown"]).nullable().optional(),
+  derivation: calculation.nullable().optional(),
+  contains_estimates: z.boolean().nullable().optional(),
+}).strict().superRefine((n,ctx)=>{const c=basisContract[n.code];if(n.unit!==c.unit||(n.definition_basis!=null&&![...c.allowed,...c.incompatible].includes(n.definition_basis))||(n.amount!==null&&n.definition_basis!=null&&c.incompatible.includes(n.definition_basis))||(n.provenance==="official"&&!n.source_uri))ctx.addIssue({code:"custom",message:"Check the nutrient unit, chemical definition and cited source. Unknown canonical quantities must remain null."});});
 
 const createDraftInputSchema = z.object({
   request_id: z.string().uuid().describe("Stable UUID for idempotent retries. Reuse only for an identical draft."),
   meal_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Local calendar date intended by the user."),
   meal_type: z.enum(["breakfast", "lunch", "dinner", "custom"]),
-  eaten_at: z.string().datetime().describe("ISO 8601 timestamp including timezone/offset when known."),
+  eaten_at: z.string().datetime({offset:true}).describe("ISO 8601 timestamp including timezone/offset when known."),
   item: z.object({
     name: z.string().trim().min(1).max(160),
     brand: z.string().trim().max(120).nullable().optional(),
@@ -60,23 +74,14 @@ type JwtClaims = {
 };
 
 function endpoints(request: Request) {
-  const url = new URL(request.url);
-  const prefixIndex = url.pathname.indexOf(FUNCTION_SEGMENT);
-  const functionPath = prefixIndex >= 0
-    ? url.pathname.slice(0, prefixIndex + FUNCTION_SEGMENT.length)
-    : FUNCTION_SEGMENT;
-  const base = `${url.origin}${functionPath}`;
-  return {
-    mcp: `${base}/mcp`,
-    metadata: `${base}/.well-known/oauth-protected-resource`,
-  };
+  return publicEndpoints(SUPABASE_URL,request.url);
 }
 
 function protectedResourceResponse(request: Request) {
-  const { mcp } = endpoints(request);
+  const { mcp,authorizationServer } = endpoints(request);
   return Response.json({
     resource: mcp,
-    authorization_servers: [`${SUPABASE_URL}/auth/v1`],
+    authorization_servers: [authorizationServer],
     scopes_supported: [...OAUTH_SCOPES],
     resource_documentation: "https://github.com/Auto-Hal/nutrition-sleep-app",
   }, {
@@ -133,7 +138,8 @@ async function authenticatedClient(request: Request) {
 
 function draftPayload(input: CreateDraftInput) {
   return {
-    schema_version: 1,
+    schema_version: 2,
+    nutrient_schema_version: 2,
     draft_only: true,
     request_id: input.request_id,
     meal: {
@@ -166,7 +172,9 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
         meal_type: z.enum(["breakfast", "lunch", "dinner", "custom"]),
         item_name: z.string(),
       },
-      securitySchemes: oauthSecurity,
+
+      // SDK 1.25 uses MCP _meta for the documented ChatGPT compatibility mirror.
+      _meta: { securitySchemes: oauthSecurity },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -177,7 +185,7 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
     async (rawInput) => {
       const input = createDraftInputSchema.parse(rawInput);
       const payload = draftPayload(input);
-      const { data, error } = await auth.supabase.rpc("create_chat_meal_draft_v1", {
+      const { data, error } = await auth.supabase.rpc("create_chat_meal_draft_v2", {
         p_request_id: input.request_id,
         p_payload: payload,
       });
@@ -220,9 +228,9 @@ async function handleMcp(request: Request, auth: NonNullable<Awaited<ReturnType<
         id: z.string().min(1),
         email: z.string().email().optional(),
       },
-      securitySchemes: oauthSecurity,
+
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-      _meta: { "openai/profile": true },
+      _meta: { "openai/profile": true, securitySchemes: oauthSecurity },
     },
     async () => {
       const profile = {

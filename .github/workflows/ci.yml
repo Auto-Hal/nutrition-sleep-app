@@ -31,21 +31,73 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.6
+      - name: Typecheck the nutrition MCP contract
+        run: deno check --config supabase/functions/nutrition-mcp/deno.json supabase/functions/nutrition-mcp/index.ts
       - run: pnpm test
       - run: pnpm verify:env
       - run: pnpm build
 
   database:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.0
       - run: supabase start
       - run: supabase db reset
       - run: supabase test db
+      - name: Verify authenticated concurrent nutrition mutations
+        run: node tests/integration/nutrition-concurrency.mjs
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Install Chromium and WebKit for authenticated nutrition flows
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Verify real authenticated nutrition application
+        run: node tests/integration/nutrition-browser.mjs
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Verify an upgrade from main preserves existing contracts and snapshots
+        run: node tests/integration/nutrition-upgrade.mjs
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Save synthetic nutrition verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nutrition-authenticated-browser-report
+          path: |
+            nutrition-playwright-report/
+            test-results/nutrition-browser/
+            test-results/nutrition-server/
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Build disposable public viewer acceptance app
+        run: pnpm build
+      - name: Verify public reads, owner isolation and protected writes
+        run: node tests/integration/public-view.mjs
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      - name: Save synthetic public viewer screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-view-browser-report
+          path: test-results/public-view-*
+          retention-days: 7
       - if: always()
         run: supabase stop
