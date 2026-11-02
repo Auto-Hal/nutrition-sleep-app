@@ -1,5 +1,7 @@
 # 段階的実装・検証記録
 
+2026-11-02追記: 所有者の追加の本番反映承認後、PR #47をmainへマージし、総合更新のDB/app/EdgeをProductionへ反映した。[13のリリース記録](13-production-release-2026-11-02.md)が最新の運用状態であり、以下の禁止・未反映表記は各段階の履歴である。実機・外部接続の未確認は継続する。
+
 開始日: 2026-11-01。ブランチ: feature/nutrition-comprehensive-update。基準main: 7b2bcea。第1段階設計と追加指示を正本とする。Productionは読み取り監査だけで、merge/migration/deployは禁止。
 
 ## 重点4項目の判断

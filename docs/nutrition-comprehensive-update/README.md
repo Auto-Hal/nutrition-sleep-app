@@ -5,9 +5,11 @@
 - 監査基準main: **7b2bcea83c97d14aa8b11b06a8f2d0377dbbaec5**
 - 設計ブランチ: **docs/nutrition-comprehensive-design**
 - 実装ブランチ: **feature/nutrition-comprehensive-update** / [PR #47](https://github.com/Auto-Hal/nutrition-sleep-app/pull/47)
-- 状態: **実装・自動統合検証済み / Preview反映済み / Hosted認証後・実機受け入れ待ち / Production未承認**
+- 状態: **2026-11-02の明示承認により総合更新をProduction反映済み。物理端末・外部OCR/OAuthの未確認は継続**。最新のSHA、DB台帳、復旧先、検証範囲は[本番リリース記録](13-production-release-2026-11-02.md)を参照。
 
 ## 今回の範囲と停止条件
+
+以下は設計・実装段階の承認履歴である。その後の「良さそうです 本番へ反映してください」で本アップデートのDB・mainマージ・アプリ/Edge反映が承認された。リリース実施内容は13を正とし、未確認の実機操作が合格になったという意味ではない。
 
 第1段階では設計文書だけを作成した。2026-11-01の追加指示により、設計を正本とした実装・自動検証・Preview反映・PR作成が承認された。以降の実施状況は[実装記録](09-implementation-status.md)を参照する。mainマージ、Production migration、Productionデプロイは新しい明示承認まで禁止。
 
@@ -31,6 +33,7 @@ PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyと
 | [10-preview-acceptance-and-production-plan.md](10-preview-acceptance-and-production-plan.md) | 操作案内、実機確認表、Production承認後の移行・障害対応 |
 | [11-chat-v2-instructions.md](11-chat-v2-instructions.md) | 既存ChatGPT Projectをv2契約へ切り替えるためのコピー用指示 |
 | [12-feature-coverage-and-verification.md](12-feature-coverage-and-verification.md) | 画面・29項目の全経路・数値契約・実用上の制約と受け入れ範囲 |
+| [13-production-release-2026-11-02.md](13-production-release-2026-11-02.md) | 承認後の本番DB/app/Edge反映、既存データ照合、復旧先と未確認事項 |
 
 ## 主要な設計判断
 
