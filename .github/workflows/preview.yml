@@ -19,6 +19,8 @@ jobs:
     environment: preview
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.15.0
@@ -34,8 +36,9 @@ jobs:
           cat > .vercel/project.json <<'JSON'
           {"orgId":"team_aTOsma3gZ9xkcFkGJ53dUCCO","projectId":"prj_WiPB989mXurOuIgVm8asfmfdPA6W"}
           JSON
-      - run: pnpm dlx vercel@48.2.0 pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      - name: Verify the actual Vercel Preview target without printing secrets
-        run: node --env-file=.vercel/.env.preview.local scripts/verify-hosted-target.mjs preview
-      - run: pnpm dlx vercel@48.2.0 build --target=preview --yes --token=${{ secrets.VERCEL_TOKEN }}
-      - run: pnpm dlx vercel@48.2.0 deploy --prebuilt --target=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build and deploy Preview with secrets retained inside Vercel
+        run: pnpm dlx vercel@48.2.0 deploy --target=preview --yes --meta "githubCommitSha=$PREVIEW_GIT_SHA" --meta "githubCommitRef=$PREVIEW_GIT_REF" --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PREVIEW_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PREVIEW_GIT_REF: ${{ github.head_ref || github.ref_name }}
