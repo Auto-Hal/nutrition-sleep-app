@@ -302,12 +302,14 @@ export function DailyPfcCard({
   initial,
   binding,
   catalogItems = [],
+  readOnly = false,
 }: {
   initial: NutritionPeriod;
   binding: OutboxBinding;
   catalogItems?: CatalogItem[];
+  readOnly?: boolean;
 }) {
-  const runtime = useNutritionPeriod(initial, binding);
+  const runtime = useNutritionPeriod(initial, binding, readOnly);
   const day = evaluatePfcDay(runtime.period, initial.start_date, {
     pending: runtime.pending,
     available: runtime.available,
@@ -372,11 +374,13 @@ function SummaryCounts({
 export function MonthlyPfc({
   initial,
   binding,
+  readOnly = false,
 }: {
   initial: NutritionPeriod;
   binding: OutboxBinding;
+  readOnly?: boolean;
 }) {
-  const runtime = useNutritionPeriod(initial, binding);
+  const runtime = useNutritionPeriod(initial, binding, readOnly);
   const { period } = runtime;
   const today = localDate(period.time_zone, new Date(period.as_of));
   const days = period.days.map((d) =>
@@ -501,11 +505,13 @@ export function MonthlyPfc({
 export function WeeklyPfc({
   initial,
   binding,
+  readOnly = false,
 }: {
   initial: NutritionPeriod;
   binding: OutboxBinding;
+  readOnly?: boolean;
 }) {
-  const runtime = useNutritionPeriod(initial, binding),
+  const runtime = useNutritionPeriod(initial, binding, readOnly),
     { period } = runtime;
   const today = localDate(period.time_zone, new Date(period.as_of));
   const days = period.days.map((d) =>

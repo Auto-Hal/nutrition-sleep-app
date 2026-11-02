@@ -18,12 +18,14 @@ const base = `http://127.0.0.1:${port}`;
 let server;
 const diagnostic = [];
 try {
+  const hasBody = (await pool.query("select to_regclass('public.body_measurements') is not null as present")).rows[0].present;
   for (const [id, name] of [[owner, publicName], [other, hiddenName]]) {
     await pool.query("insert into auth.users(id, email) values ($1, $2)", [id, `${id}@example.invalid`]);
     await pool.query("insert into public.user_profiles(user_id,time_zone) values ($1,'UTC') on conflict(user_id) do update set time_zone='UTC'", [id]);
     const item = (await pool.query("insert into public.catalog_items(user_id,item_type,name) values ($1,'ingredient',$2) returning id", [id, name])).rows[0].id;
     const meal = (await pool.query("insert into public.meals(user_id,meal_date,meal_type,state) values ($1,$2,'breakfast','recorded') returning id", [id, date])).rows[0].id;
     await pool.query("insert into public.meal_entries(user_id,meal_id,catalog_item_id,quantity,quantity_unit) values ($1,$2,$3,1,'serving')", [id, meal, item]);
+    if (hasBody) await pool.query("insert into public.body_measurements(id,user_id,measured_on,weight_kg,body_fat_percent,time_zone,source) values ($4,$1,$2,$3,20,'UTC','manual')", [id, date, id === owner ? 70 : 99, randomUUID()]);
   }
   // A public read must not accidentally acquire write capability even through
   // a SECURITY DEFINER RPC. No anonymous SQL grants or RLS changes are needed.
@@ -55,7 +57,9 @@ try {
       const page = await context.newPage();
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
-      for (const path of ["/today", "/history", "/nutrition", "/nutrition?range=30&nutrient=protein", "/sleep", "/sleep?range=30", "/settings"]) {
+      const paths = ["/today", "/history", "/nutrition", "/nutrition?range=30&nutrient=protein", "/sleep", "/sleep?range=30", "/settings"];
+      if (hasBody) paths.push("/nutrition?view=week", "/body", "/body?range=90");
+      for (const path of paths) {
         const response = await page.goto(base + path, { waitUntil: "networkidle" });
         assert.equal(response.status(), 200, path);
         assert(!page.url().includes("/login"), path);
@@ -63,6 +67,7 @@ try {
         const text = await page.locator("body").innerText();
         assert(!text.includes(hiddenName), "owner isolation");
         if (path === "/today" || path === "/history") assert(text.includes(publicName));
+        if (path.startsWith("/body")) { assert(text.includes("70 kg")); assert(!text.includes("99 kg")); }
         assert.equal(await page.locator('form[method="post"]').count(), 0);
         assert.equal(await page.getByRole("button", { name: /保存|削除|同期する|接続/ }).count(), 0);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `horizontal overflow ${path}`);

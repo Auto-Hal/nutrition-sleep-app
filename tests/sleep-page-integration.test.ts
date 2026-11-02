@@ -48,8 +48,8 @@ function source(): RawSleepSession[] {
 }
 
 beforeAll(() => vi.stubGlobal("React", React));
-afterAll(() => vi.unstubAllGlobals());
-beforeEach(() => { state.authenticated = true; state.loadError = false; state.calls = []; });
+afterAll(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+beforeEach(() => { vi.stubEnv("APP_PUBLIC_READ_ENABLED", "false"); state.authenticated = true; state.loadError = false; state.calls = []; });
 
 describe("authenticated server-page integration with synthetic sleep records", () => {
   it.each([7, 30, 90])("renders the %d-day sleep score, trends, details and original sync actions", async (range) => {

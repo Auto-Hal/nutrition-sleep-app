@@ -19,6 +19,7 @@ import {
 export function useNutritionPeriod(
   initial: NutritionPeriod,
   binding: OutboxBinding,
+  readOnly = false,
 ) {
   const [period, setPeriod] = useState(initial);
   const [pending, setPending] = useState<PendingMutation[]>([]);
@@ -35,6 +36,7 @@ export function useNutritionPeriod(
   const start = initial.start_date,
     end = initial.end_date;
   const refresh = useCallback(async () => {
+    if (readOnly) return;
     const seq = ++sequence.current;
     setAvailable(false);
     try {
@@ -62,8 +64,9 @@ export function useNutritionPeriod(
         "最新の同期状態を確認できません。表示中の既知量を参考に、オンラインで再取得してください。",
       );
     }
-  }, [ownerBinding, start, end]);
+  }, [ownerBinding, start, end, readOnly]);
   useEffect(() => {
+    if (readOnly) return;
     const requestSequence = sequence;
     void refresh();
     const onVisible = () => {
@@ -84,6 +87,8 @@ export function useNutritionPeriod(
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refresh]);
-  return { period, pending, available, error, refresh };
+  }, [refresh, readOnly]);
+  return readOnly
+    ? { period: initial, pending: [] as PendingMutation[], available: true, error: null, refresh }
+    : { period, pending, available, error, refresh };
 }

@@ -77,7 +77,7 @@ function toPayload(d: Draft): BodyMeasurementPayload {
   return parsed.data;
 }
 
-function BodyChart({
+export function BodyChart({
   progress,
   fat = false,
 }: {

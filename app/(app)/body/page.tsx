@@ -2,7 +2,8 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BodyTracker } from "@/components/body-tracker";
-import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { getViewingSessionForRsc } from "@/lib/public-view/access";
+import { PublicBody } from "@/components/public-body";
 import { appEnvironmentId } from "@/lib/app-environment";
 import { getBodyProgress } from "@/lib/body/repository";
 import { getNutritionPeriod } from "@/lib/nutrition/goal-repository";
@@ -13,7 +14,7 @@ export default async function BodyPage({
 }: {
   searchParams: Promise<{ range?: string; end?: string }>;
 }) {
-  const session = await getAppSessionForRsc();
+  const session = await getViewingSessionForRsc();
   if (!session) redirect("/login");
   const params = await searchParams,
     range = params.range === "90" ? 90 : 30;
@@ -65,7 +66,7 @@ export default async function BodyPage({
       <p className="muted">
         {progress.start_date}〜{progress.end_date}
       </p>
-      <BodyTracker
+      {session.readOnly ? <PublicBody progress={progress} nutrition={nutrition} /> : <BodyTracker
         key={`${range}:${progress.end_date}`}
         initial={progress}
         nutrition={nutrition}
@@ -73,7 +74,7 @@ export default async function BodyPage({
           ownerUserId: session.userId,
           environmentId: appEnvironmentId(),
         }}
-      />
+      />}
     </main>
   );
 }

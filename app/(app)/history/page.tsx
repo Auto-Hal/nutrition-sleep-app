@@ -89,7 +89,7 @@ export default async function HistoryPage() {
                 {dayMeals.map((meal) => (
                   <div className="history-meal" key={meal.id}>
                     <strong>{mealLabels[meal.meal_type]}</strong>
-                    {meal.entries.length > 0 && <KaromiruTransferLink source="meal" id={meal.id} label="食事全体をカロミルへ転送" />}
+                    {!session.readOnly && meal.entries.length > 0 && <KaromiruTransferLink source="meal" id={meal.id} label="食事全体をカロミルへ転送" />}
                     {meal.entries.length > 0 ? (
                       <div className="stack">
                         {meal.entries.map((entry) => {

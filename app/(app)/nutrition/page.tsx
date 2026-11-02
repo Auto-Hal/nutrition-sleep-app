@@ -81,7 +81,7 @@ export default async function NutritionPage({
     const bounds = view === "pfc" ? monthBounds(month) : weekBounds(isIsoDate(params.week) && params.week <= today ? params.week : today);
     const period = await getNutritionPeriod(session.accessToken, bounds.start, bounds.end);
     const binding = { ownerUserId: session.userId, environmentId: appEnvironmentId() };
-    return <main className="app-main nutrition-page"><header className="topbar"><div className="page-heading"><span className="heading-icon"><AppIcon name="nutrition" /></span><div><p className="eyebrow">個人目標と食事記録</p><h1>栄養</h1></div></div></header>{sections}{view === "pfc" ? <MonthlyPfc key={period.start_date} initial={period} binding={binding} /> : <WeeklyPfc key={period.start_date} initial={period} binding={binding} />}</main>;
+    return <main className="app-main nutrition-page"><header className="topbar"><div className="page-heading"><span className="heading-icon"><AppIcon name="nutrition" /></span><div><p className="eyebrow">個人目標と食事記録</p><h1>栄養</h1></div></div></header>{sections}{view === "pfc" ? <MonthlyPfc key={period.start_date} initial={period} binding={binding} readOnly={session.readOnly} /> : <WeeklyPfc key={period.start_date} initial={period} binding={binding} readOnly={session.readOnly} />}</main>;
   }
   const referenceProfile: NutritionReferenceProfile = {
     birthDate: profile?.birth_date ?? null,

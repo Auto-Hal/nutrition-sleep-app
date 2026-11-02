@@ -56,6 +56,12 @@ describe("public read boundary", () => {
     expect(q.values).toEqual(["2026-11-01", "2026-11-02"]);
     expect(() => compilePublicRead(url("rpc/get_nutrition_daily_summary"), "POST", { ...body, p_user_id: "other" })).toThrow();
   });
+  it("allows only the declared read parameters for Body and PFC", () => {
+    expect(compilePublicRead(url("rpc/get_body_progress_v1"), "POST", { p_range: 30, p_end_date: null }).values).toEqual([30, null]);
+    expect(() => compilePublicRead(url("rpc/get_body_progress_v1"), "POST", { p_range: 365, p_end_date: null })).toThrow();
+    expect(() => compilePublicRead(url("rpc/get_body_progress_v1"), "POST", { p_range: 30, p_end_date: "today;delete" })).toThrow();
+    expect(compilePublicRead(url("rpc/get_nutrition_goal_period_v1"), "POST", { p_start_date: "2026-11-01", p_end_date: "2026-11-30" }).rows).toBe(false);
+  });
   it("starts a read-only RLS transaction with the configured owner, without any session", async () => {
     const response = await publicReadFetch(url("meals?select=id"));
     expect(response.status).toBe(200);

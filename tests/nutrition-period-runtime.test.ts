@@ -3,6 +3,23 @@ import { harness, settle } from "./helpers/component-harness.mjs";
 import { nutritionPeriodFixture } from "./helpers/nutrition-period-fixture";
 import type { useNutritionPeriod } from "@/components/nutrition-period-runtime";
 describe("period snapshot and local outbox reconciliation", () => {
+  it("renders the public snapshot without reading or sending a device's private outbox", async () => {
+    const initial = nutritionPeriodFixture();
+    let reads = 0;
+    let requests = 0;
+    const h = harness({ "@/lib/offline/outbox-idb": { listOutboxMutations: async () => { reads++; throw new Error("private device outbox"); } } });
+    h.context.fetchImpl = async () => { requests++; throw new Error("owner-only API"); };
+    const { useNutritionPeriod: usePeriod } = h.load("components/nutrition-period-runtime.ts") as unknown as { useNutritionPeriod: typeof useNutritionPeriod };
+    const render = () => h.render(() => usePeriod(initial, { ownerUserId: "public", environmentId: "public" }, true), {});
+    const result = render();
+    h.effects[0]();
+    await result.refresh();
+    expect(result.period).toBe(initial);
+    expect(result.available).toBe(true);
+    expect(result.pending).toEqual([]);
+    expect(reads).toBe(0);
+    expect(requests).toBe(0);
+  });
   it("updates pending rows immediately after a queued event even while the server is offline", async () => {
     const initial = nutritionPeriodFixture();
     let rows: unknown[] = [];

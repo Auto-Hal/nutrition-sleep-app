@@ -17,6 +17,9 @@ const tables: Record<string, readonly string[]> = {
 
 const rpcs: Record<string, { rows: boolean; args: readonly (readonly [string, string])[] }> = {
   get_nutrition_daily_summary: { rows: true, args: [["p_start_date", "date"], ["p_end_date", "date"]] },
+  get_nutrition_goal_period_v1: { rows: false, args: [["p_start_date", "date"], ["p_end_date", "date"]] },
+  get_body_progress_v1: { rows: false, args: [["p_range", "int"], ["p_end_date", "date?"]] },
+  get_catalog_library_v1: { rows: false, args: [["p_include_inactive", "boolean"]] },
 };
 
 type ReadQuery = { text: string; values: unknown[]; rows: boolean };
@@ -41,9 +44,12 @@ export function compilePublicRead(url: URL, method: string, body: unknown): Read
     const values = rpc.args.map(([name, type]) => {
       const value = input[name];
       if (type === "date" && (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))) denied();
+      if (type === "date?" && value !== null && (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value))) denied();
+      if (type === "int" && (typeof value !== "number" || ![30, 90].includes(value))) denied();
+      if (type === "boolean" && typeof value !== "boolean") denied();
       return value;
     });
-    const args = rpc.args.map(([name, type], i) => `${name} => $${i + 1}::${type}`).join(", ");
+    const args = rpc.args.map(([name, type], i) => `${name} => $${i + 1}::${type.replace("?", "")}`).join(", ");
     return { text: rpc.rows ? `select coalesce(jsonb_agg(r), '[]'::jsonb) as data from public.${name}(${args}) r` : `select public.${name}(${args}) as data`, values, rows: false };
   }
   if (method !== "GET" || !Object.hasOwn(tables, path)) denied();
