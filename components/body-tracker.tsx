@@ -178,8 +178,7 @@ export function BodyChart({
             fill={fat ? "#496eaa" : "#187c62"}
           >
             <title>
-              {m.measured_on}：{fat ? m.body_fat_percent : m.weight_kg}
-              {fat ? "%" : "kg"}
+              {`${m.measured_on}：${fat ? m.body_fat_percent : m.weight_kg}${fat ? "%" : "kg"}`}
             </title>
           </circle>
         ))}
