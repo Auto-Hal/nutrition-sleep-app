@@ -36,6 +36,10 @@ try {
     await client.query("select set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: owner, role: "authenticated" })]);
     const names = (await client.query("select name from public.catalog_items")).rows.map((r) => r.name);
     assert(names.includes(publicName)); assert(!names.includes(hiddenName));
+    const profileCount = await client.query("select count(*) as count from public.user_profiles");
+    assert.equal(Number(profileCount.rows[0].count), 1);
+    const summary = await client.query("select nutrient_code, missing_entry_count from public.get_nutrition_daily_summary($1::date,$1::date)", [date]);
+    assert.equal(Number(summary.rows.find((row) => row.nutrient_code === "energy").missing_entry_count), 1);
     await assert.rejects(client.query("update public.meals set state='skipped' where user_id=$1", [owner]), (e) => ["25006", "42501"].includes(e.code));
   } finally { await client.query("rollback"); client.release(); }
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], {
@@ -73,7 +77,7 @@ try {
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `horizontal overflow ${path}`);
       }
       for (const path of ["/api/meals", "/api/profile", "/api/account/delete", "/api/health/google/sync", "/api/products/reliable"]) {
-        const response = await context.request.post(base + path, { data: {}, headers: { Origin: base } });
+        const response = await context.request.post(base + path, { data: {}, headers: { Origin: base, Accept: "application/json" } });
         assert.equal(response.status(), 401, `unauthenticated write ${path}`);
       }
       assert.equal((await context.request.get(base + "/api/export")).status(), 401);
