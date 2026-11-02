@@ -11,7 +11,7 @@ function pool() {
   globalThis.__astraPool = new Pool({
     connectionString: databaseUrl,
     max: 4,
-    ssl: databaseUrl.includes("localhost") ? undefined : { rejectUnauthorized: false },
+    ssl: ["localhost", "127.0.0.1", "[::1]"].includes(new URL(databaseUrl).hostname) ? undefined : { rejectUnauthorized: false },
   });
   return globalThis.__astraPool;
 }
