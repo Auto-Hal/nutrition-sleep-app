@@ -110,6 +110,7 @@ export function compilePublicRead(url: URL, method: string, body: unknown): Read
 
 export async function publicReadFetch(input: RequestInfo | URL, init?: RequestInit) {
   const responseHeaders = { "content-type": "application/json", "cache-control": "private, no-store" };
+  let operation: string | null = null;
   try {
     if (process.env.APP_PUBLIC_READ_ENABLED !== "true") denied();
     const env = requiredServerEnv();
@@ -118,6 +119,7 @@ export async function publicReadFetch(input: RequestInfo | URL, init?: RequestIn
     if (url.origin !== new URL(env.url).origin) denied();
     const body = request.method === "POST" ? await request.json() : null;
     const compiled = compilePublicRead(url, request.method, body);
+    operation = url.pathname.replace(/^\/rest\/v1\//, "");
     const data = await withTransaction(async (client) => {
       await client.query("set transaction read only");
       await client.query("set local role authenticated");
@@ -132,7 +134,11 @@ export async function publicReadFetch(input: RequestInfo | URL, init?: RequestIn
     const single = request.headers.get("accept")?.includes("application/vnd.pgrst.object+json");
     if (single && result.rows.length !== 1) return new Response(JSON.stringify({ code: "PGRST116", message: "No single row", details: `The result contains ${result.rows.length} rows` }), { status: 406, headers: responseHeaders });
     return new Response(JSON.stringify(single ? result.rows[0] : result.rows), { status: 200, headers: { ...responseHeaders, "content-range": `${offset}-${offset + result.rows.length - 1}/${result.count}` } });
-  } catch {
+  } catch (error) {
+    if (operation) {
+      const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" && /^[0-9A-Z]{5}$/.test(error.code) ? error.code : "READ_FAILURE";
+      console.error("[public-read]", { operation, code });
+    }
     // Neither SQL details, account identifiers nor credentials reach a visitor.
     return new Response(JSON.stringify({ code: "PUBLIC_READ_UNAVAILABLE", message: "公開データを取得できませんでした。" }), { status: 503, headers: responseHeaders });
   }
