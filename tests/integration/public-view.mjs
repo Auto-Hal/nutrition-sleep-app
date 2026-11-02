@@ -80,7 +80,7 @@ try {
         const response = await context.request.post(base + path, { data: {}, headers: { Origin: base, Accept: "application/json" } });
         assert.equal(response.status(), 401, `unauthenticated write ${path}`);
       }
-      assert.equal((await context.request.get(base + "/api/export")).status(), 401);
+      assert.equal((await context.request.post(base + "/api/export", { data: {}, headers: { Origin: base, Accept: "application/json" } })).status(), 401);
       assert.equal((await context.cookies()).some((c) => c.name === "astra_session"), false);
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `test-results/public-view-${device.viewport.width}.png`, fullPage: true });
