@@ -78,7 +78,10 @@ test("authenticated nutrition, body and transfer story", async ({
       void report(String(event.reason));
     });
   });
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (error) => {
+    errors.push(error.message);
+    console.log(JSON.stringify({ browser: info.project.name, path: new URL(page.url()).pathname, browserDiagnostic: error.message }));
+  });
   await page.goto("/login");
   await page.locator("#email").fill(process.env.E2E_LOGIN_EMAIL!);
   await page.locator("#password").fill(process.env.E2E_LOGIN_PASSWORD!);
@@ -95,6 +98,7 @@ test("authenticated nutrition, body and transfer story", async ({
   await expect(
     page.getByRole("link", { name: "食事を記録", exact: true }),
   ).toBeVisible();
+  await page.waitForLoadState("networkidle");
   const beforeGoals = (await get(page, "/api/nutrition/goals")).history.versions
     .length;
   await page.goto("/settings?view=goals");
@@ -233,6 +237,10 @@ test("authenticated nutrition, body and transfer story", async ({
   await lunch.getByRole("button", { name: "追加", exact: true }).click();
   await page.locator("#meal-item").selectOption(product.id);
   await page.locator("#meal-quantity").fill("1");
+  // Load the initial authoritative totals before simulating an outage.
+  // Fast iPad interactions otherwise cut off initial meals/today reads and
+  // surface WebKit native cancellations, rather than testing offline input.
+  await page.waitForLoadState("networkidle");
   await context.setOffline(true);
   await page.getByRole("button", { name: "記録する", exact: true }).click();
   await expect(
