@@ -540,7 +540,7 @@ test("owner login preserves ChatGPT inbox and fragment links after public viewin
   const requestId = randomUUID();
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
   const draft = chatNutritionDraftSchema.parse({
-    schema_version: 2, draft_only: true, request_id: requestId,
+    schema_version: 2, nutrient_schema_version: 2, draft_only: true, request_id: requestId,
     meal: { meal_date: day, meal_type: "breakfast", eaten_at: `${day}T08:00:00+09:00` },
     item: { name: `synthetic-inbox-${requestId}`, item_type: "ingredient", serving_size: 1, serving_unit: "serving" },
     nutrients: [],
