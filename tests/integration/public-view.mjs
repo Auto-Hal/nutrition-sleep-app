@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import pg from "pg";
 import { chromium, webkit, devices } from "@playwright/test";
+import { publicNativeCancellationKind } from "../helpers/public-native-diagnostics.mjs";
 
 // Synthetic accounts and data on a disposable loopback database only.
 const connectionString = process.env.DATABASE_URL;
@@ -122,11 +123,19 @@ try {
       });
       assert(worker && new URL(worker).origin === base, "a successful same-origin service worker update is required");
       assert.deepEqual(await page.evaluate(() => window.__publicScriptErrors), []);
-      const nativeCancellation = /^\/127\.0\.0\.1:3198\/sw\.js\?v=development due to access control checks\.$/;
-      const diagnostics = engine === webkit ? errors.filter((message) => nativeCancellation.test(message)) : [];
+      const diagnostics = engine === webkit ? errors.filter((message) => publicNativeCancellationKind(message) !== null) : [];
+      const nativePrefetchCancellations = diagnostics.filter((message) => publicNativeCancellationKind(message) === "prefetch");
+      const recoveredPrefetches = [];
+      for (const message of nativePrefetchCancellations) {
+        const path = message.slice("/127.0.0.1:3198".length, -" due to access control checks.".length);
+        const response = await context.request.get(base + path, { headers: { RSC: "1" } });
+        assert.equal(response.status(), 200, "a cancelled prefetch must be recoverable");
+        assert((response.headers()["content-type"] ?? "").includes("text/x-component"), "a real RSC response is required");
+        recoveredPrefetches.push({ path, status: response.status() });
+      }
       assert.deepEqual(errors.filter((message) => !diagnostics.includes(message)), []);
       await mkdir("test-results", { recursive: true });
-      await writeFile(`test-results/public-view-${device.viewport.width}-diagnostics.json`, JSON.stringify({ nativeServiceWorkerCancellations: diagnostics, realScriptErrors: [], workerUpdateSucceeded: true }, null, 2));
+      await writeFile(`test-results/public-view-${device.viewport.width}-diagnostics.json`, JSON.stringify({ nativeServiceWorkerCancellations: diagnostics.filter((message) => publicNativeCancellationKind(message) === "worker"), nativePrefetchCancellations, recoveredPrefetches, realScriptErrors: [], workerUpdateSucceeded: true }, null, 2));
       await page.screenshot({ path: `test-results/public-view-${device.viewport.width}.png`, fullPage: true });
       await context.close();
       console.log(`Public read, external registration refresh, entry modes and protected writes passed: ${device.viewport.width}px`);
