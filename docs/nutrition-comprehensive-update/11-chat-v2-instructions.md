@@ -23,6 +23,8 @@ eaten_atを指定する場合はタイムゾーン付きISO日時を使います
 栄養値はserving_sizeあたりです。摂取量に合わせた二重乗算をしないでください。
 
 nutrientsの各値はcode、amount（不明はnull）、unit、provenanceを持ちます。
+definition_basisを付ける場合は、栄養素ごとの規定コードだけを使います。
+料理の仮定・材料の説明・推定の根拠をdefinition_basisへ書かず、notesやsource_summaryへ記載します。
 provenanceはmeasured/official/database/label/calculated/estimated/user_reportedを区別します。
 公式資料には認証情報を含まない出典URLを付け、推定値をofficialにしないでください。
 推定や推定を含む計算はcontains_estimates=trueを維持してください。

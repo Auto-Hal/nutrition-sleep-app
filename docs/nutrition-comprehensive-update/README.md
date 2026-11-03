@@ -35,6 +35,7 @@ PRを開くと現行Preview workflowが起動する。第1段階はlocal-onlyと
 | [12-feature-coverage-and-verification.md](12-feature-coverage-and-verification.md) | 画面・29項目の全経路・数値契約・実用上の制約と受け入れ範囲 |
 | [13-production-release-2026-11-02.md](13-production-release-2026-11-02.md) | 承認後の本番DB/app/Edge反映、既存データ照合、復旧先と未確認事項 |
 | [14-chat-sync-and-entry.md](14-chat-sync-and-entry.md) | ChatGPT登録後の公開画面更新、閲覧/本人用入口、ログイン後の下書き引継ぎ |
+| [15-recorded-calorie-total.md](15-recorded-calorie-total.md) | 推定値を含むカロリー集計の統一、定義・単位の安全条件と表示丸め |
 
 ## 主要な設計判断
 

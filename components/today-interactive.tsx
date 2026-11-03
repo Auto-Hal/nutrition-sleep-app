@@ -7,11 +7,7 @@ import type { TodayNutritionSummary } from "@/lib/nutrition/analytics";
 import type { CatalogItem, Meal } from "@/lib/nutrition/catalog";
 import type { OutboxBinding, PendingMutationStatus } from "@/lib/offline/outbox-contract";
 import { listOutboxMutations } from "@/lib/offline/outbox-idb";
-
-function formatEnergy(value: number | null) {
-  if (value === null) return "—";
-  return new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
-}
+import { formatEnergyAmount as formatEnergy } from "@/lib/nutrition/energy-display";
 
 function nutritionTitleForDate(date: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);

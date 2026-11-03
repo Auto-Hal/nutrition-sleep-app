@@ -26,6 +26,7 @@ import {
 import { localDate, shiftIsoDate } from "@/lib/nutrition/civil-date";
 import { resolveGoal } from "@/lib/nutrition/goals";
 import { useNutritionPeriod } from "@/components/nutrition-period-runtime";
+import { formatEnergyAmount } from "@/lib/nutrition/energy-display";
 import type { CatalogItem } from "@/lib/nutrition/catalog";
 import {
   pendingNutritionProgress,
@@ -106,9 +107,9 @@ export function PfcDayDetails({ day }: { day: PfcDay }) {
                 </span>
               </div>
               <p className="pfc-value">
-                {pfcAmount(m.known_amount)}{" "}
+                {c === "energy" ? formatEnergyAmount(m.known_amount) : pfcAmount(m.known_amount)}{" "}
                 <small>
-                  / {pfcAmount(m.target)} {unit}
+                  / {c === "energy" ? formatEnergyAmount(m.target) : pfcAmount(m.target)} {unit}
                 </small>
               </p>
               <small>
@@ -130,6 +131,7 @@ export function PfcDayDetails({ day }: { day: PfcDay }) {
           );
         })}
       </div>
+      {TARGET_CODES.some((c) => day.metrics[c].row.estimate_status === "contains_estimates") && <p className="muted">推定値を含む記録合計です。</p>}
       {target ? (
         <p className="muted">
           目標構成比 P {target.protein_bps / 100}% / F {target.fat_bps / 100}% /
@@ -569,8 +571,8 @@ export function WeeklyPfc({
               <div className="pfc-metric" key={c}>
                 <strong>{LABELS[c]}</strong>
                 <p>
-                  既知合計 {pfcAmount(m.known_amount)} / 週目標{" "}
-                  {pfcAmount(m.weekly_target)} {unit}
+                  既知合計 {c === "energy" ? formatEnergyAmount(m.known_amount) : pfcAmount(m.known_amount)} / 週目標{" "}
+                  {c === "energy" ? formatEnergyAmount(m.weekly_target) : pfcAmount(m.weekly_target)} {unit}
                 </p>
                 {!m.weekly_target && (
                   <small>
@@ -632,7 +634,7 @@ export function WeeklyPfc({
               onClick={() => setSelected(d.meal_date)}
             >
               {d.meal_date.slice(5)}
-              <span>{pfcAmount(d.metrics.energy.known_amount)} kcal</span>
+              <span>{formatEnergyAmount(d.metrics.energy.known_amount)} kcal</span>
               <small>{STATES[d.overall]}</small>
             </button>
           ))}
