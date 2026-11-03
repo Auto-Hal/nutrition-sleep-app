@@ -74,7 +74,7 @@ try {
       assert.equal(new URL(page.url()).pathname, "/login", "anonymous launch offers both entry modes");
       assert.equal(await page.getByRole("heading", { name: "ログインして記録・編集" }).count(), 1);
       await page.getByRole("link", { name: "閲覧モードで開く" }).click();
-      await page.getByText("公開閲覧", { exact: true }).waitFor();
+      await page.getByRole("banner").getByText("公開閲覧", { exact: true }).waitFor();
       const paths = ["/today", "/history", "/nutrition", "/nutrition?range=30&nutrient=protein", "/sleep", "/sleep?range=30", "/settings"];
       if (hasBody) paths.push("/nutrition?view=week", "/body", "/body?range=90");
       for (const path of paths) {

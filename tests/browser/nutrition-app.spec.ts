@@ -555,7 +555,7 @@ test("owner login preserves ChatGPT inbox and fragment links after public viewin
     await page.goto("/");
     await expect(page).toHaveURL(/\/login$/);
     await page.getByRole("link", { name: "閲覧モードで開く" }).click();
-    await expect(page.getByText("公開閲覧", { exact: true })).toBeVisible();
+    await expect(page.getByRole("banner").getByText("公開閲覧", { exact: true })).toBeVisible();
     await page.goto(`/nutrition-import?draft=${inbox}`);
     await expect(page).toHaveURL(new RegExp(`/login\\?next=${encodeURIComponent(`/nutrition-import?draft=${inbox}`)}$`));
     await login();
