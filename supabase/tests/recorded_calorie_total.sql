@@ -14,8 +14,8 @@ insert into public.meals(user_id,meal_date,meal_type,state) values
  ('11111111-1111-4111-8111-111111112901',current_date,'dinner','skipped');
 insert into public.meal_entries(id,user_id,meal_id,catalog_item_id,quantity,quantity_unit)
 select c.entry_id,'11111111-1111-4111-8111-111111112901',m.id,c.item_id,1,'serving' from calorie_items c cross join calorie_meal m;
-insert into public.meal_entry_nutrient_snapshots(meal_entry_id,user_id,nutrient_code,amount,unit,provenance,quality,value_origin,definition_basis,contains_estimates)
-select c.entry_id,'11111111-1111-4111-8111-111111112901',v.code,v.amounts[c.n],v.unit,
+insert into public.meal_entry_nutrient_snapshots(meal_entry_id,nutrient_code,amount,unit,source_catalog_revision,provenance,quality,value_origin,definition_basis,contains_estimates)
+select c.entry_id,v.code,v.amounts[c.n],v.unit,1,
  case when c.n>2 then 'estimated_dish' else 'approved_external_db' end,
  'unverified',case when c.n>2 then 'estimated' else 'database' end,
  case when c.n>2 then 'synthetic recipe assumptions, not a chemical-form code' end,c.n>2
@@ -23,7 +23,7 @@ from calorie_items c cross join (values
  ('energy','kcal',array[100,200,400,700]::numeric[]),('protein','g',array[10,20,30,40]::numeric[]),
  ('fat','g',array[2,4,6,8]::numeric[]),('carbohydrate','g',array[20,40,60,80]::numeric[])
 ) v(code,unit,amounts);
-create temp table calorie_snapshot_before as select jsonb_agg(to_jsonb(s) order by meal_entry_id,nutrient_code) payload from public.meal_entry_nutrient_snapshots s where user_id='11111111-1111-4111-8111-111111112901';
+create temp table calorie_snapshot_before as select jsonb_agg(to_jsonb(s) order by meal_entry_id,nutrient_code) payload from public.meal_entry_nutrient_snapshots s where meal_entry_id in (select entry_id from calorie_items);
 create temp table calorie_rows as select x from jsonb_array_elements(public.get_nutrition_goal_period_v1(current_date,current_date)->'rows') x;
 select is((select (x->>'known_amount')::numeric from calorie_rows where x->>'nutrient_code'='energy'),1400::numeric,'recorded calories include the estimated narrative-note entries');
 select is((select (x->>'known_amount')::numeric from calorie_rows where x->>'nutrient_code'='energy'),(select known_amount from public.get_nutrition_daily_summary(current_date,current_date) where nutrient_code='energy'),'PFC calories and the daily summary use the same recorded total');
@@ -33,7 +33,7 @@ select is((select x->>'value_quality' from calorie_rows where x->>'nutrient_code
 select is((select (x->>'known_amount')::numeric from calorie_rows where x->>'nutrient_code'='protein'),100::numeric,'estimated protein is retained as recorded');
 select is((select (x->>'known_amount')::numeric from calorie_rows where x->>'nutrient_code'='fat'),20::numeric,'estimated fat is retained as recorded');
 select is((select (x->>'known_amount')::numeric from calorie_rows where x->>'nutrient_code'='carbohydrate'),200::numeric,'estimated declared total carbohydrate is retained as recorded');
-select is((select jsonb_agg(to_jsonb(s) order by meal_entry_id,nutrient_code) from public.meal_entry_nutrient_snapshots s where user_id='11111111-1111-4111-8111-111111112901'),(select payload from calorie_snapshot_before),'reading the new total does not rewrite immutable snapshots');
+select is((select jsonb_agg(to_jsonb(s) order by meal_entry_id,nutrient_code) from public.meal_entry_nutrient_snapshots s where meal_entry_id in (select entry_id from calorie_items)),(select payload from calorie_snapshot_before),'reading the new total does not rewrite immutable snapshots');
 
 -- Deliberate malformed historical fixtures remain unsafe; no conversion or
 -- unknown-to-zero repair is performed by the compatibility read.

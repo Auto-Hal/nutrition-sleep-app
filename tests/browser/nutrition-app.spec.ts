@@ -509,7 +509,7 @@ test("authenticated nutrition, body and transfer story", async ({
   await pool.query("insert into public.catalog_items(id,user_id,item_type,name,serving_size,serving_unit) values($1,$2,'estimated_dish','synthetic legacy recipe',1,'serving')", [legacyItem, process.env.E2E_OWNER_ID]);
   try {
     await pool.query("insert into public.meal_entries(id,user_id,meal_id,catalog_item_id,quantity,quantity_unit) values($1,$2,$3,$4,1,'serving')", [legacyEntry, process.env.E2E_OWNER_ID, entry.meal_id, legacyItem]);
-    await pool.query("insert into public.meal_entry_nutrient_snapshots(meal_entry_id,user_id,nutrient_code,unit,amount,provenance,quality,value_origin,definition_basis,contains_estimates) select $1,$2,v.code,v.unit,v.amount,'estimated_dish','unverified','estimated','synthetic recipe assumptions',true from (values('energy','kcal',100.25::numeric),('protein','g',10::numeric),('fat','g',2::numeric),('carbohydrate','g',20::numeric))v(code,unit,amount)", [legacyEntry, process.env.E2E_OWNER_ID]);
+    await pool.query("insert into public.meal_entry_nutrient_snapshots(meal_entry_id,nutrient_code,unit,amount,source_catalog_revision,provenance,quality,value_origin,definition_basis,contains_estimates) select $1,v.code,v.unit,v.amount,1,'estimated_dish','unverified','estimated','synthetic recipe assumptions',true from (values('energy','kcal',100.25::numeric),('protein','g',10::numeric),('fat','g',2::numeric),('carbohydrate','g',20::numeric))v(code,unit,amount)", [legacyEntry]);
     await page.goto(`/today?date=${day}`, { waitUntil: "networkidle" });
     const summary = (await get(page, `/api/nutrition/today?date=${day}`)).summary;
     const period = (await get(page, `/api/nutrition/period?start=${day}&end=${day}`)).period;
