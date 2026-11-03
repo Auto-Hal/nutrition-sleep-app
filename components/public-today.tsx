@@ -7,7 +7,7 @@ import { getMealsForDate } from "@/lib/nutrition/today-data";
 import { isIsoDate, shiftIsoDate } from "@/lib/nutrition/meal-history";
 import { loadSleepAssessment } from "@/lib/sleep/assessment";
 import { SleepScore } from "@/components/sleep-score";
-import { formatNutrientAmount } from "@/components/nutrient-averages";
+import { formatEnergyAmount } from "@/lib/nutrition/energy-display";
 import { getNutritionPeriod } from "@/lib/nutrition/goal-repository";
 import { DailyPfcCard } from "@/components/pfc-dashboard";
 
@@ -27,7 +27,7 @@ export async function PublicToday({ date: requestedDate }: { date?: string }) {
   return <main className="app-main"><header className="topbar"><div><p className="eyebrow">公開閲覧</p><h1>{date === today ? "今日" : date}の記録</h1></div><Link className="button ghost" href="/history">食事履歴</Link></header>
     <nav className="subnav" aria-label="表示する日"><Link href={`/today?date=${shiftIsoDate(date, -1)}` as Route}>前の日</Link><span>{date}</span>{date < today && <Link href={`/today?date=${shiftIsoDate(date, 1)}` as Route}>次の日</Link>}</nav>
     <details className="card"><summary>日付を選ぶ</summary><form className="form" action="/today" method="get"><label htmlFor="public-date">日付を選ぶ</label><input id="public-date" name="date" type="date" defaultValue={date} max={today} required /><button className="button secondary" type="submit">表示</button></form></details>
-    <div className="stack"><DailyPfcCard initial={pfc} binding={{ ownerUserId: "public", environmentId: "public" }} readOnly /><details className="card"><summary>摂取エネルギーの記録状況</summary><p className="public-energy">{formatNutrientAmount(summary.energy_known_amount, "kcal")}</p><p className="muted">{summary.entry_count === 0 ? "摂取項目が未登録のため、量や達成を判定しません。" : summary.energy_coverage_complete ? "記録した食品の栄養値は完全です。" : "既知分のみ。不明値を0として扱いません。"} {summary.record_complete ? "記録完了" : "記録途中・未記録"}</p></details>
+    <div className="stack"><DailyPfcCard initial={pfc} binding={{ ownerUserId: "public", environmentId: "public" }} readOnly /><details className="card"><summary>摂取エネルギーの記録状況</summary><p className="public-energy">{formatEnergyAmount(summary.energy_known_amount)} kcal</p><p className="muted">{summary.entry_count === 0 ? "摂取項目が未登録のため、量や達成を判定しません。" : summary.energy_coverage_complete ? "記録した食品の栄養値は完全です。" : "既知分のみ。不明値を0として扱いません。"} {summary.record_complete ? "記録完了" : "記録途中・未記録"}</p></details>
       <section className="card stack"><h2>食事履歴</h2>{meals.length === 0 && <p className="muted">この日の食事記録はありません。</p>}{meals.map((meal) => <div key={meal.id} className="history-meal"><strong>{mealLabels[meal.meal_type]}</strong><span className="pill">{meal.state === "recorded" ? "記録済み" : meal.state === "skipped" ? "スキップ" : "未記録"}</span>{meal.entries.map((entry) => <p key={entry.id}>{entry.name} × {entry.quantity} {entry.quantity_unit}</p>)}{meal.entries.length === 0 && <p className="muted">登録した食品はありません。</p>}</div>)}</section>
       {sleep && <section><SleepScore assessment={sleep.assessment} compact /><Link className="button ghost" href="/sleep">睡眠の詳細</Link></section>}
     </div>

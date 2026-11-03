@@ -10,6 +10,7 @@ import {
 import { gtinCheckDigit } from "../../lib/products/barcode";
 import { encodeChatNutritionDraft } from "../../lib/nutrition/chat-import-link";
 import { chatNutritionDraftSchema } from "../../lib/nutrition/chat-import-contract";
+import { formatEnergyAmount } from "../../lib/nutrition/energy-display";
 const connectionString = process.env.E2E_DATABASE_URL;
 if (!connectionString)
   throw new Error("Run through the disposable nutrition-browser runner");
@@ -321,7 +322,7 @@ test("authenticated nutrition, body and transfer story", async ({
       return p.days[0].record_state === "complete";
     })
     .toBe(true);
-  await expect(page.locator(".pfc-daily-card")).toContainText("1800");
+  await expect(page.locator(".pfc-daily-card")).toContainText("1,800");
   await noOverflow(page);
   await page.screenshot({ path: info.outputPath("today.png"), fullPage: true });
   const savedSnapshots = (
@@ -501,6 +502,28 @@ test("authenticated nutrition, body and transfer story", async ({
       )
     ).rows[0].p,
   ).toEqual(savedSnapshots);
+  // A historical estimated record may contain a recipe note in the old basis
+  // column. It must not silently disappear from the displayed PFC total.
+  const beforeEnergy = (await get(page, `/api/nutrition/today?date=${day}`)).summary.energy_known_amount;
+  const legacyItem = randomUUID(), legacyEntry = randomUUID();
+  await pool.query("insert into public.catalog_items(id,user_id,item_type,name,serving_size,serving_unit) values($1,$2,'estimated_dish','synthetic legacy recipe',1,'serving')", [legacyItem, process.env.E2E_OWNER_ID]);
+  try {
+    await pool.query("insert into public.meal_entries(id,user_id,meal_id,catalog_item_id,quantity,quantity_unit) values($1,$2,$3,$4,1,'serving')", [legacyEntry, process.env.E2E_OWNER_ID, entry.meal_id, legacyItem]);
+    await pool.query("insert into public.meal_entry_nutrient_snapshots(meal_entry_id,user_id,nutrient_code,unit,amount,provenance,quality,value_origin,definition_basis,contains_estimates) select $1,$2,v.code,v.unit,v.amount,'estimated_dish','unverified','estimated','synthetic recipe assumptions',true from (values('energy','kcal',100.25::numeric),('protein','g',10::numeric),('fat','g',2::numeric),('carbohydrate','g',20::numeric))v(code,unit,amount)", [legacyEntry, process.env.E2E_OWNER_ID]);
+    await page.goto(`/today?date=${day}`, { waitUntil: "networkidle" });
+    const summary = (await get(page, `/api/nutrition/today?date=${day}`)).summary;
+    const period = (await get(page, `/api/nutrition/period?start=${day}&end=${day}`)).period;
+    expect(summary.energy_known_amount).toBe(beforeEnergy + 100.25);
+    expect(Number(period.rows.find((row: { nutrient_code: string }) => row.nutrient_code === "energy").known_amount)).toBe(summary.energy_known_amount);
+    const shown = formatEnergyAmount(summary.energy_known_amount);
+    await expect(page.locator(".pfc-daily-card .pfc-value").first()).toContainText(shown);
+    await expect(page.locator(".today-summary-card strong").first()).toHaveText(`${shown} kcal`);
+    await expect(page.getByText("推定値を含む記録合計です。", { exact: true })).toBeVisible();
+    expect((await pool.query("select distinct definition_basis from public.meal_entry_nutrient_snapshots where meal_entry_id=$1", [legacyEntry])).rows).toEqual([{ definition_basis: "synthetic recipe assumptions" }]);
+  } finally {
+    await pool.query("delete from public.meal_entries where id=$1 and user_id=$2", [legacyEntry, process.env.E2E_OWNER_ID]);
+    await pool.query("delete from public.catalog_items where id=$1 and user_id=$2", [legacyItem, process.env.E2E_OWNER_ID]);
+  }
   await page.goto("/sleep?range=30");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await noOverflow(page);
