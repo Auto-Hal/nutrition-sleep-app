@@ -1,7 +1,7 @@
 {
   "name": "栄養・睡眠管理",
   "short_name": "栄養・睡眠管理",
-  "start_url": "/today",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f3f1eb",
   "theme_color": "#f3f1eb",

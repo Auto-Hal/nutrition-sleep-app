@@ -8,6 +8,8 @@ import {
   STANDARD_NUTRIENT_DEFINITIONS,
 } from "../../lib/nutrition/catalog";
 import { gtinCheckDigit } from "../../lib/products/barcode";
+import { encodeChatNutritionDraft } from "../../lib/nutrition/chat-import-link";
+import { chatNutritionDraftSchema } from "../../lib/nutrition/chat-import-contract";
 const connectionString = process.env.E2E_DATABASE_URL;
 if (!connectionString)
   throw new Error("Run through the disposable nutrition-browser runner");
@@ -76,7 +78,10 @@ test("authenticated nutrition, body and transfer story", async ({
       void report(String(event.reason));
     });
   });
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (error) => {
+    errors.push(error.message);
+    console.log(JSON.stringify({ browser: info.project.name, path: new URL(page.url()).pathname, browserDiagnostic: error.message }));
+  });
   await page.goto("/login");
   await page.locator("#email").fill(process.env.E2E_LOGIN_EMAIL!);
   await page.locator("#password").fill(process.env.E2E_LOGIN_PASSWORD!);
@@ -93,6 +98,7 @@ test("authenticated nutrition, body and transfer story", async ({
   await expect(
     page.getByRole("link", { name: "食事を記録", exact: true }),
   ).toBeVisible();
+  await page.waitForLoadState("networkidle");
   const beforeGoals = (await get(page, "/api/nutrition/goals")).history.versions
     .length;
   await page.goto("/settings?view=goals");
@@ -231,6 +237,10 @@ test("authenticated nutrition, body and transfer story", async ({
   await lunch.getByRole("button", { name: "追加", exact: true }).click();
   await page.locator("#meal-item").selectOption(product.id);
   await page.locator("#meal-quantity").fill("1");
+  // Load the initial authoritative totals before simulating an outage.
+  // Fast iPad interactions otherwise cut off initial meals/today reads and
+  // surface WebKit native cancellations, rather than testing offline input.
+  await page.waitForLoadState("networkidle");
   await context.setOffline(true);
   await page.getByRole("button", { name: "記録する", exact: true }).click();
   await expect(
@@ -531,4 +541,48 @@ test("authenticated nutrition, body and transfer story", async ({
   expect(errors.filter((message) => !diagnostics.includes(message))).toEqual(
     [],
   );
+});
+
+test("owner login preserves ChatGPT inbox and fragment links after public viewing", async ({ page, context }) => {
+  const owner = process.env.E2E_OWNER_ID!;
+  const requestId = randomUUID();
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
+  const draft = chatNutritionDraftSchema.parse({
+    schema_version: 2, nutrient_schema_version: 2, draft_only: true, request_id: requestId,
+    meal: { meal_date: day, meal_type: "breakfast", eaten_at: `${day}T08:00:00+09:00` },
+    item: { name: `synthetic-inbox-${requestId}`, item_type: "ingredient", serving_size: 1, serving_unit: "serving" },
+    nutrients: [],
+  });
+  const inbox = (await pool.query("insert into public.chat_meal_drafts(user_id,request_id,schema_version,payload) values($1,$2,2,$3::jsonb) returning id", [owner, requestId, JSON.stringify(draft)])).rows[0].id;
+  async function login() {
+    await page.locator("#email").fill(process.env.E2E_LOGIN_EMAIL!);
+    await page.locator("#password").fill(process.env.E2E_LOGIN_PASSWORD!);
+    await page.getByRole("button", { name: "ログイン", exact: true }).click();
+  }
+  try {
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/login$/);
+    await page.getByRole("link", { name: "閲覧モードで開く" }).click();
+    await expect(page.getByRole("banner").getByText("公開閲覧", { exact: true })).toBeVisible();
+    await page.goto(`/nutrition-import?draft=${inbox}`);
+    await expect(page).toHaveURL(new RegExp(`/login\\?next=${encodeURIComponent(`/nutrition-import?draft=${inbox}`)}$`));
+    await login();
+    await expect(page).toHaveURL(new RegExp(`/nutrition-import\\?draft=${inbox}$`));
+    await expect(page.getByText(draft.item.name, { exact: true })).toBeVisible();
+    await expect(page.getByText("公開閲覧", { exact: true })).toHaveCount(0);
+    await page.goto("/today");
+    await expect(page.getByRole("link", { name: "食事を記録", exact: true })).toBeVisible();
+
+    await context.clearCookies();
+    const fragmentDraft = chatNutritionDraftSchema.parse({ ...draft, request_id: randomUUID(), item: { ...draft.item, name: `synthetic-fragment-${requestId}` } });
+    const fragment = `#data=${encodeChatNutritionDraft(fragmentDraft)}`;
+    await page.goto(`/nutrition-import${fragment}`);
+    await expect(page).toHaveURL(/\/login\?next=.*#data=/);
+    await login();
+    await expect(page).toHaveURL(origin + "/nutrition-import" + fragment);
+    await expect(page.getByText(fragmentDraft.item.name, { exact: true })).toBeVisible();
+    await noOverflow(page);
+  } finally {
+    await pool.query("delete from public.chat_meal_drafts where id=$1 and user_id=$2", [inbox, owner]);
+  }
 });

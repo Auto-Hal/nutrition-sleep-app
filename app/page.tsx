@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
+import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
 
-export default function HomePage() {
-  redirect("/today");
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  redirect(await getAppSessionForRsc() ? "/today" : "/login");
 }

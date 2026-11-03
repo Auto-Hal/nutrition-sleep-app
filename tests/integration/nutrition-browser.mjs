@@ -104,6 +104,7 @@ try {
     DATABASE_URL: dbUrl,
     APP_SESSION_ENCRYPTION_KEY: `synthetic-${randomUUID()}`,
     APP_ALLOWED_USER_ID: owner,
+    APP_PUBLIC_READ_ENABLED: "true",
     APP_LOGIN_RATE_LIMIT_KEY: `synthetic-${randomUUID()}`,
     APP_ORIGIN: "http://127.0.0.1:3001",
     SUPABASE_SERVICE_ROLE_KEY: "",
