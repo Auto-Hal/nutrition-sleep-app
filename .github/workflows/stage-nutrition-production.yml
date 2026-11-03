@@ -27,7 +27,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import { appendFileSync } from 'node:fs';
-          const source = '44fc5935411eb009de4fa86d71483b3cbed1fc9e';
+          const source = '34824c1d0362c0bc74e861459f13ef3067e3bfe2';
           const team = 'team_aTOsma3gZ9xkcFkGJ53dUCCO';
           if (!process.env.VERCEL_TOKEN) throw new Error('Vercel credential is unavailable');
           const headers = { Authorization: `Bearer ${process.env.VERCEL_TOKEN}`, 'Content-Type': 'application/json' };
@@ -42,11 +42,11 @@ jobs:
             body: JSON.stringify({
               name: 'nutrition-sleep-app',
               project: 'prj_WiPB989mXurOuIgVm8asfmfdPA6W',
-              deploymentId: 'dpl_8EP3n4mk1D9RHyWTixwkvje4sJyS',
+              deploymentId: 'dpl_FGCnnR29FyQhBnZXBM6TQqSsFk22',
               withLatestCommit: false,
               target: 'production',
               autoAssignCustomDomains: false,
-              meta: { githubCommitSha: source, githubCommitRef: 'fix/chat-sync-entry', releaseScope: 'chat-sync-entry-fix-staged' }
+              meta: { githubCommitSha: source, githubCommitRef: 'fix/unified-calorie-total', releaseScope: 'recorded-calorie-total-fix-staged' }
             })
           });
           if (!created.id) throw new Error('Missing deployment ID');
