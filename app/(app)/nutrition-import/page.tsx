@@ -1,11 +1,12 @@
 import { ChatNutritionImport } from "@/components/chat-nutrition-import";
 import { redirect } from "next/navigation";
 import { getAppSessionForRsc } from "@/lib/auth/session-rsc";
+import { nutritionImportLoginPath } from "@/lib/auth/login-navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function NutritionImportPage() {
-  if (!(await getAppSessionForRsc())) redirect("/login");
+export default async function NutritionImportPage({ searchParams }: { searchParams: Promise<{ draft?: string }> }) {
+  if (!(await getAppSessionForRsc())) redirect(nutritionImportLoginPath((await searchParams).draft));
   return (
     <main className="app-main">
       <header className="topbar">

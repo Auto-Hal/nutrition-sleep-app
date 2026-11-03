@@ -29,6 +29,7 @@ function harness(extraModules = {}) {
     },
     useMemo: fn => fn(),
     useCallback: fn => fn,
+    useTransition: () => [false, work => work()],
     useEffect: fn => { effects.push(fn); },
   };
   const context = {

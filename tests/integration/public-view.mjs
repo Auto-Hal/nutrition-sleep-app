@@ -70,6 +70,11 @@ try {
       const page = await context.newPage();
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
+      await page.goto(base, { waitUntil: "networkidle" });
+      assert.equal(new URL(page.url()).pathname, "/login", "anonymous launch offers both entry modes");
+      assert.equal(await page.getByRole("heading", { name: "ログインして記録・編集" }).count(), 1);
+      await page.getByRole("link", { name: "閲覧モードで開く" }).click();
+      await page.getByText("公開閲覧", { exact: true }).waitFor();
       const paths = ["/today", "/history", "/nutrition", "/nutrition?range=30&nutrient=protein", "/sleep", "/sleep?range=30", "/settings"];
       if (hasBody) paths.push("/nutrition?view=week", "/body", "/body?range=90");
       for (const path of paths) {
@@ -85,6 +90,21 @@ try {
         assert.equal(await page.getByRole("button", { name: /保存|削除|同期する|接続/ }).count(), 0);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `horizontal overflow ${path}`);
         assert.deepEqual(await page.evaluate(() => window.__publicScriptErrors), [], `real JavaScript errors ${path}`);
+      }
+      // Simulate a registration from ChatGPT after the viewer has already
+      // opened the page. The fixture writer stays on the disposable DB.
+      await page.goto(base + "/today", { waitUntil: "networkidle" });
+      for (const trigger of ["focus", "manual"]) {
+        const externalName = `external-${randomUUID()}`;
+        const item = (await pool.query("insert into public.catalog_items(user_id,item_type,name) values ($1,'ingredient',$2) returning id", [owner, externalName])).rows[0].id;
+        const meal = (await pool.query("select id from public.meals where user_id=$1 and meal_date=$2 and meal_type='breakfast'", [owner, date])).rows[0].id;
+        await pool.query("insert into public.meal_entries(user_id,meal_id,catalog_item_id,quantity,quantity_unit) values ($1,$2,$3,1,'serving')", [owner, meal, item]);
+        assert.equal((await page.locator("body").innerText()).includes(externalName), false, "the open view starts stale");
+        if (trigger === "focus") await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        else await page.getByRole("button", { name: "最新の記録を表示", exact: true }).click();
+        await page.getByText(externalName, { exact: false }).waitFor({ state: "visible" });
+        assert(!(await page.locator("body").innerText()).includes(hiddenName));
+        assert.deepEqual(await page.evaluate(() => window.__publicScriptErrors), []);
       }
       for (const path of ["/api/meals", "/api/profile", "/api/account/delete", "/api/health/google/sync", "/api/products/reliable"]) {
         const response = await context.request.post(base + path, { data: {}, headers: { Origin: base, Accept: "application/json" } });
@@ -109,7 +129,7 @@ try {
       await writeFile(`test-results/public-view-${device.viewport.width}-diagnostics.json`, JSON.stringify({ nativeServiceWorkerCancellations: diagnostics, realScriptErrors: [], workerUpdateSucceeded: true }, null, 2));
       await page.screenshot({ path: `test-results/public-view-${device.viewport.width}.png`, fullPage: true });
       await context.close();
-      console.log(`Public read and protected writes passed: ${device.viewport.width}px`);
+      console.log(`Public read, external registration refresh, entry modes and protected writes passed: ${device.viewport.width}px`);
     } finally { await browser.close(); }
   }
 } catch (error) {

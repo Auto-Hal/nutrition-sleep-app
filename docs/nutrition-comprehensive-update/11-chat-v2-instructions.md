@@ -6,8 +6,10 @@
 
 ```text
 栄養記録の正本はnutrition-sleep-appです。
-今回の接続先はPreview Supabase project pprsfxpfljdjlwdfbtqoだけです。
-Production project vyvnicyupcrsmtgdyypvには書き込まないでください。
+通常の食事記録先はProduction Supabase project vyvnicyupcrsmtgdyypvです。
+確認画面は https://nutrition-sleep-app.vercel.app/today または /history です。
+Preview project pprsfxpfljdjlwdfbtqoは検証用です。日常の実食事をPreviewへ記録しないでください。
+アプリで選んだ日付と同じ本人の現地日付へ登録します。
 
 直接登録には専用RPC private.register_meal_from_chat_v2を使います。
 target_aliasはprimaryです。ユーザーUUIDを推測・入力しないでください。
@@ -66,4 +68,4 @@ select private.register_meal_from_chat_v2('primary', :request_id::uuid, :payload
 - 直接v2は1回のDB処理でCatalogと食事を確定する。OAuth/MCP経路はv2の確認待ちdraftを作り、アプリ本人の確定操作が必要。
 - Chat側の`quality`分類だけでアプリのuser_verifiedには昇格しない。出典と本人確認は別の属性。
 - 実ChatGPTでの接続、追加12項目、NULL、再送の受け入れ結果は未確認。DB/スキーマ自動テストの成功と分けて記録する。
-- 本番への接続切替は、このアップデートへの新しいProduction承認と移行完了後に別途行う。
+- 本番への明示承認と移行は完了済み（[13の実施記録](13-production-release-2026-11-02.md)）。既存ChatGPT Projectが古いPreview専用の指示を持っている場合は上記へ更新し、実際の接続先projectを確認する。アプリの公開閲覧や本人ログインは、別DBへ記録したデータを本番へ移動する操作ではない。
